@@ -1,0 +1,4 @@
+# This directory contains local data storage
+# - models/: Saved factory models (JSON)
+# - scenarios/: Saved scenarios
+# - results/: Simulation results (Parquet)

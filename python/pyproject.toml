@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "factorysim"
+version = "1.0.0"
+description = "Desktop Digital Twin for Manufacturing - SimPy Simulation Engine"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "FactorySim Team"}
+]
+keywords = ["simulation", "manufacturing", "digital-twin", "simpy", "factory"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Manufacturing",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "simpy>=4.1.1",
+    "numpy>=1.26.0",
+    "pandas>=2.1.0",
+    "pyarrow>=14.0.0",
+    "openpyxl>=3.1.0",
+]
+
+[project.optional-dependencies]
+connectors = [
+    "paho-mqtt>=1.6.0",
+    "opcua>=0.98.0",
+    "requests>=2.31.0",
+]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+all = [
+    "factorysim[connectors,dev]",
+]
+
+[project.scripts]
+factorysim-server = "factorysim.api.server:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["factorysim*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "N"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "-v --cov=factorysim --cov-report=term-missing"

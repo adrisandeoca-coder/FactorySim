@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FactorySim Documentation</title>
+<style>
+  :root {
+    --sidebar-w: 260px;
+    --blue-600: #2563eb;
+    --blue-50: #eff6ff;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-500: #6b7280;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--gray-800);
+    line-height: 1.65;
+    background: #fff;
+  }
+
+  /* ---- Sidebar ---- */
+  nav.sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    width: var(--sidebar-w);
+    background: var(--gray-50);
+    border-right: 1px solid var(--gray-200);
+    overflow-y: auto;
+    padding: 20px 0;
+    z-index: 10;
+  }
+  nav.sidebar .logo {
+    padding: 0 20px 16px;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--blue-600);
+    border-bottom: 1px solid var(--gray-200);
+    margin-bottom: 12px;
+  }
+  nav.sidebar .logo small {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 400;
+    color: var(--gray-500);
+    margin-top: 2px;
+  }
+  nav.sidebar ul { list-style: none; }
+  nav.sidebar > ul > li > a {
+    display: block;
+    padding: 6px 20px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    text-decoration: none;
+    transition: background .15s;
+  }
+  nav.sidebar > ul > li > a:hover { background: var(--gray-100); }
+  nav.sidebar > ul > li > ul { margin-bottom: 6px; }
+  nav.sidebar > ul > li > ul > li > a {
+    display: block;
+    padding: 3px 20px 3px 34px;
+    font-size: 0.78rem;
+    color: var(--gray-500);
+    text-decoration: none;
+    transition: color .15s;
+  }
+  nav.sidebar > ul > li > ul > li > a:hover { color: var(--blue-600); }
+
+  /* ---- Main content ---- */
+  main {
+    margin-left: var(--sidebar-w);
+    max-width: 860px;
+    padding: 32px 40px 80px;
+  }
+
+  h1 { font-size: 1.8rem; margin-bottom: 8px; color: var(--gray-900); }
+  h2 { font-size: 1.4rem; margin: 40px 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--blue-600); color: var(--gray-900); }
+  h3 { font-size: 1.1rem; margin: 28px 0 8px; color: var(--gray-900); }
+  h4 { font-size: 0.95rem; margin: 20px 0 6px; color: var(--gray-700); }
+
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0 8px 24px; }
+  li { margin: 4px 0; }
+
+  code {
+    font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+    background: var(--gray-100);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.88em;
+  }
+  pre {
+    background: var(--gray-900);
+    color: #e5e7eb;
+    padding: 14px 18px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    margin: 12px 0;
+  }
+  pre code { background: none; padding: 0; color: inherit; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 0.88rem;
+  }
+  th, td {
+    padding: 8px 12px;
+    border: 1px solid var(--gray-200);
+    text-align: left;
+  }
+  th { background: var(--gray-50); font-weight: 600; }
+
+  .callout {
+    background: var(--blue-50);
+    border-left: 4px solid var(--blue-600);
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin: 16px 0;
+    font-size: 0.9rem;
+  }
+  .callout strong { color: var(--blue-600); }
+
+  .tag {
+    display: inline-block;
+    background: var(--gray-100);
+    border: 1px solid var(--gray-200);
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 0.78rem;
+    color: var(--gray-700);
+  }
+
+  kbd {
+    display: inline-block;
+    background: var(--gray-100);
+    border: 1px solid var(--gray-300);
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-size: 0.82rem;
+    font-family: inherit;
+    box-shadow: 0 1px 0 var(--gray-300);
+  }
+
+  @media (max-width: 800px) {
+    nav.sidebar { display: none; }
+    main { margin-left: 0; padding: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ SIDEBAR TOC ============ -->
+<nav class="sidebar">
+  <div class="logo">FactorySim Docs<small>v1.0.0 &middot; Desktop Digital Twin</small></div>
+  <ul>
+    <li><a href="#getting-started">Getting Started</a>
+      <ul>
+        <li><a href="#what-is-factorysim">What Is FactorySim?</a></li>
+        <li><a href="#first-model">Your First Model</a></li>
+        <li><a href="#running-simulation">Running a Simulation</a></li>
+      </ul>
+    </li>
+    <li><a href="#app-pages">App Pages</a>
+      <ul>
+        <li><a href="#page-dashboard">Dashboard</a></li>
+        <li><a href="#page-builder">Factory Builder</a></li>
+        <li><a href="#page-scenarios">Scenarios</a></li>
+        <li><a href="#page-orders">Orders</a></li>
+        <li><a href="#page-code">Code Editor</a></li>
+        <li><a href="#page-data">Data Sync</a></li>
+        <li><a href="#page-settings">Settings</a></li>
+      </ul>
+    </li>
+    <li><a href="#node-types">Node Types Reference</a>
+      <ul>
+        <li><a href="#node-station">Station</a></li>
+        <li><a href="#node-buffer">Buffer</a></li>
+        <li><a href="#node-source">Source</a></li>
+        <li><a href="#node-sink">Sink</a></li>
+        <li><a href="#node-conveyor">Conveyor</a></li>
+        <li><a href="#node-inspection">Inspection</a></li>
+        <li><a href="#node-operator">Operator</a></li>
+        <li><a href="#node-assembly">Assembly</a></li>
+        <li><a href="#node-disassembly">Disassembly</a></li>
+        <li><a href="#node-palletize">Palletize</a></li>
+        <li><a href="#node-depalletize">Depalletize</a></li>
+        <li><a href="#node-splitter">Splitter</a></li>
+        <li><a href="#node-merge">Merge</a></li>
+        <li><a href="#node-matchbuffer">Match Buffer</a></li>
+      </ul>
+    </li>
+    <li><a href="#products-routing">Products &amp; Routing</a></li>
+    <li><a href="#connections">Connections</a></li>
+    <li><a href="#resources">Resources</a></li>
+    <li><a href="#distributions">Distribution Types</a></li>
+    <li><a href="#sim-settings">Simulation Settings</a></li>
+    <li><a href="#oee-kpis">OEE &amp; KPIs</a></li>
+    <li><a href="#scenarios">Scenarios</a></li>
+    <li><a href="#excel-import">Excel Import / Export</a></li>
+    <li><a href="#shortcuts">Keyboard Shortcuts</a></li>
+    <li><a href="#templates">Built-in Templates</a></li>
+    <li><a href="#roles">User Roles</a></li>
+  </ul>
+</nav>
+
+<!-- ============ MAIN CONTENT ============ -->
+<main>
+
+<!-- ===================== GETTING STARTED ===================== -->
+<h1>FactorySim Documentation</h1>
+<p>Complete reference for the FactorySim desktop digital-twin platform for manufacturing simulation.</p>
+
+<h2 id="getting-started">Getting Started</h2>
+
+<h3 id="what-is-factorysim">What Is FactorySim?</h3>
+<p>
+  FactorySim is a desktop application for building discrete-event simulation models of manufacturing systems.
+  It combines a visual drag-and-drop factory builder with a SimPy-based simulation engine, letting you model
+  production lines, job shops, assembly cells, and other manufacturing layouts without writing code.
+</p>
+<p>Key capabilities:</p>
+<ul>
+  <li>Visual factory layout editor with 14 node types</li>
+  <li>Discrete-event simulation powered by SimPy 4.1 (Python 3.11+)</li>
+  <li>OEE, throughput, cycle time, WIP, and utilization KPIs</li>
+  <li>What-if scenario analysis with side-by-side comparison</li>
+  <li>Multi-product routing with per-product cycle time overrides</li>
+  <li>Export models as standalone Python/SimPy scripts</li>
+  <li>Excel/CSV import and export for batch parameter editing</li>
+  <li>Run artifacts (screenshots, KPIs, event logs) auto-saved per run</li>
+</ul>
+
+<h3 id="first-model">Your First Model</h3>
+<ol>
+  <li>Open the <strong>Factory Builder</strong> page from the sidebar.</li>
+  <li>Drag a <strong>Source</strong> onto the canvas &mdash; this generates parts.</li>
+  <li>Drag a <strong>Station</strong> &mdash; this processes parts. Set its cycle time.</li>
+  <li>Drag a <strong>Sink</strong> &mdash; this collects finished parts.</li>
+  <li>Connect them: click a node&rsquo;s output handle and drag to the next node&rsquo;s input handle.</li>
+  <li>Go to <strong>Orders</strong> &gt; <strong>Products</strong> to define at least one product with a routing through your station.</li>
+  <li>Press <kbd>Ctrl</kbd>+<kbd>S</kbd> to save your model.</li>
+</ol>
+
+<h3 id="running-simulation">Running a Simulation</h3>
+<ol>
+  <li>Navigate to the <strong>Dashboard</strong>.</li>
+  <li>Set the simulation duration (e.g., 8 hours for a shift).</li>
+  <li>Click <strong>Run Simulation</strong>. Progress appears in the header bar.</li>
+  <li>When complete, KPI cards and charts update automatically.</li>
+  <li>Use the widget configurator to choose which charts to display.</li>
+  <li>Download event logs or screenshots from the dashboard toolbar.</li>
+</ol>
+
+<div class="callout">
+  <strong>Tip:</strong> Use multiple replications (Settings &gt; Simulation Defaults &gt; Replications) with different random seeds to get statistically meaningful results. Confidence intervals are shown when replications &gt; 1.
+</div>
+
+<!-- ===================== APP PAGES ===================== -->
+<h2 id="app-pages">App Pages</h2>
+
+<h3 id="page-dashboard">Dashboard</h3>
+<p>
+  The main results view after running a simulation. Displays KPI summary cards (OEE, throughput, cycle time, WIP),
+  interactive charts (utilization bar chart, throughput-over-time, WIP trend, bottleneck heatmap, OEE breakdown),
+  and a station data table. Use the <strong>widget configurator</strong> to toggle, reorder, and resize widgets.
+</p>
+<p>The dashboard auto-caches a screenshot 2 seconds after results arrive. Run artifacts (screenshot, KPIs JSON, event log) are saved to the <code>runs/</code> folder in your user data directory.</p>
+
+<h3 id="page-builder">Factory Builder</h3>
+<p>
+  A visual, drag-and-drop editor for constructing your factory model. The left panel lists all 14 available
+  node types. Drag a node onto the canvas, then configure its parameters in the right-side property panel.
+  Connect nodes by dragging from an output handle to an input handle.
+</p>
+<p>Features:</p>
+<ul>
+  <li>Pan (click &amp; drag on canvas) and zoom (<kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>-</kbd>)</li>
+  <li>Select a node and press <kbd>Delete</kbd> to remove it</li>
+  <li>Click a connection to select it, then <kbd>Delete</kbd> to remove</li>
+  <li>Start from a template via the template selector button</li>
+  <li>Undo / Redo with <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></li>
+</ul>
+
+<h3 id="page-scenarios">Scenarios</h3>
+<p>
+  Run what-if analyses by overriding model parameters without changing the base model.
+</p>
+<ul>
+  <li><strong>Quick Scenarios</strong> &mdash; 10 pre-defined what-if templates (e.g., &ldquo;Double buffer capacity&rdquo;, &ldquo;Add parallel station&rdquo;, &ldquo;Reduce cycle time by 20%&rdquo;). One-click launch, results compared to baseline.</li>
+  <li><strong>Custom Scenarios</strong> &mdash; pick any entity (station, buffer, source, etc.) and override specific parameters. Save the scenario for later re-use.</li>
+  <li><strong>Comparison</strong> &mdash; select two or more scenarios to view side-by-side KPI differences with percentage changes.</li>
+</ul>
+
+<h3 id="page-orders">Orders</h3>
+<p>Three sub-tabs:</p>
+<ul>
+  <li><strong>Product Manager</strong> &mdash; define products, set arrival rates, priority, and routing sequences through your factory nodes.</li>
+  <li><strong>Order Manager</strong> &mdash; create production orders specifying product, quantity, and due date. Sources in &ldquo;orders&rdquo; feed mode pull from this queue.</li>
+  <li><strong>Delivery Predictions</strong> &mdash; view estimated completion dates based on the latest simulation results.</li>
+</ul>
+
+<h3 id="page-code">Code Editor</h3>
+<p>
+  Exports your current factory model as a standalone Python script using SimPy. The generated code is fully
+  runnable outside FactorySim &mdash; useful for advanced customization, CI/CD pipelines, or sharing with
+  colleagues who don&rsquo;t have FactorySim installed.
+</p>
+<p>Click <strong>Export</strong> to generate, then <strong>Copy</strong> or <strong>Save</strong> the script.</p>
+
+<h3 id="page-data">Data Sync</h3>
+<p>
+  Import model parameters from external files or configure live data connectors.
+</p>
+<ul>
+  <li><strong>CSV Import</strong> &mdash; upload a CSV file with station/buffer parameters and map columns.</li>
+  <li><strong>Excel Import</strong> &mdash; upload an Excel workbook. Supports sheet selection and column mapping.</li>
+  <li><strong>Connectors</strong> (extensible) &mdash; placeholder for MES, MQTT, OPC-UA integration. Configure connector type and settings.</li>
+</ul>
+
+<h3 id="page-settings">Settings</h3>
+<p>
+  User profile, simulation defaults (duration, replications, seed), appearance (theme, language),
+  data &amp; storage management (export data, clear cache), and the role permissions matrix.
+</p>
+
+<!-- ===================== NODE TYPES ===================== -->
+<h2 id="node-types">Node Types Reference</h2>
+<p>FactorySim provides 14 node types. Drag them from the left panel in the Factory Builder.</p>
+
+<h3 id="node-station">Station</h3>
+<p>The primary processing node. Parts arrive, are processed for a cycle time, and exit.</p>
+<table>
+  <tr><th>Parameter</th><th>Description</th><th>Default</th></tr>
+  <tr><td>Cycle Time</td><td>Time to process one part. Configurable distribution (constant, normal, exponential, triangular, uniform, lognormal, weibull).</td><td>60s constant</td></tr>
+  <tr><td>Setup Time</td><td>Optional time for changeover between batches or products. Also a distribution.</td><td>None</td></tr>
+  <tr><td>MTBF</td><td>Mean Time Between Failures (hours). Triggers random breakdowns.</td><td>None (no failures)</td></tr>
+  <tr><td>MTTR</td><td>Mean Time To Repair (hours). Duration of each breakdown.</td><td>None</td></tr>
+  <tr><td>Scrap Rate</td><td>Percentage of parts scrapped after processing (0&ndash;100%).</td><td>0%</td></tr>
+  <tr><td>Batch Size</td><td>Number of parts processed together before releasing.</td><td>1</td></tr>
+  <tr><td>Shift Schedule</td><td>Define shifts with start/end hours and active days. Station is off-shift outside these windows.</td><td>24/7</td></tr>
+  <tr><td>Per-Product Cycle Times</td><td>Override the default cycle time for specific products.</td><td>Uses default</td></tr>
+</table>
+
+<h3 id="node-buffer">Buffer</h3>
+<p>A queue that holds parts between processing steps. Provides decoupling and absorbs variability.</p>
+<table>
+  <tr><th>Parameter</th><th>Description</th><th>Default</th></tr>
+  <tr><td>Capacity</td><td>Maximum number of parts the buffer can hold.</td><td>10</td></tr>
+  <tr><td>Queue Rule</td><td><code>FIFO</code> (first-in-first-out), <code>LIFO</code> (last-in-first-out), or <code>PRIORITY</code> (by product priority).</td><td>FIFO</td></tr>
+</table>
+
+<h3 id="node-source">Source</h3>
+<p>Generates parts and feeds them into the factory. Every model needs at least one source.</p>
+<table>
+  <tr><th>Parameter</th><th>Description</th><th>Default</th></tr>
+  <tr><td>Feed Mode</td><td><code>interval</code> &mdash; generates parts at a fixed rate. <code>orders</code> &mdash; pulls from the order queue.</td><td>interval</td></tr>
+  <tr><td>Arrival Rate</td><td>Seconds between consecutive arrivals (interval mode only).</td><td>60s</td></tr>
+  <tr><td>Product Filter</td><td>Optional: restrict this source to spawn only a specific product type.</td><td>All products</td></tr>
+  <tr><td>Product Batch Size</td><td>Consecutive parts of the same product type before switching to the next. <code>1</code> = round-robin.</td><td>1</td></tr>
+</table>
+
+<h3 id="node-sink">Sink</h3>
+<p>Exit point for finished parts. Records throughput and end-to-end cycle time. No configurable parameters.</p>
+
+<h3 id="node-conveyor">Conveyor</h3>
+<p>Transports parts between nodes with travel time based on length and speed.</p>
+<table>
+  <tr><th>Parameter</th><th>Description</th><th>Default</th></tr>
+  <tr><td>Length</td><td>Conveyor length in meters.</td><td>10 m</td></tr>
+  <tr><td>Speed</td><td>Travel speed in meters per second.</td><td>1 m/s</td></tr>
+  <tr><td>Capacity</td><td>Maximum number of items on the conveyor simultaneously.</td><td>10</td></tr>
+</table>
+
+<h3 id="node-inspection">Inspection</h3>
+<p>Quality check station. Parts are inspected; those that fail are routed out as defects.</p>
+<table>
+  <tr><th>Parameter</th><th>Description</th><th>Default</th></tr>
+  <tr><td>Inspection Time</td><td>Seconds per inspection.</td><td>30s</td></tr>
+  <tr><td>Defect Rate</td><td>Percentage of parts found defective (0&ndash;100%).</td><td>5%</td></tr>
+  <tr><td>Inspection Type</td><td><code>visual</code>, <code>automated</code>, or <code>sampling</code>.</td><td>visual</td></tr>
+</table>
+
+<h3 id="node-operator">Operator</h3>
+<p>A shared human resource that can be assigned to stations requiring manual labor.</p>
+<table>
+  <tr><th>Parameter</th><th>Description</th><th>Default</th></tr>
+  <tr><td>Count</td><td>Number of operators in this pool.</td><td>1</td></tr>
+  <tr><td>Efficiency</td><td>Operator efficiency as a percentage (1&ndash;100%). Scales effective cycle time.</td><td>100%</td></tr>
+  <tr><td>Skill</td><td>Skill label (e.g., &ldquo;General&rdquo;, &ldquo;Welding&rdquo;, &ldquo;Assembly&rdquo;). Stations can require specific skills.</td><td>General</td></tr>
+</table>
+
+<h3 id="node-assembly">Assembly</h3>
+<p>Combines multiple input parts into one output. Waits until all required inputs are available.</p>
+<table>
+  <tr><th>Parameter</th><th>Description</th><th>Default</th></tr>
+  <tr><td>Cycle Time</td><td>Seconds to perform assembly.</td><td>60s</td></tr>
+  <tr><td>Input Parts</td><td>Number of parts consumed per assembly (2&ndash;10). In simple mode, all inputs are generic.</td><td>2</td></tr>
+  <tr><td>Per-Product Inputs</td><td>Advanced mode: specify exactly which products and quantities are required.</td><td>Simple mode</td></tr>
+</table>
+
+<h3 id="node-disassembly">Disassembly</h3>
+<p>Breaks one input part into multiple output parts (reverse of assembly).</p>
+<table>
+  <tr><th>Parameter</th><th>Description</th><th>Default</th></tr>
+  <tr><td>Cycle Time</td><td>Seconds to disassemble.</td><td>60s</td></tr>
+  <tr><td>Output Parts</td><td>List of output products with quantities produced per disassembly.</td><td>&mdash;</td></tr>
+</table>
+
+<h3 id="node-palletize">Palletize</h3>
+<p>Groups individual parts onto a pallet. The pallet continues downstream as a single entity.</p>
+<table>
+  <tr><th>Parameter</th><th>Description</th><th>Default</th></tr>
+  <tr><td>Default Pallet Size</td><td>Number of items per pallet.</td><td>10</td></tr>
+  <tr><td>Cycle Time</td><td>Seconds to palletize one batch.</td><td>30s</td></tr>
+  <tr><td>Per-Product Pallet Sizes</td><td>Override pallet size for specific product types.</td><td>Uses default</td></tr>
+</table>
+
+<h3 id="node-depalletize">Depalletize</h3>
+<p>Unloads all items from a pallet, releasing them individually downstream.</p>
+<table>
+  <tr><th>Parameter</th><th>Description</th><th>Default</th></tr>
+  <tr><td>Cycle Time per Item</td><td>Seconds to unload each item from the pallet.</td><td>5s</td></tr>
+</table>
+
+<h3 id="node-splitter">Splitter</h3>
+<p>Routes incoming parts to one of 2&ndash;5 outputs based on a split strategy.</p>
+<table>
+  <tr><th>Parameter</th><th>Description</th><th>Default</th></tr>
+  <tr><td>Outputs</td><td>Number of output ports (2&ndash;5).</td><td>2</td></tr>
+  <tr><td>Split Type</td><td><code>equal</code> &mdash; round-robin. <code>percentage</code> &mdash; weighted probability. <code>conditional</code> &mdash; logic-based. <code>product-based</code> &mdash; route by product type.</td><td>equal</td></tr>
+  <tr><td>Product Routing</td><td>For product-based mode: map each product to a specific output port.</td><td>&mdash;</td></tr>
+</table>
+
+<h3 id="node-merge">Merge</h3>
+<p>Combines 2&ndash;5 input streams into a single output stream.</p>
+<table>
+  <tr><th>Parameter</th><th>Description</th><th>Default</th></tr>
+  <tr><td>Inputs</td><td>Number of input ports (2&ndash;5).</td><td>2</td></tr>
+  <tr><td>Merge Type</td><td><code>fifo</code> &mdash; first available. <code>priority</code> &mdash; by product priority. <code>alternating</code> &mdash; round-robin between inputs.</td><td>fifo</td></tr>
+</table>
+
+<h3 id="node-matchbuffer">Match Buffer</h3>
+<p>Holds parts until a complete set of required components is available, then releases them together. Useful for kitting or order-based assembly.</p>
+<table>
+  <tr><th>Parameter</th><th>Description</th><th>Default</th></tr>
+  <tr><td>Capacity</td><td>Maximum parts the buffer can hold while waiting for matches.</td><td>100</td></tr>
+  <tr><td>Match Key</td><td><code>order</code> &mdash; match by order ID. <code>batch</code> &mdash; match by batch ID.</td><td>order</td></tr>
+  <tr><td>Required Parts</td><td>List of product-quantity pairs that constitute a complete set.</td><td>&mdash;</td></tr>
+  <tr><td>Timeout</td><td>Optional maximum wait time (seconds). Incomplete sets are released or scrapped after timeout.</td><td>None</td></tr>
+</table>
+
+<!-- ===================== PRODUCTS & ROUTING ===================== -->
+<h2 id="products-routing">Products &amp; Routing</h2>
+<p>
+  Products are defined in the <strong>Orders &gt; Product Manager</strong>. Each product has:
+</p>
+<table>
+  <tr><th>Field</th><th>Description</th></tr>
+  <tr><td>Name</td><td>Display name for the product.</td></tr>
+  <tr><td>Routing</td><td>Ordered list of station/node IDs the product visits. The simulation engine automatically creates arrival buffers for the first station in each routing.</td></tr>
+  <tr><td>Arrival Rate</td><td>Seconds between arrivals (used by sources in interval mode).</td></tr>
+  <tr><td>Priority</td><td>Numeric priority (lower = higher priority). Used by PRIORITY queue buffers and priority merge nodes.</td></tr>
+</table>
+<div class="callout">
+  <strong>Routing tip:</strong> A product&rsquo;s routing defines the <em>logical</em> sequence of processing steps. The physical connections on the canvas define which nodes can transfer parts. Both must align for parts to flow correctly.
+</div>
+
+<!-- ===================== CONNECTIONS ===================== -->
+<h2 id="connections">Connections</h2>
+<p>
+  Connections define the material flow between nodes. Drag from one node&rsquo;s output handle to another&rsquo;s input handle in the Factory Builder.
+</p>
+<table>
+  <tr><th>Property</th><th>Description</th></tr>
+  <tr><td>Source</td><td>The upstream node.</td></tr>
+  <tr><td>Target</td><td>The downstream node.</td></tr>
+  <tr><td>Probability</td><td>Optional (0&ndash;1). When a node has multiple outgoing connections, probability values determine the routing split. If not set, parts are distributed equally. Must sum to 1 across all outputs from a node.</td></tr>
+</table>
+
+<!-- ===================== RESOURCES ===================== -->
+<h2 id="resources">Resources</h2>
+<p>
+  Resources represent shared capacity that stations compete for. Defined in the model and available in the Factory Builder.
+</p>
+<table>
+  <tr><th>Field</th><th>Description</th></tr>
+  <tr><td>Name</td><td>Resource pool name.</td></tr>
+  <tr><td>Type</td><td><code>operator</code>, <code>machine</code>, or <code>tool</code>.</td></tr>
+  <tr><td>Capacity</td><td>Number of units available in the pool.</td></tr>
+  <tr><td>Shifts</td><td>Optional shift schedules (name, start hour, end hour, active days).</td></tr>
+  <tr><td>Skills</td><td>Optional skill tags. Stations can require specific skills.</td></tr>
+</table>
+
+<!-- ===================== DISTRIBUTIONS ===================== -->
+<h2 id="distributions">Distribution Types</h2>
+<p>
+  Cycle times, setup times, and other stochastic parameters can use any of these distributions:
+</p>
+<table>
+  <tr><th>Distribution</th><th>Parameters</th><th>Use Case</th></tr>
+  <tr><td><code>constant</code></td><td><code>value</code></td><td>Fixed, deterministic times (e.g., automated machines).</td></tr>
+  <tr><td><code>normal</code></td><td><code>mean</code>, <code>std</code></td><td>Symmetric variation around a mean (e.g., manual assembly).</td></tr>
+  <tr><td><code>exponential</code></td><td><code>mean</code></td><td>Memoryless arrivals or service times (e.g., random arrivals).</td></tr>
+  <tr><td><code>triangular</code></td><td><code>min</code>, <code>mode</code>, <code>max</code></td><td>Known best/worst/most-likely estimates.</td></tr>
+  <tr><td><code>uniform</code></td><td><code>min</code>, <code>max</code></td><td>Equal probability across a range.</td></tr>
+  <tr><td><code>lognormal</code></td><td><code>mean</code>, <code>sigma</code></td><td>Right-skewed times (e.g., repair durations, complex manual tasks).</td></tr>
+  <tr><td><code>weibull</code></td><td><code>shape</code>, <code>scale</code></td><td>Reliability modeling (e.g., time-to-failure with aging effects).</td></tr>
+  <tr><td><code>empirical</code></td><td><code>values</code> (array)</td><td>Sampled from recorded data points.</td></tr>
+</table>
+
+<!-- ===================== SIMULATION SETTINGS ===================== -->
+<h2 id="sim-settings">Simulation Settings</h2>
+<p>Configure these before running (Dashboard toolbar or Settings &gt; Simulation Defaults):</p>
+<table>
+  <tr><th>Setting</th><th>Description</th><th>Default</th></tr>
+  <tr><td>Duration</td><td>Total simulation time. Options: 1 hour, 4 hours, 8 hours (shift), 24 hours, 1 week.</td><td>8 hours</td></tr>
+  <tr><td>Warmup Period</td><td>Initial time excluded from statistics to let the system reach steady state.</td><td>0</td></tr>
+  <tr><td>Random Seed</td><td>Fix the seed for reproducible results. Leave blank for random.</td><td>Random</td></tr>
+  <tr><td>Replications</td><td>Number of independent runs (1&ndash;100). More replications = narrower confidence intervals.</td><td>1</td></tr>
+  <tr><td>Confidence Level</td><td>Confidence level for interval estimation when replications &gt; 1.</td><td>95%</td></tr>
+  <tr><td>Trace Mode</td><td>Enable detailed event logging (increases output size).</td><td>Off</td></tr>
+</table>
+
+<!-- ===================== OEE & KPIs ===================== -->
+<h2 id="oee-kpis">OEE &amp; KPIs</h2>
+
+<h3>Overall Equipment Effectiveness (OEE)</h3>
+<p>OEE = Availability &times; Performance &times; Quality</p>
+<table>
+  <tr><th>Component</th><th>Formula</th><th>Meaning</th></tr>
+  <tr><td>Availability (A)</td><td>Average of each station&rsquo;s uptime / total time</td><td>How much time was the equipment available to run?</td></tr>
+  <tr><td>Performance (P)</td><td>Average of each station&rsquo;s (ideal CT &times; count) / (processing time + setup time)</td><td>How fast did it run vs. ideal speed? Setup is counted as a speed loss.</td></tr>
+  <tr><td>Quality (Q)</td><td>Line-level throughput / (throughput + scrapped)</td><td>What fraction of output was good?</td></tr>
+</table>
+<div class="callout">
+  <strong>Note:</strong> Station-level OEE is computed in the engine (<code>station.py:get_oee()</code>). The overall OEE is aggregated in <code>simulation.py:_calculate_oee()</code> by averaging station A and P, and using line-level Q.
+</div>
+
+<h3>Throughput</h3>
+<p>Total parts completed during the simulation, broken down by product and by hour. The <em>rate per hour</em> is derived from total / duration.</p>
+
+<h3>Cycle Time</h3>
+<p>End-to-end time from when a part enters the system (source) to when it exits (sink). Reported as mean, standard deviation, min, and max, both overall and per product.</p>
+
+<h3>Work-In-Progress (WIP)</h3>
+<p>Total inventory in the system at any point. Reported as current total, per-buffer breakdown, and a time series chart showing WIP over the simulation.</p>
+
+<h3>Utilization States</h3>
+<p>Each station&rsquo;s time is broken down into these states (percentages summing to 100%):</p>
+<table>
+  <tr><th>State</th><th>Meaning</th></tr>
+  <tr><td><strong>Busy</strong></td><td>Actively processing a part.</td></tr>
+  <tr><td><strong>Idle</strong></td><td>Available but waiting for a part to arrive.</td></tr>
+  <tr><td><strong>Setup</strong></td><td>Performing a changeover/setup between batches or products.</td></tr>
+  <tr><td><strong>Blocked</strong></td><td>Finished processing but cannot release the part because the downstream buffer is full.</td></tr>
+  <tr><td><strong>Starved</strong></td><td>Ready to process but no parts available in the input buffer.</td></tr>
+  <tr><td><strong>Failed</strong></td><td>Equipment is broken down (MTBF/MTTR).</td></tr>
+  <tr><td><strong>Off-Shift</strong></td><td>Outside the configured shift schedule.</td></tr>
+</table>
+
+<!-- ===================== SCENARIOS ===================== -->
+<h2 id="scenarios">Scenarios</h2>
+
+<h3>Quick Scenarios</h3>
+<p>Pre-defined what-if templates that apply common changes with one click. Examples:</p>
+<ul>
+  <li>Double all buffer capacities</li>
+  <li>Reduce cycle times by 20%</li>
+  <li>Add a parallel station at the bottleneck</li>
+  <li>Increase arrival rate by 50%</li>
+  <li>Add a second shift</li>
+</ul>
+<p>Each quick scenario runs the simulation with the override and compares results to the baseline.</p>
+
+<h3>Custom Scenarios</h3>
+<ol>
+  <li>Click <strong>New Custom Scenario</strong> on the Scenarios page.</li>
+  <li>Select an entity type (station, buffer, source, conveyor, inspection, assembly, splitter, merge, disassembly, palletize, depalletize, match buffer).</li>
+  <li>Pick the specific entity and the parameter to override.</li>
+  <li>Set the new value. Repeat for multiple overrides.</li>
+  <li>Name and save the scenario.</li>
+  <li>Run it &mdash; results are stored alongside the scenario.</li>
+</ol>
+
+<h3>Comparing Scenarios</h3>
+<p>
+  Select two or more scenarios from the list and click <strong>Compare</strong>. A side-by-side view shows
+  OEE, throughput, cycle time, and WIP differences with percentage changes from the first (baseline) scenario.
+</p>
+
+<!-- ===================== EXCEL IMPORT/EXPORT ===================== -->
+<h2 id="excel-import">Excel Import / Export</h2>
+
+<h3>Importing</h3>
+<p>Go to <strong>Data Sync</strong> and choose <strong>Import Excel</strong> or <strong>Import CSV</strong>.</p>
+<ul>
+  <li>Select the file and sheet (for Excel).</li>
+  <li>Map columns to FactorySim parameters.</li>
+  <li>Preview the import and confirm.</li>
+  <li>Errors and warnings are shown per row.</li>
+</ul>
+
+<h3>Exporting</h3>
+<p>Use <strong>Dashboard &gt; Export Report</strong> to save simulation results as CSV or JSON. The CSV includes:</p>
+<ul>
+  <li>Summary section: OEE, throughput, cycle time, WIP</li>
+  <li>Station utilization breakdown</li>
+  <li>Hourly throughput time series</li>
+</ul>
+
+<h3>Round-Trip Workflow</h3>
+<ol>
+  <li>Export your current model parameters to Excel.</li>
+  <li>Edit values in the spreadsheet (batch update cycle times, capacities, etc.).</li>
+  <li>Re-import the modified spreadsheet to update the model.</li>
+</ol>
+
+<!-- ===================== KEYBOARD SHORTCUTS ===================== -->
+<h2 id="shortcuts">Keyboard Shortcuts</h2>
+<table>
+  <tr><th>Shortcut</th><th>Action</th></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>N</kbd></td><td>New model</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save model</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Redo</td></tr>
+  <tr><td><kbd>Delete</kbd></td><td>Remove selected node or connection</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>+</kbd></td><td>Zoom in</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>-</kbd></td><td>Zoom out</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>Reset zoom</td></tr>
+  <tr><td><kbd>F11</kbd></td><td>Toggle fullscreen</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></td><td>Developer tools</td></tr>
+</table>
+
+<!-- ===================== BUILT-IN TEMPLATES ===================== -->
+<h2 id="templates">Built-in Templates</h2>
+<p>Start quickly by loading a pre-built template from the Factory Builder&rsquo;s template selector.</p>
+
+<table>
+  <tr><th>Template</th><th>Category</th><th>Description</th></tr>
+  <tr><td><strong>Flow Line</strong></td><td>Manufacturing</td><td>Linear production line with 3 sequential stations and 2 FIFO buffers. Normal-distributed cycle times (55&ndash;65s). Good starting point for serial production.</td></tr>
+  <tr><td><strong>Job Shop</strong></td><td>Manufacturing</td><td>5 stations (Milling &times;2, Turning &times;2, Assembly) with 3 buffers. Flexible routing for high-mix, low-volume production.</td></tr>
+  <tr><td><strong>Batch Processing</strong></td><td>Process</td><td>4 stations (Mixing, Heating, Cooling, Packaging) with batch size 100. Includes setup times. Large-capacity buffers (500&ndash;1000).</td></tr>
+  <tr><td><strong>Assembly Cell</strong></td><td>Assembly</td><td>4 stations (Sub-Assembly A &amp; B, Final Assembly, Testing with 2% scrap). 3 buffers for parts staging. Multi-product environment.</td></tr>
+  <tr><td><strong>U-Cell</strong></td><td>Lean</td><td>6 stations in U-shaped layout. All constant 25s cycle times. Designed for studying flexible operator allocation in lean manufacturing.</td></tr>
+</table>
+
+<!-- ===================== USER ROLES ===================== -->
+<h2 id="roles">User Roles</h2>
+<p>FactorySim supports four roles with increasing levels of access:</p>
+<table>
+  <tr><th>Feature</th><th>Operator</th><th>Analyst</th><th>Engineer</th><th>Developer</th></tr>
+  <tr><td>View Dashboards</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td></tr>
+  <tr><td>Run Guided Scenarios</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td></tr>
+  <tr><td>Build Custom Scenarios</td><td>&mdash;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td></tr>
+  <tr><td>Edit Model Parameters</td><td>&mdash;</td><td>&mdash;</td><td>&#10003;</td><td>&#10003;</td></tr>
+  <tr><td>Access Code Editor</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&#10003;</td></tr>
+  <tr><td>Configure Data Connectors</td><td>&mdash;</td><td>&mdash;</td><td>&#10003;</td><td>&#10003;</td></tr>
+</table>
+<p>Change your role in <strong>Settings &gt; User Profile</strong> (read-only display; role is set at account creation).</p>
+
+<hr style="margin-top:48px">
+<p style="font-size:0.8rem;color:var(--gray-500);text-align:center;">
+  FactorySim v1.0.0 &middot; Build 2026.02.13 &middot; Engine: SimPy 4.1 / Python 3.11+ &middot; UI: Electron + React + TypeScript
+</p>
+
+</main>
+</body>
+</html>

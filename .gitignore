@@ -1,0 +1,76 @@
+# Dependencies
+node_modules/
+python/__pycache__/
+python/**/__pycache__/
+python/*.egg-info/
+python/.eggs/
+*.pyc
+*.pyo
+*.pyd
+
+# Build outputs
+dist/
+release/
+out/
+build/
+
+# IDE and editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+
+# Python virtual environment
+venv/
+.venv/
+env/
+.python-version
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+.nyc_output/
+.pytest_cache/
+htmlcov/
+python/tests/comprehensive_results.json
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Simulation results (large files)
+data/results/*.parquet
+data/results/*.csv
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Electron
+*.asar
+
+# TypeScript
+*.tsbuildinfo

@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#1D4ED8;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="node" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#E0E7FF;stop-opacity:1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect x="16" y="16" width="480" height="480" rx="96" ry="96" fill="url(#bg)"/>
+
+  <!-- Flow arrows (connections between nodes) -->
+  <g stroke="#93C5FD" stroke-width="6" fill="none" stroke-linecap="round">
+    <!-- Source → Station 1 -->
+    <line x1="158" y1="170" x2="210" y2="170"/>
+    <polygon points="207,162 221,170 207,178" fill="#93C5FD" stroke="none"/>
+    <!-- Station 1 → Buffer -->
+    <line x1="300" y1="170" x2="340" y2="256"/>
+    <polygon points="333,250 346,260 337,265" fill="#93C5FD" stroke="none"/>
+    <!-- Buffer → Station 2 -->
+    <line x1="390" y1="256" x2="430" y2="256" stroke-dasharray="8,6"/>
+    <polygon points="427,248 441,256 427,264" fill="#93C5FD" stroke="none"/>
+    <!-- Station 2 → Sink (bottom) -->
+    <line x1="430" y1="290" x2="370" y2="355"/>
+    <polygon points="375,348 366,360 363,348" fill="#93C5FD" stroke="none"/>
+    <!-- Source → Branch bottom -->
+    <line x1="130" y1="195" x2="130" y2="355"/>
+    <line x1="130" y1="355" x2="220" y2="355"/>
+    <polygon points="217,347 231,355 217,363" fill="#93C5FD" stroke="none"/>
+  </g>
+
+  <!-- Source node (circle) -->
+  <circle cx="130" cy="170" r="32" fill="url(#node)" stroke="#3B82F6" stroke-width="3"/>
+  <text x="130" y="176" text-anchor="middle" font-family="Inter,sans-serif" font-size="22" font-weight="700" fill="#1D4ED8">S</text>
+
+  <!-- Station 1 (rounded rect) -->
+  <rect x="222" y="140" width="76" height="60" rx="12" fill="url(#node)" stroke="#3B82F6" stroke-width="3"/>
+  <text x="260" y="178" text-anchor="middle" font-family="Inter,sans-serif" font-size="18" font-weight="600" fill="#1D4ED8">ST1</text>
+
+  <!-- Buffer (diamond) -->
+  <polygon points="365,222 400,256 365,290 330,256" fill="url(#node)" stroke="#3B82F6" stroke-width="3"/>
+  <text x="365" y="262" text-anchor="middle" font-family="Inter,sans-serif" font-size="16" font-weight="600" fill="#1D4ED8">B</text>
+
+  <!-- Station 2 (rounded rect, right) -->
+  <rect x="412" y="222" width="76" height="68" rx="12" fill="url(#node)" stroke="#3B82F6" stroke-width="3"/>
+  <text x="450" y="263" text-anchor="middle" font-family="Inter,sans-serif" font-size="18" font-weight="600" fill="#1D4ED8">ST2</text>
+
+  <!-- Station 3 (rounded rect, bottom branch) -->
+  <rect x="222" y="325" width="76" height="60" rx="12" fill="url(#node)" stroke="#3B82F6" stroke-width="3"/>
+  <text x="260" y="363" text-anchor="middle" font-family="Inter,sans-serif" font-size="18" font-weight="600" fill="#1D4ED8">ST3</text>
+
+  <!-- Sink (circle, bottom right) -->
+  <circle cx="350" cy="370" r="30" fill="url(#node)" stroke="#3B82F6" stroke-width="3"/>
+  <text x="350" y="376" text-anchor="middle" font-family="Inter,sans-serif" font-size="20" font-weight="700" fill="#1D4ED8">K</text>
+</svg>

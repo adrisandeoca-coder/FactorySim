@@ -1,0 +1,66 @@
+{
+  "id": "template-flow-line",
+  "name": "Simple Flow Line",
+  "description": "Three-station serial flow line with buffers",
+  "category": "flow",
+  "stations": [
+    {
+      "id": "station-1",
+      "name": "Cutting",
+      "position": { "x": 100, "y": 200 },
+      "cycleTime": { "type": "normal", "parameters": { "mean": 45, "std": 5 } },
+      "capacity": 1,
+      "mtbf": 7200,
+      "mttr": 600
+    },
+    {
+      "id": "station-2",
+      "name": "Assembly",
+      "position": { "x": 350, "y": 200 },
+      "cycleTime": { "type": "normal", "parameters": { "mean": 60, "std": 8 } },
+      "capacity": 1,
+      "mtbf": 5400,
+      "mttr": 900
+    },
+    {
+      "id": "station-3",
+      "name": "Packaging",
+      "position": { "x": 600, "y": 200 },
+      "cycleTime": { "type": "normal", "parameters": { "mean": 30, "std": 3 } },
+      "capacity": 1,
+      "mtbf": 10800,
+      "mttr": 300
+    }
+  ],
+  "buffers": [
+    {
+      "id": "buffer-1",
+      "name": "Buffer 1",
+      "position": { "x": 225, "y": 200 },
+      "capacity": 15,
+      "queueRule": "FIFO"
+    },
+    {
+      "id": "buffer-2",
+      "name": "Buffer 2",
+      "position": { "x": 475, "y": 200 },
+      "capacity": 15,
+      "queueRule": "FIFO"
+    }
+  ],
+  "connections": [
+    { "id": "c1", "sourceId": "station-1", "targetId": "buffer-1" },
+    { "id": "c2", "sourceId": "buffer-1", "targetId": "station-2" },
+    { "id": "c3", "sourceId": "station-2", "targetId": "buffer-2" },
+    { "id": "c4", "sourceId": "buffer-2", "targetId": "station-3" }
+  ],
+  "products": [
+    {
+      "id": "product-1",
+      "name": "Standard Product",
+      "routing": ["station-1", "station-2", "station-3"],
+      "arrivalRate": 90,
+      "priority": 1
+    }
+  ]
+}
