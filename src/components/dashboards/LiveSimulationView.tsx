@@ -16,7 +16,7 @@ import { LiveStationNode } from '../factory-builder/nodes/LiveStationNode';
 import { LiveBufferNode } from '../factory-builder/nodes/LiveBufferNode';
 import { LiveGenericNode } from '../factory-builder/nodes/LiveGenericNode';
 import { LiveAnimationOverlay } from './LiveAnimationOverlay';
-import { formatDuration } from '../../stores/simulationStore';
+import { formatDuration, useSimulationStore } from '../../stores/simulationStore';
 import { registerElement } from '../../services/elementRegistry';
 
 const liveNodeTypes: NodeTypes = {
@@ -73,6 +73,7 @@ interface LiveSimulationViewProps {
 
 function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height: heightOverride }: LiveSimulationViewProps) {
   const { model } = useModelStore();
+  const warmupPeriod = useSimulationStore((s) => s.defaultOptions.warmupPeriod) ?? 0;
   const stationStates = useLiveSimulationStore((s) => s.stationStates);
   const bufferLevels = useLiveSimulationStore((s) => s.bufferLevels);
   const activeProducts = useLiveSimulationStore((s) => s.activeProducts);
@@ -546,6 +547,23 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
 
       {/* P6 — Progress bar with hour markers */}
       <div className="absolute top-0 left-0 right-0 h-5 bg-slate-800">
+        {/* Warm-up zone overlay */}
+        {warmupPeriod > 0 && simDuration > 0 && (
+          <div
+            className="absolute top-0 left-0 h-full z-[1]"
+            style={{
+              width: `${(warmupPeriod / simDuration) * 100}%`,
+              background: 'repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(251,191,36,0.15) 3px, rgba(251,191,36,0.15) 6px)',
+              borderRight: '1px solid rgba(251,191,36,0.4)',
+            }}
+          >
+            {currentTime < warmupPeriod && (
+              <span className="absolute top-0 left-1 text-[7px] font-bold text-amber-400/80 uppercase tracking-wider leading-5">
+                warm-up
+              </span>
+            )}
+          </div>
+        )}
         {/* Fill */}
         <div
           className="h-full transition-all duration-300"
@@ -755,15 +773,21 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
             {topBnId ? 'Fly to Bottleneck' : 'No Bottleneck'}
           </button>
 
-          {/* Active failures — with station names */}
-          {(stateCounts.failed ?? 0) > 0 && (
-            <div className="mb-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[9px] text-slate-400 font-bold uppercase">Failures</span>
+          {/* Active failures — always visible */}
+          <div className="mb-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] text-slate-400 font-bold uppercase">Failures</span>
+              {(stateCounts.failed ?? 0) > 0 ? (
                 <span className="text-[10px] font-bold text-red-400 animate-pulse">
                   {stateCounts.failed} station{(stateCounts.failed ?? 0) > 1 ? 's' : ''}
                 </span>
-              </div>
+              ) : (
+                <span className="text-[10px] font-bold text-green-400">
+                  0 stations
+                </span>
+              )}
+            </div>
+            {(stateCounts.failed ?? 0) > 0 ? (
               <div className="mt-0.5">
                 {Object.entries(stationStates)
                   .filter(([, s]) => s === 'failed')
@@ -774,8 +798,15 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
                     </div>
                   ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="mt-0.5">
+                <div className="text-[9px] text-green-400 flex items-center">
+                  <svg className="w-2.5 h-2.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                  All operational
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
       {/* P0 + P9 — Fullscreen toggle + Pop-out buttons */}

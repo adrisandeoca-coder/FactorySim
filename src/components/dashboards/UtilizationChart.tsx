@@ -18,14 +18,14 @@ const MAX_WIDGET_HEIGHT = 600;
 const CHART_WIDTH = 620;
 
 const categories = [
-  { key: 'busy', color: '#3b82f6', label: 'Busy' },
-  { key: 'idle', color: '#d1d5db', label: 'Idle' },
-  { key: 'setup', color: '#8b5cf6', label: 'Setup' },
-  { key: 'blocked', color: '#f59e0b', label: 'Blocked' },
-  { key: 'failed', color: '#ef4444', label: 'Failed' },
-  { key: 'starved', color: '#a855f7', label: 'Starved' },
-  { key: 'offShift', color: '#6b7280', label: 'Off Shift' },
-  { key: 'batchWait', color: '#60a5fa', label: 'Batching' },
+  { key: 'busy', color: '#3b82f6', label: 'Busy', pattern: 'pat-busy' },
+  { key: 'idle', color: '#d1d5db', label: 'Idle', pattern: 'pat-idle' },
+  { key: 'setup', color: '#8b5cf6', label: 'Setup', pattern: 'pat-setup' },
+  { key: 'blocked', color: '#f59e0b', label: 'Blocked', pattern: 'pat-blocked' },
+  { key: 'failed', color: '#ef4444', label: 'Failed', pattern: 'pat-failed' },
+  { key: 'starved', color: '#a855f7', label: 'Starved', pattern: 'pat-starved' },
+  { key: 'offShift', color: '#6b7280', label: 'Off Shift', pattern: 'pat-offShift' },
+  { key: 'batchWait', color: '#60a5fa', label: 'Batching', pattern: 'pat-batchWait' },
 ] as const;
 
 export function UtilizationChart({ data }: UtilizationChartProps) {
@@ -90,6 +90,49 @@ export function UtilizationChart({ data }: UtilizationChartProps) {
           className="w-full"
           style={{ height: contentHeight, minHeight: widgetHeight }}
         >
+          <defs>
+            {/* Busy: solid (no overlay pattern needed — default) */}
+            <pattern id="pat-busy" patternUnits="userSpaceOnUse" width="8" height="8">
+              <rect width="8" height="8" fill="#3b82f6" />
+            </pattern>
+            {/* Idle: horizontal lines */}
+            <pattern id="pat-idle" patternUnits="userSpaceOnUse" width="8" height="8">
+              <rect width="8" height="8" fill="#d1d5db" />
+              <line x1="0" y1="4" x2="8" y2="4" stroke="#fff" strokeWidth="1.5" opacity="0.5" />
+            </pattern>
+            {/* Setup: diagonal stripes (45deg) */}
+            <pattern id="pat-setup" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+              <rect width="6" height="6" fill="#8b5cf6" />
+              <line x1="0" y1="0" x2="6" y2="0" stroke="#fff" strokeWidth="1.5" opacity="0.4" />
+            </pattern>
+            {/* Blocked: dots */}
+            <pattern id="pat-blocked" patternUnits="userSpaceOnUse" width="6" height="6">
+              <rect width="6" height="6" fill="#f59e0b" />
+              <circle cx="3" cy="3" r="1.2" fill="#fff" opacity="0.45" />
+            </pattern>
+            {/* Failed: crosshatch */}
+            <pattern id="pat-failed" patternUnits="userSpaceOnUse" width="6" height="6">
+              <rect width="6" height="6" fill="#ef4444" />
+              <line x1="0" y1="0" x2="6" y2="6" stroke="#fff" strokeWidth="1" opacity="0.4" />
+              <line x1="6" y1="0" x2="0" y2="6" stroke="#fff" strokeWidth="1" opacity="0.4" />
+            </pattern>
+            {/* Starved: diagonal stripes (135deg) */}
+            <pattern id="pat-starved" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(135)">
+              <rect width="6" height="6" fill="#a855f7" />
+              <line x1="0" y1="0" x2="6" y2="0" stroke="#fff" strokeWidth="1.5" opacity="0.4" />
+            </pattern>
+            {/* Off Shift: vertical lines */}
+            <pattern id="pat-offShift" patternUnits="userSpaceOnUse" width="6" height="6">
+              <rect width="6" height="6" fill="#6b7280" />
+              <line x1="3" y1="0" x2="3" y2="6" stroke="#fff" strokeWidth="1.5" opacity="0.4" />
+            </pattern>
+            {/* Batching: checkerboard */}
+            <pattern id="pat-batchWait" patternUnits="userSpaceOnUse" width="6" height="6">
+              <rect width="6" height="6" fill="#60a5fa" />
+              <rect x="0" y="0" width="3" height="3" fill="#fff" opacity="0.25" />
+              <rect x="3" y="3" width="3" height="3" fill="#fff" opacity="0.25" />
+            </pattern>
+          </defs>
           {sortedStations.map((station, i) => {
             const stationData = data.byStation[station.id] || {
               busy: 0, idle: 0, setup: 0, blocked: 0, failed: 0, starved: 0, offShift: 0,
@@ -148,7 +191,7 @@ export function UtilizationChart({ data }: UtilizationChartProps) {
                       x={x} y={y}
                       width={Math.max(segWidth, 0)}
                       height={effectiveBarHeight}
-                      fill={cat.color}
+                      fill={`url(#${cat.pattern})`}
                       rx={cat.key === 'busy' ? 3 : 0}
                       opacity={isHovered ? 1 : 0.85}
                     >

@@ -4,22 +4,29 @@ import type { Station } from '../../../types';
 
 interface StationNodeData extends Station {}
 
-function getCycleTimeDisplay(ct?: { type?: string; parameters?: Record<string, number | number[]> }): { value: number; approx: boolean } {
-  if (!ct?.parameters) return { value: 0, approx: false };
+const DIST_ABBREV: Record<string, string> = {
+  constant: 'C', normal: 'N', lognormal: 'LN', exponential: 'E',
+  triangular: 'T', uniform: 'U', weibull: 'W',
+};
+
+function getCycleTimeDisplay(ct?: { type?: string; parameters?: Record<string, number | number[]> }): { value: number; approx: boolean; distAbbrev: string } {
+  if (!ct?.parameters) return { value: 0, approx: false, distAbbrev: '' };
   const p = ct.parameters as Record<string, number>;
+  const distAbbrev = DIST_ABBREV[ct.type || ''] || '';
   switch (ct.type) {
-    case 'constant': return { value: p.value ?? 0, approx: false };
-    case 'normal': case 'lognormal': case 'exponential': return { value: p.mean ?? 0, approx: true };
-    case 'triangular': return { value: (p.mode ?? ((p.min + p.max) / 2)) || 0, approx: true };
-    case 'uniform': return { value: ((p.min + p.max) / 2) || 0, approx: true };
-    case 'weibull': return { value: Math.round(p.scale ?? 0), approx: true };
-    default: return { value: 0, approx: false };
+    case 'constant': return { value: p.value ?? 0, approx: false, distAbbrev };
+    case 'normal': case 'lognormal': case 'exponential': return { value: p.mean ?? 0, approx: true, distAbbrev };
+    case 'triangular': return { value: (p.mode ?? ((p.min + p.max) / 2)) || 0, approx: true, distAbbrev };
+    case 'uniform': return { value: ((p.min + p.max) / 2) || 0, approx: true, distAbbrev };
+    case 'weibull': return { value: Math.round(p.scale ?? 0), approx: true, distAbbrev };
+    default: return { value: 0, approx: false, distAbbrev };
   }
 }
 
 export const StationNode = memo(({ data, selected }: NodeProps<StationNodeData>) => {
-  const { value: cycleTime, approx } = getCycleTimeDisplay(data.cycleTime);
+  const { value: cycleTime, approx, distAbbrev } = getCycleTimeDisplay(data.cycleTime);
   const isCompact = useStore((s) => (s as any).transform[2] < 0.5);
+  const hasScrap = (data.scrapRate ?? 0) > 0;
 
   if (isCompact) {
     return (
@@ -28,8 +35,9 @@ export const StationNode = memo(({ data, selected }: NodeProps<StationNodeData>)
         style={{ minWidth: '120px' }}
       >
         <Handle type="target" position={Position.Left} />
-        <div className="bg-green-500 px-2 py-1.5">
-          <div className="font-bold text-[16px] text-white truncate leading-tight">{data.name}</div>
+        <div className="bg-green-500 px-2 py-1.5 flex items-center">
+          <div className="font-bold text-[16px] text-white truncate leading-tight flex-1">{data.name}</div>
+          {hasScrap && <div className="w-2 h-2 rounded-full bg-red-400 ml-1 flex-shrink-0" title={`Scrap: ${((data.scrapRate ?? 0) * 100).toFixed(1)}%`} />}
         </div>
         <Handle type="source" position={Position.Right} />
       </div>
@@ -50,7 +58,7 @@ export const StationNode = memo(({ data, selected }: NodeProps<StationNodeData>)
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-[14px] text-gray-900 truncate leading-tight">{data.name}</div>
           <div className="text-xs text-gray-600 mt-0.5">
-            CT: {approx ? '~' : ''}{cycleTime}s
+            CT: {approx ? '~' : ''}{cycleTime}s{distAbbrev ? ` (${distAbbrev})` : ''}
           </div>
         </div>
       </div>

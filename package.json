@@ -109,6 +109,14 @@
     "vite": "^5.1.0",
     "vitest": "^1.2.2"
   },
-  "author": "FactorySim Team",
-  "license": "MIT"
+  "author": "Adrian Sanchez",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adrisanchez/FactorySim.git"
+  },
+  "bugs": {
+    "url": "https://github.com/adrisanchez/FactorySim/issues"
+  },
+  "homepage": "https://github.com/adrisanchez/FactorySim#readme"
 }

@@ -260,13 +260,22 @@ class JsonRpcServer:
                     "currentTime": last_diag.get("currentTime", config.duration),
                     "diagnostics": last_diag.get("diagnostics", {}),
                 })
-            # Fast-sim guard: warn if very few snapshots captured
-            if len(diag_snapshots) < 3:
-                import logging
-                logging.warning(
-                    f"[FrameCapture] Only {len(diag_snapshots)} diagnostic snapshots captured "
-                    f"(expected 3+). Simulation may have been too fast for threshold callbacks."
-                )
+
+            # Backfill any thresholds missed due to fast simulations
+            final_diag = last_diag.get("diagnostics", {}) if last_diag else {}
+            final_time = last_diag.get("currentTime", config.duration) if last_diag else config.duration
+            captured_thresholds = {s["threshold"] for s in diag_snapshots}
+            for t in frame_thresholds:
+                if t not in captured_thresholds:
+                    diag_snapshots.append({
+                        "threshold": t,
+                        "currentTime": final_time,
+                        "diagnostics": final_diag,
+                        "trigger": "backfill",
+                    })
+            # Sort by threshold for consistent ordering
+            diag_snapshots.sort(key=lambda s: s["threshold"])
+
             result["diagSnapshots"] = diag_snapshots
             return result
         finally:

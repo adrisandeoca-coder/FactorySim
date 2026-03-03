@@ -24,10 +24,11 @@ export function CodeEditor() {
   const [code, setCode] = useState('');
   const [output, setOutput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
-  const [viewMode, setViewMode] = useState<'code' | 'json'>('code');
+  const [viewMode, setViewMode] = useState<'code' | 'json' | 'diff'>('code');
   const [monacoFailed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [diffSummary, setDiffSummary] = useState<string>('');
   const codeEditorRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
 
@@ -71,6 +72,62 @@ export function CodeEditor() {
           .catch(() => setCode('# Error generating code — backend unavailable'));
       } else {
         setCode('# Code generation requires the desktop app backend');
+      }
+    } else if (viewMode === 'diff') {
+      setCode('');
+      setDiffSummary('Loading previous run...');
+      const factorySim = (window as any).factorySim;
+      if (factorySim?.artifacts?.listRuns) {
+        factorySim.artifacts.listRuns().then(async (runs: string[]) => {
+          if (!runs || runs.length === 0) {
+            setDiffSummary('No previous run to compare against');
+            return;
+          }
+          try {
+            const latestRun = runs[runs.length - 1];
+            const prevModel = await factorySim.artifacts.loadRunFile(latestRun, 'model.json');
+            if (!prevModel) {
+              setDiffSummary('No model.json found in previous run');
+              return;
+            }
+            const prev = typeof prevModel === 'string' ? JSON.parse(prevModel) : prevModel;
+            const lines: string[] = [];
+            // Station diff
+            const prevStationNames = new Set((prev.stations || []).map((s: any) => s.name));
+            const curStationNames = new Set((model.stations || []).map(s => s.name));
+            const addedStations = (model.stations || []).filter(s => !prevStationNames.has(s.name));
+            const removedStations = (prev.stations || []).filter((s: any) => !curStationNames.has(s.name));
+            if (addedStations.length) lines.push(`+ Added stations: ${addedStations.map(s => s.name).join(', ')}`);
+            if (removedStations.length) lines.push(`- Removed stations: ${removedStations.map((s: any) => s.name).join(', ')}`);
+            // Buffer diff
+            const prevBufferNames = new Set((prev.buffers || []).map((b: any) => b.name));
+            const curBufferNames = new Set((model.buffers || []).map(b => b.name));
+            const addedBuffers = (model.buffers || []).filter(b => !prevBufferNames.has(b.name));
+            const removedBuffers = (prev.buffers || []).filter((b: any) => !curBufferNames.has(b.name));
+            if (addedBuffers.length) lines.push(`+ Added buffers: ${addedBuffers.map(b => b.name).join(', ')}`);
+            if (removedBuffers.length) lines.push(`- Removed buffers: ${removedBuffers.map((b: any) => b.name).join(', ')}`);
+            // Buffer capacity changes
+            for (const buf of model.buffers || []) {
+              const prevBuf = (prev.buffers || []).find((b: any) => b.name === buf.name);
+              if (prevBuf && prevBuf.capacity !== buf.capacity) {
+                lines.push(`~ Buffer "${buf.name}" capacity: ${prevBuf.capacity} → ${buf.capacity}`);
+              }
+            }
+            // Station parameter changes
+            for (const st of model.stations || []) {
+              const prevSt = (prev.stations || []).find((s: any) => s.name === st.name);
+              if (!prevSt) continue;
+              if (prevSt.scrapRate !== st.scrapRate) lines.push(`~ "${st.name}" scrap rate: ${((prevSt.scrapRate || 0) * 100).toFixed(1)}% → ${((st.scrapRate || 0) * 100).toFixed(1)}%`);
+              if (prevSt.mtbf !== st.mtbf) lines.push(`~ "${st.name}" MTBF: ${prevSt.mtbf || 'none'} → ${st.mtbf || 'none'}`);
+              if (prevSt.batchSize !== st.batchSize) lines.push(`~ "${st.name}" batch size: ${prevSt.batchSize || 1} → ${st.batchSize || 1}`);
+            }
+            setDiffSummary(lines.length > 0 ? lines.join('\n') : 'No structural changes detected between current model and last run');
+          } catch {
+            setDiffSummary('Failed to load or parse previous run model');
+          }
+        }).catch(() => setDiffSummary('Failed to list runs'));
+      } else {
+        setDiffSummary('Diff requires the desktop app backend');
       }
     } else {
       setCode(JSON.stringify(model, null, 2));
@@ -131,6 +188,7 @@ export function CodeEditor() {
   // Model stats for quick reference
   const stationCount = model.stations?.length || 0;
   const bufferCount = model.buffers?.length || 0;
+  const extraNodeCount = model.extraNodes?.length || 0;
   const productNames = (model.products || []).map(p => p.name);
 
   return (
@@ -163,6 +221,16 @@ export function CodeEditor() {
               }`}
             >
               JSON
+            </button>
+            <button
+              onClick={() => setViewMode('diff')}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'diff'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Diff
             </button>
           </div>
           <button
@@ -225,7 +293,19 @@ export function CodeEditor() {
               </div>
             </div>
             <div className="flex-1 min-h-0">
-              {monacoFailed ? (
+              {viewMode === 'diff' ? (
+                <div className="w-full h-full p-4 font-mono text-sm bg-white overflow-auto">
+                  <div className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-3">Model Diff vs Last Run</div>
+                  <pre className="whitespace-pre-wrap text-sm leading-relaxed">{diffSummary.split('\n').map((line, i) => (
+                    <div key={i} className={
+                      line.startsWith('+') ? 'text-green-700 bg-green-50 px-2 py-0.5 rounded' :
+                      line.startsWith('-') ? 'text-red-700 bg-red-50 px-2 py-0.5 rounded' :
+                      line.startsWith('~') ? 'text-amber-700 bg-amber-50 px-2 py-0.5 rounded' :
+                      'text-gray-600'
+                    }>{line}</div>
+                  ))}</pre>
+                </div>
+              ) : monacoFailed ? (
                 <textarea
                   className="w-full h-full p-4 font-mono text-sm bg-white border-0 resize-none focus:outline-none"
                   value={code}
@@ -314,7 +394,7 @@ export function CodeEditor() {
                 {(stationCount > 0 || bufferCount > 0) && (
                   <div className="pb-2 mb-2 border-b border-gray-100">
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Current Model</p>
-                    <p>{stationCount} station{stationCount !== 1 ? 's' : ''}, {bufferCount} buffer{bufferCount !== 1 ? 's' : ''}</p>
+                    <p>{stationCount} station{stationCount !== 1 ? 's' : ''}, {bufferCount} buffer{bufferCount !== 1 ? 's' : ''}{extraNodeCount > 0 ? `, ${extraNodeCount} extra node${extraNodeCount !== 1 ? 's' : ''}` : ''}</p>
                     {productNames.length > 0 && (
                       <p className="text-xs text-gray-400 mt-0.5">Products: {productNames.join(', ')}</p>
                     )}

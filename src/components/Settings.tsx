@@ -121,7 +121,10 @@ export function Settings() {
                 className="input bg-gray-50 text-gray-400"
               />
               <p className="text-xs text-gray-400 mt-1">
-                Multi-replication support coming in a future release
+                Multi-replication support coming soon.{' '}
+                <a href="https://github.com/adrisanchez/FactorySim/discussions" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">
+                  Vote for this feature
+                </a>
               </p>
             </div>
           </div>

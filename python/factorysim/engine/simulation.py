@@ -1465,7 +1465,7 @@ class Simulation:
     def _progress_reporter(self):
         """SimPy process for reporting progress with diagnostics."""
         # Use up to 500 updates for smooth animation, but no faster than every 2 sim-seconds
-        report_interval = max(self.config.duration / 500, 2.0)
+        report_interval = max(self.config.duration / 500, min(self.config.duration / 20, 2.0))
 
         while self.env.now < self.config.duration:
             yield self.env.timeout(report_interval)
@@ -2277,6 +2277,17 @@ class Simulation:
                         "waiting for input. The upstream process cannot keep up."
                     ),
                 })
+            setup = breakdown.get("setup", 0)
+            if setup > 0.50:
+                warnings.append({
+                    "type": "station_setup_dominant",
+                    "severity": "warning",
+                    "message": (
+                        f"Station '{station.name}' spends {setup*100:.0f}% of its time on "
+                        "setup/changeover. Consider reducing setup time or increasing batch sizes "
+                        "to improve throughput."
+                    ),
+                })
         return warnings
 
     def _calculate_oee(self) -> Dict[str, Any]:
@@ -2535,13 +2546,8 @@ class Simulation:
                 if produced < qty:
                     # Order not fully fulfilled — at risk
                     at_risk += 1
-                else:
-                    # Order fulfilled — check if items of this type had late deliveries
-                    late_count = late_by_product.get(pid, 0)
-                    total_produced = throughput_by_product.get(pid, 0)
-                    if total_produced > 0 and late_count / total_produced > 0.10:
-                        # More than 10% of items late → order had delivery issues
-                        at_risk += 1
+                # Fulfilled orders are never "at risk" — late delivery rates
+                # are already captured by on_time_rate.
         else:
             # No formal orders — count in-flight products past their due date
             at_risk = len([p for p in self.active_products.values()

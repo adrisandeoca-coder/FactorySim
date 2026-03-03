@@ -41,8 +41,32 @@ export function ScenarioManager() {
   const [quickScenarioResults, setQuickScenarioResults] = useState<Record<string, unknown> | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [runningScenarioId, setRunningScenarioId] = useState<string | null>(null);
+  const [runAllProgress, setRunAllProgress] = useState<{ current: number; total: number } | null>(null);
+  const runAllCancelRef = useRef(false);
   const scenarioRef = useRef<HTMLDivElement>(null);
   const quickResultsRef = useRef<HTMLDivElement>(null);
+
+  // Context-aware scenario relevance check
+  const isScenarioRelevant = (scenarioId: string): boolean => {
+    switch (scenarioId) {
+      case 'reduce-batch':
+        return (model.stations || []).some(s => (s.batchSize ?? 1) > 1);
+      case 'machine-failure':
+      case 'preventive-maintenance':
+        return (model.stations || []).some(s => s.mtbf != null && s.mtbf > 0);
+      case 'add-shift':
+        return (model.stations || []).some(s => (s as any).shiftSchedule != null);
+      default:
+        return true;
+    }
+  };
+
+  const stationCount = model.stations?.length || 1;
+  const getEstimate = (scenarioId: string): string => {
+    const duration = SCENARIO_DURATIONS[scenarioId] || DEFAULT_SCENARIO_DURATION;
+    const estSeconds = Math.max(1, Math.round(stationCount * duration / 10000));
+    return estSeconds >= 60 ? `~${Math.round(estSeconds / 60)}m` : `~${estSeconds}s`;
+  };
 
   // Register scenarios tab for cross-tab screenshot capture
   useEffect(() => {
@@ -988,21 +1012,80 @@ export function ScenarioManager() {
           subtitle="Pre-built templates for common what-if questions"
         />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {guidedScenarios.map((scenario) => (
-            <button
-              key={scenario.id}
-              onClick={() => handleRunQuickScenario(scenario.id)}
-              disabled={isRunning}
-              className={`p-4 border border-gray-200 rounded-lg hover:border-blue-500 ${scenario.bgColor} hover:shadow-md transition-all text-left group disabled:opacity-50`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <scenario.icon className={`w-8 h-8 ${scenario.color}`} />
-                <span className="text-xs text-gray-400 group-hover:text-blue-500">Click to run</span>
-              </div>
-              <div className="font-medium text-gray-900">{scenario.name}</div>
-              <div className="text-sm text-gray-500 mt-1">{scenario.description}</div>
-            </button>
-          ))}
+          {[...guidedScenarios].sort((a, b) => {
+            const aRel = isScenarioRelevant(a.id) ? 0 : 1;
+            const bRel = isScenarioRelevant(b.id) ? 0 : 1;
+            return aRel - bRel;
+          }).map((scenario) => {
+            const relevant = isScenarioRelevant(scenario.id);
+            return (
+              <button
+                key={scenario.id}
+                onClick={() => handleRunQuickScenario(scenario.id)}
+                disabled={isRunning}
+                className={`p-4 border border-gray-200 rounded-lg hover:border-blue-500 ${scenario.bgColor} hover:shadow-md transition-all text-left group disabled:opacity-50 ${!relevant ? 'opacity-50' : ''}`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <scenario.icon className={`w-8 h-8 ${scenario.color}`} />
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-400">{getEstimate(scenario.id)}</span>
+                    <span className="text-xs text-gray-400 group-hover:text-blue-500">Click to run</span>
+                  </div>
+                </div>
+                <div className="font-medium text-gray-900">{scenario.name}</div>
+                <div className="text-sm text-gray-500 mt-1">{scenario.description}</div>
+                {!relevant && <div className="text-xs text-gray-400 mt-1 italic">(not applicable to current model)</div>}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Run All Quick Scenarios */}
+        <div className="mt-4 flex items-center space-x-3">
+          <Button
+            variant="secondary"
+            onClick={async () => {
+              if (runAllProgress) {
+                runAllCancelRef.current = true;
+                return;
+              }
+              runAllCancelRef.current = false;
+              const total = guidedScenarios.length;
+              setRunAllProgress({ current: 0, total });
+              for (let i = 0; i < total; i++) {
+                if (runAllCancelRef.current) break;
+                setRunAllProgress({ current: i + 1, total });
+                await new Promise<void>((resolve) => {
+                  const origOnComplete = handleRunQuickScenario;
+                  origOnComplete(guidedScenarios[i].id);
+                  // Wait for isRunning to become false
+                  const check = setInterval(() => {
+                    // Poll isRunning state — scenario run sets it false when done
+                    if (!document.querySelector('[data-scenario-running="true"]')) {
+                      clearInterval(check);
+                      resolve();
+                    }
+                  }, 500);
+                  // Safety timeout after 120s per scenario
+                  setTimeout(() => { clearInterval(check); resolve(); }, 120000);
+                });
+              }
+              setRunAllProgress(null);
+              if (!runAllCancelRef.current) {
+                addToast({ type: 'success', message: 'All quick scenarios completed' });
+              }
+            }}
+            disabled={isRunning && !runAllProgress}
+          >
+            {runAllProgress
+              ? `Running scenario ${runAllProgress.current} of ${runAllProgress.total}...`
+              : 'Run All Quick Scenarios'}
+          </Button>
+          {runAllProgress && (
+            <Button variant="ghost" size="sm" onClick={() => { runAllCancelRef.current = true; }}>
+              Cancel
+            </Button>
+          )}
         </div>
       </Card>
 

@@ -21,6 +21,9 @@ export interface RunArtifactOptions {
   /** Diagnostic snapshots from the simulation result. Saved as JSON sidecars
    *  even when no animation frame PNGs are available (e.g. quick scenarios). */
   diagSnapshots?: Array<Record<string, unknown>>;
+  /** Pre-snapshotted animation frames captured at result time.
+   *  Prevents cross-contamination when runs happen in quick succession. */
+  capturedFrames?: Array<{ progress: number; base64: string; metadata?: { simTime: number; diagnostics: Record<string, unknown>; trigger?: string } }>;
 }
 
 /**
@@ -46,7 +49,7 @@ async function getScreenshot(
  * Gracefully handles missing elements or failed captures.
  */
 export async function saveRunArtifacts(opts: RunArtifactOptions): Promise<string | null> {
-  const { model, result, simOptions, scenarioName, dashboardScreenshot, modelScreenshot, diagSnapshots } = opts;
+  const { model, result, simOptions, scenarioName, dashboardScreenshot, modelScreenshot, diagSnapshots, capturedFrames: passedFrames } = opts;
 
   if (!window.factorySim?.artifacts?.saveRunBundle) {
     console.warn('artifacts:saveRunBundle IPC not available');
@@ -167,8 +170,8 @@ export async function saveRunArtifacts(opts: RunArtifactOptions): Promise<string
 
   // 11. Animation frames captured during live simulation (PNG + JSON sidecar)
   try {
-    const { capturedFrames } = useLiveSimulationStore.getState();
-    for (const frame of capturedFrames) {
+    const frames = passedFrames ?? useLiveSimulationStore.getState().capturedFrames;
+    for (const frame of frames) {
       const label = String(Math.round(frame.progress)).padStart(2, '0');
       files.push({
         name: `animation-frame-${label}pct.png`,
@@ -192,7 +195,7 @@ export async function saveRunArtifacts(opts: RunArtifactOptions): Promise<string
     // If no PNGs were captured (e.g. quick scenarios) but diagSnapshots are
     // available, save the structured data as JSON-only sidecars so the
     // simulation state progression is preserved for analysis.
-    if (capturedFrames.length === 0 && diagSnapshots && diagSnapshots.length > 0) {
+    if (frames.length === 0 && diagSnapshots && diagSnapshots.length > 0) {
       for (const snap of diagSnapshots) {
         const pct = Math.round(((snap.threshold as number) ?? 0) * 100);
         const label = String(pct).padStart(2, '0');

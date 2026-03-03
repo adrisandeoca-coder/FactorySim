@@ -50,6 +50,7 @@ export const LiveBufferNode = memo(({ data }: NodeProps<LiveBufferNodeData>) => 
   }, [level, capacity]);
 
   const isFull = pct >= 95;
+  const isNearFull = pct >= 90 && !isFull;
   const fc = fillColor(pct);
 
   // Tank height — slight growth when full, subtle
@@ -69,9 +70,9 @@ export const LiveBufferNode = memo(({ data }: NodeProps<LiveBufferNodeData>) => 
           style={{
             width: 20, height: 14, borderRadius: 2,
             backgroundColor: isFull ? '#ef4444' : fc,
-            opacity: isFull ? 1 : 0.7,
-            border: isFull ? '2px solid #fca5a5' : '1px solid #475569',
-            boxShadow: isFull ? '0 0 8px rgba(239,68,68,0.7)' : undefined,
+            opacity: isFull || isNearFull ? 1 : 0.7,
+            border: isFull ? '2px solid #fca5a5' : isNearFull ? '2px solid #fbbf24' : '1px solid #475569',
+            boxShadow: isFull ? '0 0 8px rgba(239,68,68,0.7)' : isNearFull ? '0 0 6px rgba(245,158,11,0.5)' : undefined,
           }}
         />
         <Handle type="source" position={Position.Right} className="w-1 h-1" style={{ opacity: 0 }} />
@@ -109,10 +110,15 @@ export const LiveBufferNode = memo(({ data }: NodeProps<LiveBufferNodeData>) => 
             {level}
           </span>
         </div>
-        {/* FULL badge */}
+        {/* FULL / NEAR FULL badge */}
         {isFull && (
           <div className="absolute top-0 right-0 bg-red-500 rounded-bl px-1" style={{ fontSize: 7, color: '#fff', fontWeight: 900 }}>
             FULL
+          </div>
+        )}
+        {isNearFull && (
+          <div className="absolute top-0 right-0 bg-amber-500 rounded-bl px-1" style={{ fontSize: 7, color: '#fff', fontWeight: 900 }}>
+            90%
           </div>
         )}
         <Handle type="source" position={Position.Right} className="w-2 h-2" />
@@ -195,6 +201,25 @@ export const LiveBufferNode = memo(({ data }: NodeProps<LiveBufferNodeData>) => 
             }}
           >
             FULL {level}/{capacity}
+          </span>
+        </div>
+      )}
+      {/* NEAR FULL badge — amber overlay */}
+      {isNearFull && (
+        <div className="absolute inset-0 flex items-center justify-center z-10">
+          <span
+            style={{
+              backgroundColor: 'rgba(245,158,11,0.8)',
+              color: '#fff',
+              padding: '2px 8px',
+              borderRadius: 4,
+              fontSize: 10,
+              fontWeight: 800,
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase' as const,
+            }}
+          >
+            NEAR FULL
           </span>
         </div>
       )}

@@ -14,7 +14,7 @@ import { UtilizationChart } from './UtilizationChart';
 import { QualityScrapChart } from './QualityScrapChart';
 import { WipTrendChart } from './WipTrendChart';
 import { WidgetConfigurator } from './WidgetConfigurator';
-import { useSimulationStore, formatPercentage } from '../../stores/simulationStore';
+import { useSimulationStore, formatPercentage, formatDuration } from '../../stores/simulationStore';
 import { useModelStore } from '../../stores/modelStore';
 import { useAppStore } from '../../stores/appStore';
 import { useLiveSimulationStore } from '../../stores/liveSimulationStore';
@@ -162,6 +162,10 @@ export function Dashboard() {
       startDayOfWeek,
       startHour,
     };
+    // Snapshot animation frames and model screenshot at result time to prevent cross-contamination
+    const framesSnap = [...useLiveSimulationStore.getState().capturedFrames];
+    const diagSnapshotsSnap: Array<Record<string, unknown>> = (resultSnap as any).diagSnapshots || [];
+    const modelScreenshotSnap = modelScreenshotRef.current;
 
     // Pre-capture at 500ms as early fallback (charts may be partially rendered)
     let earlyCaptureBase64: string | undefined;
@@ -206,7 +210,9 @@ export function Dashboard() {
           result: resultSnap,
           simOptions: optsSnap,
           dashboardScreenshot: dashScreenshot,
-          modelScreenshot: modelScreenshotRef.current,
+          modelScreenshot: modelScreenshotSnap,
+          capturedFrames: framesSnap,
+          diagSnapshots: diagSnapshotsSnap,
         });
         if (savedPath) {
           addToast({ type: 'info', message: 'Run artifacts saved' });
@@ -334,7 +340,7 @@ export function Dashboard() {
         if (container) {
           try {
             const base64 = await captureToBase64(container, null);
-            if (base64 && base64.length > 5000) {
+            if (base64 && base64.length > 1000) {
               useLiveSimulationStore.getState().addCapturedFrame(snap.threshold * 100, base64, {
                 simTime: snap.currentTime,
                 diagnostics: snap.diagnostics as Record<string, unknown>,
@@ -907,7 +913,7 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
         <StatCard
           key={config.id}
           title="Avg Cycle Time"
-          value={`${kpis.cycleTime.mean.toFixed(0)}s`}
+          value={formatDuration(kpis.cycleTime.mean)}
           icon={<ClockIcon className="w-6 h-6 text-purple-600" />}
         />
       );

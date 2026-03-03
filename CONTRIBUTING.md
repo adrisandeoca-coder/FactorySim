@@ -12,7 +12,7 @@ Thanks for your interest in contributing! This guide will help you get set up an
 
 ```bash
 # Clone the repo
-git clone https://github.com/adrisanchez/FactorySim.git
+git clone https://github.com/adrisandeoca-coder/FactorySim.git
 cd FactorySim
 
 # Install JS dependencies

@@ -4,6 +4,10 @@
 
 A SimPy-based discrete event simulation platform that stays synchronized with your real factory floor.
 
+<p align="center">
+  <img src="docs/screenshots/1-dashboard.png" alt="Dashboard — OEE, throughput, and bottleneck analysis" width="800"/>
+</p>
+
 ## Features
 
 - **Visual Factory Builder**: Drag-and-drop interface to create factory models with stations, buffers, and connections
@@ -13,6 +17,20 @@ A SimPy-based discrete event simulation platform that stays synchronized with yo
 - **Data Synchronization**: Connect to MES, ERP, IoT sensors, and import from CSV/Excel
 - **Python Code Access**: Full scripting environment for advanced users with Monaco editor
 - **Role-Based Access**: Four user personas (Operator, Analyst, Engineer, Developer) with tailored interfaces
+
+## Screenshots
+
+| Dashboard | Factory Builder |
+|:-:|:-:|
+| ![Dashboard](docs/screenshots/1-dashboard.png) | ![Factory Builder](docs/screenshots/2-factory-builder.png) |
+
+| Scenario Comparison | Order Management |
+|:-:|:-:|
+| ![Scenarios](docs/screenshots/3-scenarios.png) | ![Orders](docs/screenshots/4-orders.png) |
+
+| Python Code Editor | Data Sync |
+|:-:|:-:|
+| ![Code Editor](docs/screenshots/5-code-editor.png) | ![Data Sync](docs/screenshots/6-data-sync.png) |
 
 ## Technology Stack
 
@@ -217,4 +235,9 @@ MIT License - See LICENSE file for details.
 
 ## Support
 
-For issues and feature requests, please visit the project repository.
+- **Bug reports & feature requests**: [GitHub Issues](https://github.com/adrisandeoca-coder/FactorySim/issues)
+- **Questions & discussions**: [GitHub Discussions](https://github.com/adrisandeoca-coder/FactorySim/discussions)
+
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.

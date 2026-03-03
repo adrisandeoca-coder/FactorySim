@@ -12,6 +12,20 @@ import { registerElement, setCachedImage } from '../../services/elementRegistry'
 
 type ImportMode = 'replace' | 'merge';
 
+function relativeTime(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return 'just now';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} minute${diffMin !== 1 ? 's' : ''} ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr} hour${diffHr !== 1 ? 's' : ''} ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `${diffDay} day${diffDay !== 1 ? 's' : ''} ago`;
+}
+
 interface Connector {
   id: string;
   name: string;
@@ -56,6 +70,12 @@ export function DataSync() {
   const [importMode, setImportMode] = useState<ImportMode>('replace');
   const [importPreview, setImportPreview] = useState<ImportResult | null>(null);
   const [importing, setImporting] = useState(false);
+  const [notifiedTypes, setNotifiedTypes] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('factorysim-notify-interest');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch { return new Set(); }
+  });
 
   /** Read the selected file and show a preview of what will be imported. */
   const previewFile = async (file: File) => {
@@ -185,6 +205,15 @@ export function DataSync() {
         </div>
 
         <div className="flex items-center space-x-3">
+          {modelStore.model && (
+            <Button variant="ghost" onClick={() => {
+              downloadModelExcel(modelStore.model!);
+              addToast({ type: 'success', message: 'Model exported to Excel' });
+            }}>
+              <DownloadIcon className="w-4 h-4 mr-2" />
+              Export Model
+            </Button>
+          )}
           <Button variant="secondary" onClick={() => setShowImportModal(true)}>
             <UploadIcon className="w-4 h-4 mr-2" />
             Import Data
@@ -229,22 +258,6 @@ export function DataSync() {
           >
             Download template with sample data
           </button>
-          {modelStore.model && (
-            <>
-              {' | '}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  downloadModelExcel(modelStore.model!);
-                  addToast({ type: 'success', message: 'Model exported to Excel' });
-                }}
-                className="text-sm text-blue-600 hover:text-blue-800 underline mt-2 inline-block"
-              >
-                Export current model
-              </button>
-            </>
-          )}
           <input
             id="file-input"
             type="file"
@@ -294,9 +307,9 @@ export function DataSync() {
                   </div>
                   <div>
                     <div className="font-medium text-gray-900">{connector.name}</div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-500" title={connector.lastSync ? new Date(connector.lastSync).toLocaleString() : undefined}>
                       {connector.lastSync
-                        ? `Last sync: ${new Date(connector.lastSync).toLocaleString()}`
+                        ? `Last sync: ${relativeTime(connector.lastSync)}`
                         : 'Never synced'}
                     </div>
                   </div>
@@ -352,6 +365,26 @@ export function DataSync() {
                 </div>
                 <div className="font-medium text-gray-900">{type.name}</div>
                 <div className="text-sm text-gray-500 mt-1">{type.description}</div>
+                {!isAvailable && (
+                  <button
+                    className={`mt-2 text-xs px-2 py-1 rounded ${
+                      notifiedTypes.has(type.type)
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                    } transition-colors`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (notifiedTypes.has(type.type)) return;
+                      const next = new Set(notifiedTypes);
+                      next.add(type.type);
+                      setNotifiedTypes(next);
+                      try { localStorage.setItem('factorysim-notify-interest', JSON.stringify([...next])); } catch {}
+                      addToast({ type: 'success', message: `We'll notify you when ${type.name} is available` });
+                    }}
+                  >
+                    {notifiedTypes.has(type.type) ? 'Requested \u2713' : 'Notify Me'}
+                  </button>
+                )}
               </div>
             );
           })}
@@ -583,6 +616,14 @@ function RefreshIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+  );
+}
+
+function DownloadIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
     </svg>
   );
 }

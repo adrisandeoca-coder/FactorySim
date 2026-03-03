@@ -265,7 +265,7 @@ export function OrderManager() {
 
   const SortArrow = ({ col }: { col: SortColumn }) => {
     if (sortColumn !== col) return <span className="ml-1 text-gray-300">&#8597;</span>;
-    return <span className="ml-1">{sortDirection === 'asc' ? '&#9650;' : '&#9660;'}</span>;
+    return <span className="ml-1 text-blue-600 font-bold">{sortDirection === 'asc' ? '\u25B2' : '\u25BC'}</span>;
   };
 
   // Batch operations
@@ -306,7 +306,7 @@ export function OrderManager() {
           </div>
           {activeTab === 'orders' && (
             <div className="flex space-x-2">
-              <Button variant="secondary" onClick={() => setShowGenerator(true)}>
+              <Button variant="secondary" onClick={() => setShowGenerator(true)} title="Generate sample orders based on your model's product types and throughput capacity">
                 <SparklesIcon className="w-4 h-4 mr-2" />
                 Auto-Generate
               </Button>
@@ -479,24 +479,24 @@ export function OrderManager() {
                         className="rounded text-blue-600"
                       />
                     </th>
-                    <th className="cursor-pointer select-none" onClick={() => handleSort('id')}>
+                    <th className={`cursor-pointer select-none ${sortColumn === 'id' ? 'font-bold bg-blue-50/50' : ''}`} onClick={() => handleSort('id')}>
                       Order ID<SortArrow col="id" />
                     </th>
-                    <th className="cursor-pointer select-none" onClick={() => handleSort('product')}>
+                    <th className={`cursor-pointer select-none ${sortColumn === 'product' ? 'font-bold bg-blue-50/50' : ''}`} onClick={() => handleSort('product')}>
                       Product<SortArrow col="product" />
                     </th>
                     <th>Start</th>
-                    <th className="cursor-pointer select-none" onClick={() => handleSort('quantity')}>
+                    <th className={`cursor-pointer select-none ${sortColumn === 'quantity' ? 'font-bold bg-blue-50/50' : ''}`} onClick={() => handleSort('quantity')}>
                       Quantity<SortArrow col="quantity" />
                     </th>
                     <th>Progress</th>
-                    <th className="cursor-pointer select-none" onClick={() => handleSort('priority')}>
+                    <th className={`cursor-pointer select-none ${sortColumn === 'priority' ? 'font-bold bg-blue-50/50' : ''}`} onClick={() => handleSort('priority')}>
                       Priority<SortArrow col="priority" />
                     </th>
-                    <th className="cursor-pointer select-none" onClick={() => handleSort('dueDate')}>
+                    <th className={`cursor-pointer select-none ${sortColumn === 'dueDate' ? 'font-bold bg-blue-50/50' : ''}`} onClick={() => handleSort('dueDate')}>
                       Due Date<SortArrow col="dueDate" />
                     </th>
-                    <th className="cursor-pointer select-none" onClick={() => handleSort('status')}>
+                    <th className={`cursor-pointer select-none ${sortColumn === 'status' ? 'font-bold bg-blue-50/50' : ''}`} onClick={() => handleSort('status')}>
                       Status<SortArrow col="status" />
                     </th>
                     <th>Actions</th>
@@ -799,11 +799,12 @@ function OrderStatCard({
   active: boolean;
   onClick: () => void;
 }) {
+  const isUrgent = color === 'red' && value > 0;
   const colorClasses = {
     gray: 'bg-gray-50 border-gray-200',
     blue: 'bg-blue-50 border-blue-200',
     green: 'bg-green-50 border-green-200',
-    red: 'bg-red-50 border-red-200',
+    red: isUrgent ? 'bg-red-100 border-red-400 border-2' : 'bg-red-50 border-red-200',
   };
 
   return (
@@ -813,7 +814,7 @@ function OrderStatCard({
       } ${active ? 'ring-2 ring-blue-500 ring-offset-1' : 'hover:shadow-md'}`}
       onClick={onClick}
     >
-      <div className="text-2xl font-bold">{value}</div>
+      <div className={`text-2xl font-bold ${isUrgent ? 'animate-pulse text-red-700' : ''}`}>{value}</div>
       <div className="text-sm text-gray-600">{label}</div>
     </div>
   );

@@ -125,13 +125,15 @@ export function BottleneckHeatmap({ stations, kpis, connections }: BottleneckHea
           icon={<ChartIcon className="w-5 h-5" />}
           color="blue"
         />
-        <SummaryCard
-          title="Healthy Stations"
-          value={`${stationMetrics.filter(m => m.severity === 'low').length} of ${stationMetrics.length}`}
-          subtitle="Operating normally"
-          icon={<CheckIcon className="w-5 h-5" />}
-          color="green"
-        />
+        <div title={stationMetrics.filter(m => m.severity === 'low').map(m => m.station.name).join(', ') || 'None'}>
+          <SummaryCard
+            title="Healthy Stations"
+            value={`${stationMetrics.filter(m => m.severity === 'low').length} of ${stationMetrics.length}`}
+            subtitle="Operating normally"
+            icon={<CheckIcon className="w-5 h-5" />}
+            color="green"
+          />
+        </div>
       </div>
 
       {/* View Mode Toggle */}
