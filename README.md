@@ -36,10 +36,11 @@ A SimPy-based discrete event simulation platform that stays synchronized with yo
 
 ## Installation
 
-### 1. Clone or download the project
+### 1. Clone and enter the project
 
 ```bash
-cd C:\Users\adris\Desktop\FactorySim
+git clone https://github.com/adrisandeoca-coder/FactorySim.git
+cd FactorySim
 ```
 
 ### 2. Install Node.js dependencies
