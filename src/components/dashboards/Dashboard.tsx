@@ -101,7 +101,7 @@ export function Dashboard() {
   const dashboardRef = useRef<HTMLDivElement>(null);
   const [showLogMenu, setShowLogMenu] = useState(false);
   const [activeSection, setActiveSection] = useState<string>('all');
-  const modelScreenshotRef = useRef<string | undefined>(undefined);
+  const modelScreenshotRef = useRef<{ image?: string; modelId?: string } | undefined>(undefined);
   const isReplaying = useLiveSimulationStore((s) => s.isReplaying);
   const replayProgress = useLiveSimulationStore((s) => s.replayProgress);
   const replayDuration = useLiveSimulationStore((s) => s.replayDuration);
@@ -165,7 +165,11 @@ export function Dashboard() {
     // Snapshot animation frames and model screenshot at result time to prevent cross-contamination
     const framesSnap = [...useLiveSimulationStore.getState().capturedFrames];
     const diagSnapshotsSnap: Array<Record<string, unknown>> = (resultSnap as any).diagSnapshots || [];
-    const modelScreenshotSnap = modelScreenshotRef.current;
+    // Verify model screenshot belongs to this model — skip if model changed (missing > wrong)
+    const screenshotData = modelScreenshotRef.current;
+    const modelScreenshotSnap = (screenshotData && screenshotData.modelId === modelSnap.id)
+      ? screenshotData.image
+      : undefined;
 
     // Pre-capture at 500ms as early fallback (charts may be partially rendered)
     let earlyCaptureBase64: string | undefined;
@@ -250,14 +254,24 @@ export function Dashboard() {
     clearCachedImage('settings-tab');
 
     // Pre-capture factory model screenshot NOW, before FactoryBuilder may unmount.
-    // Try live element first, fall back to cache (set by FactoryBuilder on model changes).
+    // AWAIT the capture to prevent race conditions in sequential runs — if we
+    // don't wait, a second run's async capture can overwrite the ref with stale data.
+    // Tag with model ID so the artifact save effect can verify it matches.
+    const captureModelId = model.id;
     const factoryEl = getElement('factory-canvas');
     if (factoryEl) {
-      captureToBase64(factoryEl)
-        .then((base64) => { modelScreenshotRef.current = base64; })
-        .catch(() => { modelScreenshotRef.current = getCachedImage('factory-canvas') || undefined; });
+      try {
+        const base64 = await captureToBase64(factoryEl);
+        if (base64) {
+          modelScreenshotRef.current = { image: base64, modelId: captureModelId };
+        } else {
+          modelScreenshotRef.current = { image: getCachedImage('factory-canvas') || undefined, modelId: captureModelId };
+        }
+      } catch {
+        modelScreenshotRef.current = { image: getCachedImage('factory-canvas') || undefined, modelId: captureModelId };
+      }
     } else {
-      modelScreenshotRef.current = getCachedImage('factory-canvas') || undefined;
+      modelScreenshotRef.current = { image: getCachedImage('factory-canvas') || undefined, modelId: captureModelId };
     }
     setSimulating(true);
     setSimulationProgress(0);

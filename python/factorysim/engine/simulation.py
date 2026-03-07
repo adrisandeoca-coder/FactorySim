@@ -468,11 +468,21 @@ class Simulation:
             if source in self.buffers and target in sink_ids:
                 self._sink_buffers.add(source)
 
-        # For every last station in every product routing, BFS to find a sink
+        # For every last station in every product routing, BFS to find a sink.
+        # Include ALL stations that could be routing endpoints:
+        # - Normal product type routings
+        # - Disassembly output product types (spawned with their own routing)
+        # - Any station connected upstream of a sink (fallback)
         last_stations: set = set()
         for pt in self.product_types.values():
             if pt.routing:
                 last_stations.add(pt.routing[-1])
+                # Also map every station in the routing — depalletize creates
+                # partial routings where any mid-routing station could become
+                # the last station for a spawned product.
+                for sid in pt.routing:
+                    if sid in self.stations:
+                        last_stations.add(sid)
 
         for station_id in last_stations:
             # BFS from station through extra nodes / direct connections to sink
@@ -490,6 +500,41 @@ class Simulation:
                         queue.append(neighbor)
                 if station_id in self._station_to_sink:
                     break
+
+    def _find_sink_for_station(self, station_id: str) -> Optional[str]:
+        """Runtime BFS fallback: find a sink reachable from *station_id*.
+
+        Caches the result in ``_station_to_sink`` so subsequent lookups are
+        O(1).  Returns ``None`` if no sink is reachable.
+        """
+        from collections import deque
+
+        # Build adjacency on-the-fly (connections don't change during a run)
+        if not hasattr(self, '_conn_graph'):
+            self._conn_graph: Dict[str, List[str]] = {}
+            for conn in self.connections:
+                src = conn.get("source") or conn.get("sourceId") or conn.get("source_id")
+                tgt = conn.get("target") or conn.get("targetId") or conn.get("target_id")
+                if src and tgt:
+                    self._conn_graph.setdefault(src, []).append(tgt)
+
+        sink_ids = set(self.sinks.keys())
+        queue = deque([station_id])
+        visited = {station_id}
+        while queue:
+            current = queue.popleft()
+            for neighbor in self._conn_graph.get(current, []):
+                if neighbor in sink_ids:
+                    self._station_to_sink[station_id] = neighbor
+                    return neighbor
+                if neighbor not in visited and (
+                    neighbor in self.extra_nodes or neighbor in self.buffers
+                ):
+                    visited.add(neighbor)
+                    queue.append(neighbor)
+        # No sink found — cache None-result to avoid re-BFS
+        self._station_to_sink[station_id] = None  # type: ignore[assignment]
+        return None
 
     def _sink_buffer_drain(self, buffer: "Buffer"):
         """Drain a buffer connected to a sink.
@@ -1391,8 +1436,13 @@ class Simulation:
                         while len(self.hourly_completions) <= hour_bucket:
                             self.hourly_completions.append(0)
                         self.hourly_completions[hour_bucket] += 1
-                        # Record sink exit
+                        # Record sink exit — try mapping, fallback to BFS
                         sink_id = self._station_to_sink.get(last_station_id)
+                        if not sink_id and last_station_id:
+                            # Runtime fallback: BFS from this station to find a sink.
+                            # This handles spawned products (disassembly/depalletize)
+                            # whose routing endpoints weren't in the initial map.
+                            sink_id = self._find_sink_for_station(last_station_id)
                         if sink_id and sink_id in self.sinks:
                             self.sinks[sink_id].record_exit(product)
                     break
