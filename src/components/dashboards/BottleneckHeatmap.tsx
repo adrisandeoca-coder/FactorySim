@@ -726,9 +726,9 @@ function MetricBox({
 
 // Helper Functions
 function getSeverity(utilization: number): 'low' | 'medium' | 'high' | 'critical' {
-  if (utilization >= 0.9) return 'critical';
-  if (utilization >= 0.8) return 'high';
-  if (utilization >= 0.65) return 'medium';
+  if (utilization >= 0.95) return 'critical';
+  if (utilization >= 0.85) return 'high';
+  if (utilization >= 0.75) return 'medium';
   return 'low';
 }
 
