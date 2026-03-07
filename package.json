@@ -44,10 +44,19 @@
         ]
       }
     ],
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "FactorySim",
+      "installerIcon": "resources/setup-icon.ico",
+      "uninstallerIcon": "resources/setup-icon.ico",
+      "artifactName": "FactorySim-Setup-${version}.${ext}"
+    },
     "win": {
       "target": [
-        "nsis",
-        "portable"
+        "nsis"
       ],
       "icon": "resources/icon.ico"
     },
@@ -107,6 +116,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "jsdom": "^28.1.0",
     "postcss": "^8.4.35",
+    "rcedit": "^5.0.2",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.3.3",
     "vite": "^5.1.0",
