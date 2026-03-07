@@ -817,6 +817,11 @@ class Simulation:
                 in_routing = any(sid in pt.routing for pt in self.product_types.values())
                 if not in_routing:
                     _warn("STATION_ORPHAN", f"Station '{st.name}' has no connections and is not in any routing")
+            # Warn on large batch sizes — these create synchronisation bottlenecks
+            if st.batch_size and st.batch_size > 3:
+                _warn("BATCH_SIZING",
+                      f"Station '{st.name}' has batchSize={st.batch_size} — large batches "
+                      f"cause significant waiting time and reduce OEE")
 
         # ── buffers ────────────────────────────────────────────────
         connected_buffers = set()
@@ -3303,6 +3308,12 @@ class Simulation:
 
         L.append('MODEL_CONFIG = ' + _repr(serializable))
         L.append('')
+        # Emit ID mapping so users can cross-reference KPIs/event logs (which use
+        # model IDs like "s1") with the slugified variable names used in this code.
+        reverse_map = {v: k for k, v in station_keys.items()}
+        L.append('# Maps slugified station key → original model ID (for cross-referencing KPIs/events)')
+        L.append('STATION_ID_MAP = ' + repr(reverse_map))
+        L.append('')
         L.append('')
 
     def _export_helpers(self, L):
@@ -3551,10 +3562,12 @@ class Simulation:
             L.append('')
 
         if "assembly" in types_used:
-            L.append('_assembly_buffers = {}')
+            L.append('_assembly_buffers = {}  # keyed by assembly node name')
             L.append('')
             L.append('def process_assembly(env, part, node_cfg, rng, results):')
-            L.append('    """Wait for required parts, consume secondaries, output primary."""')
+            L.append('    """Wait for required parts, consume secondaries, output primary.')
+            L.append('    Parts are grouped by assembly node name so concurrent assemblies')
+            L.append('    with different names are isolated."""')
             L.append('    name = node_cfg.get("name", "assembly")')
             L.append('    required = node_cfg.get("input_parts", 2)')
             L.append('    ct = node_cfg.get("cycle_time", 0)')
@@ -3571,6 +3584,7 @@ class Simulation:
             L.append('    yield env.timeout(ct)')
             L.append('    primary = items[0]')
             L.append('    for other in items[1:]:')
+            L.append('        other._consumed = True')
             L.append('        if hasattr(other, "_done_event") and other._done_event and not other._done_event.triggered:')
             L.append('            other._done_event.succeed()')
             L.append('    return primary')

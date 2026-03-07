@@ -331,8 +331,8 @@ class Station:
             while self._failed:
                 yield self._repair_event
 
-            # Setup time if product type changed
-            if self.setup_time_dist and self.current_product_type != product.product_type:
+            # Setup time if product type changed (skip initial — no changeover on first item)
+            if self.setup_time_dist and self.current_product_type is not None and self.current_product_type != product.product_type:
                 self._log_state_change(StationState.SETUP)
                 setup_time = self.setup_time_dist.sample()
                 remaining = setup_time
