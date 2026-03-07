@@ -4,6 +4,7 @@ JSON-RPC Server for FactorySim.
 Handles communication with Electron via stdin/stdout.
 """
 
+import os
 import sys
 import json
 import traceback
@@ -13,6 +14,7 @@ import threading
 import uuid
 
 from factorysim.engine.simulation import Simulation, SimulationConfig
+from factorysim.engine.plugin import PluginManager
 from factorysim.connectors.csv_connector import CSVConnector
 from factorysim.kpi.oee import OEECalculator
 from factorysim.kpi.bottleneck import BottleneckDetector
@@ -30,6 +32,14 @@ class JsonRpcServer:
         self.running_simulations: Dict[str, Simulation] = {}
         self.executor = ThreadPoolExecutor(max_workers=4)
         self.lock = threading.Lock()
+
+        # Plugin system
+        plugins_dir = os.environ.get('FACTORYSIM_PLUGINS_DIR', '')
+        if plugins_dir:
+            self.plugin_manager = PluginManager(plugins_dir)
+            self.plugin_manager.reload_all()
+        else:
+            self.plugin_manager = None
 
         self._register_methods()
 
@@ -59,6 +69,13 @@ class JsonRpcServer:
 
             # Code execution (advanced)
             "execute_code": self._execute_code,
+
+            # Plugin methods
+            "plugin_list": self._plugin_list,
+            "plugin_enable": self._plugin_enable,
+            "plugin_disable": self._plugin_disable,
+            "plugin_logs": self._plugin_logs,
+            "plugin_reload": self._plugin_reload,
 
             # System methods
             "ping": self._ping,
@@ -98,6 +115,11 @@ class JsonRpcServer:
         )
 
         sim = Simulation(model, config)
+
+        # Fire plugin pre_run hooks
+        if self.plugin_manager:
+            self.plugin_manager.fire_hook('on_load', sim)
+            self.plugin_manager.fire_hook('pre_run', sim)
 
         # Set up progress reporting with diagnostics
         # Also collect snapshots at thresholds to include in the result,
@@ -195,30 +217,17 @@ class JsonRpcServer:
                 "diagnostics": diagnostics,
             }
 
-            # Adaptive "first activity" frame — capture when products first appear
+            # Adaptive "first activity" frame — capture when products first appear.
+            # Use the actual progress as threshold instead of stealing from fixed
+            # thresholds, so that the 10% slot stays accurate.
             if not first_activity_captured and diagnostics["activeProducts"] > 0:
                 first_activity_captured = True
-                # Replace the earliest uncaptured threshold to stay within budget
-                replaced = False
-                for t in frame_thresholds:
-                    if not any(s["threshold"] == t for s in diag_snapshots):
-                        # Mark this threshold as consumed so it won't fire later
-                        diag_snapshots.append({
-                            "threshold": t,
-                            "currentTime": sim.env.now,
-                            "diagnostics": diagnostics,
-                            "trigger": "first_activity",
-                        })
-                        replaced = True
-                        break
-                if not replaced:
-                    # All thresholds already captured; append as extra frame
-                    diag_snapshots.append({
-                        "threshold": progress,
-                        "currentTime": sim.env.now,
-                        "diagnostics": diagnostics,
-                        "trigger": "first_activity",
-                    })
+                diag_snapshots.append({
+                    "threshold": progress,
+                    "currentTime": sim.env.now,
+                    "diagnostics": diagnostics,
+                    "trigger": "first_activity",
+                })
 
             # Snapshot at fixed thresholds for animation frame capture
             for t in frame_thresholds:
@@ -277,6 +286,21 @@ class JsonRpcServer:
             diag_snapshots.sort(key=lambda s: s["threshold"])
 
             result["diagSnapshots"] = diag_snapshots
+
+            # Fire plugin post_run hooks and collect custom KPIs
+            if self.plugin_manager:
+                custom_kpis = {}
+                for d in self.plugin_manager.fire_hook('post_run', sim, result):
+                    if isinstance(d, dict):
+                        custom_kpis.update(d)
+                for d in self.plugin_manager.fire_hook('custom_kpi', sim):
+                    if isinstance(d, dict):
+                        custom_kpis.update(d)
+                if custom_kpis:
+                    kpis = result.get("kpis", {})
+                    kpis["custom"] = custom_kpis
+                    result["kpis"] = kpis
+
             return result
         finally:
             with self.lock:
@@ -509,6 +533,37 @@ class JsonRpcServer:
             return {"success": True, "result": local_vars.get("result")}
         except Exception as e:
             return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
+
+    def _plugin_list(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        if not self.plugin_manager:
+            return {"plugins": []}
+        return {"plugins": self.plugin_manager.discover()}
+
+    def _plugin_enable(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        name = params.get("name", "")
+        if not self.plugin_manager:
+            return {"error": "Plugin system not initialized"}
+        self.plugin_manager.enable(name)
+        return {"status": "ok", "name": name}
+
+    def _plugin_disable(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        name = params.get("name", "")
+        if not self.plugin_manager:
+            return {"error": "Plugin system not initialized"}
+        self.plugin_manager.disable(name)
+        return {"status": "ok", "name": name}
+
+    def _plugin_logs(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        name = params.get("name", "")
+        if not self.plugin_manager:
+            return {"logs": []}
+        return {"logs": self.plugin_manager.get_logs(name)}
+
+    def _plugin_reload(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        if not self.plugin_manager:
+            return {"error": "Plugin system not initialized"}
+        self.plugin_manager.reload_all()
+        return {"status": "ok", "plugins": self.plugin_manager.discover()}
 
     def _send_notification(self, method: str, params: Any) -> None:
         notification = {

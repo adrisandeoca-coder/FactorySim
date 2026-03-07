@@ -15,6 +15,7 @@ from factorysim.engine.distributions import Distribution
 if TYPE_CHECKING:
     from factorysim.engine.simulation import Simulation
     from factorysim.engine.product import Product
+    from factorysim.engine.buffer import Buffer
 
 
 class StationState(Enum):
@@ -119,6 +120,8 @@ class Station:
         self.input_buffer: Optional["Buffer"] = None
         self.input_buffers: list = []  # All input buffers (for merge topology)
         self.output_buffer: Optional["Buffer"] = None
+        # Multi-output: maps downstream station id -> buffer for routing selection
+        self.output_buffers: Dict[str, "Buffer"] = {}
 
         # Start failure process if configured
         if self.mtbf and self.mttr:
@@ -545,6 +548,15 @@ class Station:
         else:
             performance = 0.0
 
+        # For batch stations, batch accumulation wait is a real productivity
+        # loss.  Standard OEE misses it because it's neither a speed loss
+        # (Performance) nor a downtime loss (Availability).  We fold it into
+        # Performance so that OEE reflects the true productive fraction.
+        # Effective Performance = P_speed × (busy / (busy + batch_wait))
+        if self.batch_size > 1 and self.total_batch_wait_time > 0 and busy_time > 0:
+            batch_penalty = busy_time / (busy_time + self.total_batch_wait_time)
+            performance = performance * batch_penalty
+
         result = {
             "availability": availability,
             "performance": performance,
@@ -555,6 +567,9 @@ class Station:
         d = self.cycle_time_dist.to_dict()
         if d.get("type") == "constant" and performance >= 0.98:
             result["performance_note"] = "constant_ct"
+        # Annotate batch wait penalty so the dashboard can explain the P drop
+        if self.batch_size > 1 and self.total_batch_wait_time > 0 and busy_time > 0:
+            result["performance_note"] = "batch_wait_penalty"
         return result
 
     def _record_batch_queue_wip(self, count: int) -> None:

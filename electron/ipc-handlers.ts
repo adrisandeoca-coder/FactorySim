@@ -520,7 +520,12 @@ export function registerIpcHandlers(
     const { app: electronApp } = await import('electron');
     const userDataPath = electronApp.getPath('userData');
     const runsDir = path.join(userDataPath, 'runs');
-    const runDir = path.join(runsDir, bundle.folderName);
+
+    // Path traversal guard: folderName must not escape runsDir
+    const runDir = path.resolve(runsDir, bundle.folderName);
+    if (!runDir.startsWith(runsDir + path.sep) && runDir !== runsDir) {
+      throw new Error('Invalid folder name');
+    }
 
     // Ensure directories exist
     if (!fs.existsSync(runsDir)) {
@@ -532,7 +537,11 @@ export function registerIpcHandlers(
 
     // Write each file
     for (const file of bundle.files) {
-      const filePath = path.join(runDir, file.name);
+      const filePath = path.resolve(runDir, file.name);
+      // Path traversal guard: file must stay inside runDir
+      if (!filePath.startsWith(runDir + path.sep) && filePath !== runDir) {
+        throw new Error(`Invalid file name: ${file.name}`);
+      }
       if (file.encoding === 'base64') {
         // Strip data URL prefix if present
         const base64Data = file.content.replace(/^data:[^;]+;base64,/, '');
@@ -546,7 +555,47 @@ export function registerIpcHandlers(
   });
 
   ipcMain.handle('artifacts:openRunFolder', async (_event, folderPath: string) => {
+    // Path traversal guard: only open folders inside userData/runs
+    const { app: appForOpen } = await import('electron');
+    const allowedOpenDir = path.join(appForOpen.getPath('userData'), 'runs');
+    const resolvedOpenPath = path.resolve(folderPath);
+    if (!resolvedOpenPath.startsWith(allowedOpenDir + path.sep) && resolvedOpenPath !== allowedOpenDir) {
+      throw new Error('Invalid folder path');
+    }
     shell.openPath(folderPath);
+  });
+
+  // ============ Plugin Handlers ============
+
+  ipcMain.handle('plugin:list', async () => {
+    const result = await pythonBridge.listPlugins() as { plugins: unknown[] };
+    return result.plugins || [];
+  });
+
+  ipcMain.handle('plugin:enable', async (_event, name: string) => {
+    return pythonBridge.enablePlugin(name);
+  });
+
+  ipcMain.handle('plugin:disable', async (_event, name: string) => {
+    return pythonBridge.disablePlugin(name);
+  });
+
+  ipcMain.handle('plugin:logs', async (_event, name: string) => {
+    const result = await pythonBridge.getPluginLogs(name) as { logs: string[] };
+    return result.logs || [];
+  });
+
+  ipcMain.handle('plugin:reload', async () => {
+    return pythonBridge.reloadPlugins();
+  });
+
+  ipcMain.handle('plugin:openFolder', async () => {
+    const { app: electronApp } = await import('electron');
+    const pluginsDir = path.join(electronApp.getPath('userData'), 'plugins');
+    if (!fs.existsSync(pluginsDir)) {
+      fs.mkdirSync(pluginsDir, { recursive: true });
+    }
+    shell.openPath(pluginsDir);
   });
 
   // ============ Help Handlers ============
@@ -581,6 +630,13 @@ export function registerIpcHandlers(
 
   // Load animation frames + sidecars from a run folder for replay
   ipcMain.handle('artifacts:loadRunFrames', async (_event, runPath: string) => {
+    // Path traversal guard: runPath must be inside userData/runs
+    const { app: appForFrames } = await import('electron');
+    const allowedRunsDir = path.join(appForFrames.getPath('userData'), 'runs');
+    const resolvedRunPath = path.resolve(runPath);
+    if (!resolvedRunPath.startsWith(allowedRunsDir + path.sep) && resolvedRunPath !== allowedRunsDir) {
+      throw new Error('Invalid run path');
+    }
     if (!fs.existsSync(runPath)) return { frames: [] };
 
     const files = fs.readdirSync(runPath);
@@ -656,6 +712,13 @@ export function registerIpcHandlers(
 
   // Load event log from a run folder for event-driven replay
   ipcMain.handle('artifacts:loadRunEventLog', async (_event, runPath: string) => {
+    // Path traversal guard: runPath must be inside userData/runs
+    const { app: appForEvents } = await import('electron');
+    const allowedEventRunsDir = path.join(appForEvents.getPath('userData'), 'runs');
+    const resolvedEventPath = path.resolve(runPath);
+    if (!resolvedEventPath.startsWith(allowedEventRunsDir + path.sep) && resolvedEventPath !== allowedEventRunsDir) {
+      throw new Error('Invalid run path');
+    }
     if (!fs.existsSync(runPath)) return { events: [], runInfo: null, model: null };
 
     // Load event log

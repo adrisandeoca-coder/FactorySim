@@ -8,6 +8,8 @@ import { CodeEditor } from './components/code-editor/CodeEditor';
 import { DataSync } from './components/data-sync/DataSync';
 import { OrderManager } from './components/orders/OrderManager';
 import { Settings } from './components/Settings';
+import { ParameterSweep } from './components/sweep/ParameterSweep';
+import { PluginManager } from './components/plugins/PluginManager';
 import { useAppStore } from './stores/appStore';
 import { useModelStore } from './stores/modelStore';
 import { useLiveSimulationStore } from './stores/liveSimulationStore';
@@ -107,6 +109,8 @@ function App() {
         <Route path="/orders" element={<OrderManager />} />
         <Route path="/code" element={<CodeEditor />} />
         <Route path="/data" element={<DataSync />} />
+        <Route path="/sweep" element={<ParameterSweep />} />
+        <Route path="/plugins" element={<PluginManager />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
     </Layout>

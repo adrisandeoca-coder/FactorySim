@@ -5,6 +5,15 @@ All notable changes to FactorySim will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-03-06
+
+### Added
+- **Parameter Sweep / Sensitivity Analysis** — define parameter ranges on any station, buffer, or source property and batch-run simulations across the grid. Supports one-at-a-time (OAT) and full grid modes. Visualize results with tornado charts, line charts, heatmaps, and data tables.
+- **Plugin API for Custom Logic** — extend the simulation engine with Python plugins that hook into lifecycle events (`pre_run`, `post_run`, `on_event`, `custom_kpi`). Plugin manager UI for discovery, enable/disable, and log viewing. Example plugin included.
+- **Expanded Documentation** — comprehensive `docs/` folder covering getting started, simulation engine internals, parameter sweep guide, plugin development guide, architecture overview, and FAQ.
+- **GitHub Actions Release Workflow** — automated CI/CD pipeline for building and publishing Windows (.exe), macOS (.dmg), and Linux (.AppImage/.deb) installers on tag push.
+- **Enhanced Issue Templates** — added model info section to bug report template.
+
 ## [1.0.0] - 2026-03-03
 
 ### Added

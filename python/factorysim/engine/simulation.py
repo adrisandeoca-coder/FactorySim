@@ -74,6 +74,8 @@ class Simulation:
         self.extra_nodes: Dict[str, ExtraNode] = {}
         self._extra_node_chains: Dict[tuple, List[str]] = {}
         self._extra_node_output_chains: Dict[str, List[str]] = {}
+        self._chain_buffers: Dict[tuple, List[str]] = {}  # chain key -> buffer IDs traversed
+        self._output_chain_buffers: Dict[str, List[str]] = {}  # station -> buffer IDs traversed
 
         # Source / Sink / Operator wiring
         self.sources: Dict[str, Source] = {}
@@ -212,6 +214,14 @@ class Simulation:
                                     ordered_targets.append(t2)
                 node._output_stations = ordered_targets
 
+        # First pass: build buffer→downstream station mapping
+        buffer_to_downstream: Dict[str, List[str]] = {}
+        for conn in self.connections:
+            src = conn.get("source") or conn.get("sourceId") or conn.get("source_id")
+            tgt = conn.get("target") or conn.get("targetId") or conn.get("target_id")
+            if src in self.buffers and tgt in self.stations:
+                buffer_to_downstream.setdefault(src, []).append(tgt)
+
         for conn in self.connections:
             source_id = conn.get("source") or conn.get("sourceId") or conn.get("source_id")
             target_id = conn.get("target") or conn.get("targetId") or conn.get("target_id")
@@ -222,6 +232,9 @@ class Simulation:
             if source and target:
                 if isinstance(source, Station) and isinstance(target, Buffer):
                     source.output_buffer = target
+                    # Multi-output: map downstream stations to this buffer
+                    for downstream_station_id in buffer_to_downstream.get(target_id, []):
+                        source.output_buffers[downstream_station_id] = target
                 elif isinstance(source, Buffer) and isinstance(target, Station):
                     if (source_id, target_id) not in skip_pairs:
                         if source not in target.input_buffers:
@@ -260,27 +273,33 @@ class Simulation:
                 if next_station:
                     key = (current_station, next_station)
                     if key not in self._extra_node_chains:
-                        chain = self._find_extra_node_chain(graph, current_station, next_station)
+                        chain, chain_bufs = self._find_extra_node_chain(graph, current_station, next_station)
                         if chain:
                             self._extra_node_chains[key] = chain
+                            if chain_bufs:
+                                self._chain_buffers[key] = chain_bufs
 
                 # Output chain after last station
                 if next_station is None and current_station not in self._extra_node_output_chains:
-                    output_chain = self._find_output_chain(graph, current_station)
+                    output_chain, output_bufs = self._find_output_chain(graph, current_station)
                     if output_chain:
                         self._extra_node_output_chains[current_station] = output_chain
+                        if output_bufs:
+                            self._output_chain_buffers[current_station] = output_bufs
 
             # Pre-routing chain: extra nodes upstream of the first routing station
             if pt.routing:
                 first_station = pt.routing[0]
                 key = (None, first_station)
                 if key not in self._extra_node_chains:
-                    pre_chain = self._find_pre_routing_chain(reverse_graph, first_station)
+                    pre_chain, pre_bufs = self._find_pre_routing_chain(reverse_graph, first_station)
                     if pre_chain:
                         self._extra_node_chains[key] = pre_chain
+                        if pre_bufs:
+                            self._chain_buffers[key] = pre_bufs
 
     def _find_extra_node_chain(self, graph: Dict[str, List[str]],
-                               from_id: str, to_id: str) -> List[str]:
+                               from_id: str, to_id: str) -> tuple:
         """BFS to find an ordered chain of extra nodes between two stations.
 
         Seeds BFS with ONLY extra-node neighbors of from_id so that direct
@@ -289,8 +308,10 @@ class Simulation:
 
         Traverses through both extra nodes AND buffers so that splitters/routers
         sitting between buffers are discovered.  Only extra node IDs are
-        included in the returned chain; buffers are traversed but not added
-        to the path.
+        included in the returned chain; buffers are traversed but tracked
+        separately so their statistics can be updated during product flow.
+
+        Returns (chain, buffer_ids) tuple.
         """
         from collections import deque
         queue = deque()
@@ -300,30 +321,34 @@ class Simulation:
         for neighbor in graph.get(from_id, []):
             if neighbor in self.extra_nodes and neighbor not in visited:
                 visited.add(neighbor)
-                queue.append((neighbor, [neighbor]))
+                queue.append((neighbor, [neighbor], []))
 
         while queue:
-            current, path = queue.popleft()
+            current, path, bufs = queue.popleft()
             for neighbor in graph.get(current, []):
                 if neighbor == to_id:
-                    return path
+                    return path, bufs
                 if neighbor not in visited:
                     if neighbor in self.extra_nodes:
                         visited.add(neighbor)
-                        queue.append((neighbor, path + [neighbor]))
+                        queue.append((neighbor, path + [neighbor], bufs))
                     elif neighbor in self.buffers:
                         visited.add(neighbor)
-                        queue.append((neighbor, path))
-        return []
+                        new_bufs = bufs + [neighbor] if not neighbor.startswith('__arrival_') else bufs
+                        queue.append((neighbor, path, new_bufs))
+        return [], []
 
     def _find_output_chain(self, graph: Dict[str, List[str]],
-                           from_id: str) -> List[str]:
+                           from_id: str) -> tuple:
         """Follow connections from a station through extra nodes (for post-routing).
 
         Traverses through buffers transparently so that extra nodes sitting
-        behind a buffer are still discovered.
+        behind a buffer are still discovered.  Tracks traversed buffer IDs.
+
+        Returns (chain, buffer_ids) tuple.
         """
         chain: List[str] = []
+        bufs: List[str] = []
         current = from_id
         visited = {from_id}
         while True:
@@ -337,22 +362,26 @@ class Simulation:
             elif len(extra) == 0 and len(buffers) == 1:
                 # Traverse through buffer without adding to chain
                 visited.add(buffers[0])
+                if not buffers[0].startswith('__arrival_'):
+                    bufs.append(buffers[0])
                 current = buffers[0]
             else:
                 break
-        return chain
+        return chain, bufs
 
     def _find_pre_routing_chain(self, reverse_graph: Dict[str, List[str]],
-                                first_station_id: str) -> List[str]:
+                                first_station_id: str) -> tuple:
         """Reverse BFS from first_station_id to find extra nodes upstream.
 
         Discovers chains like: buffer → splitter → station, where the splitter
-        is before the first routing station.  Returns chain in forward order.
+        is before the first routing station.  Returns (chain, buffer_ids) in
+        forward order.
         """
         from collections import deque
         visited = {first_station_id}
         queue = deque()
         found_nodes = []
+        found_bufs = []
 
         # Seed with predecessors of first_station_id that are extra nodes or buffers
         for pred in reverse_graph.get(first_station_id, []):
@@ -364,6 +393,8 @@ class Simulation:
                 elif pred in self.buffers:
                     visited.add(pred)
                     queue.append(pred)
+                    if not pred.startswith('__arrival_'):
+                        found_bufs.append(pred)
 
         while queue:
             current = queue.popleft()
@@ -376,10 +407,13 @@ class Simulation:
                     elif pred in self.buffers:
                         visited.add(pred)
                         queue.append(pred)
+                        if not pred.startswith('__arrival_'):
+                            found_bufs.append(pred)
 
         # Return in forward order (reverse of BFS discovery)
         found_nodes.reverse()
-        return found_nodes
+        found_bufs.reverse()
+        return found_nodes, found_bufs
 
     def _suppress_chain_output_buffers(self) -> None:
         """Clear output_buffer for stations that feed into extra-node chains.
@@ -517,6 +551,14 @@ class Simulation:
         unrealistic WIP buildup.
         Applies backpressure: waits when downstream input buffers are full.
         """
+        # Build a forward adjacency from connections (used for auto-detect and
+        # for finding explicit buffers connected to this source).
+        fwd: dict = {}
+        for conn in self.connections:
+            src_id = conn.get("source") or conn.get("sourceId") or conn.get("source_id")
+            tgt_id = conn.get("target") or conn.get("targetId") or conn.get("target_id")
+            fwd.setdefault(src_id, []).append(tgt_id)
+
         # Determine target product types
         if source.product_filter and source.product_filter in self.product_types:
             target_types = [self.product_types[source.product_filter]]
@@ -524,12 +566,6 @@ class Simulation:
             # Auto-detect: follow connections from source through buffers and
             # extra nodes (splitters) to find the downstream stations.
             connected_stations: set = set()
-            # Build a forward adjacency from connections
-            fwd: dict = {}
-            for conn in self.connections:
-                src_id = conn.get("source") or conn.get("sourceId") or conn.get("source_id")
-                tgt_id = conn.get("target") or conn.get("targetId") or conn.get("target_id")
-                fwd.setdefault(src_id, []).append(tgt_id)
             # BFS from source to find reachable stations (through buffers/extra nodes)
             from collections import deque
             queue: deque = deque(fwd.get(source.id, []))
@@ -585,6 +621,13 @@ class Simulation:
                 unique_shifted.append(st)
         downstream_shifted_stations = unique_shifted
 
+        # Find explicit buffers directly connected to the source so we can
+        # track product transit through them (prevents "orphaned buffer" stats).
+        source_exit_buffers = []
+        for bid in fwd.get(source.id, []):
+            if bid in self.buffers and not bid.startswith('__arrival_'):
+                source_exit_buffers.append(self.buffers[bid])
+
         inter_arrival_time = source.arrival_rate  # constant deterministic
         type_index = 0
         batch_counter = 0
@@ -630,6 +673,12 @@ class Simulation:
                 "source": source.name,
             })
 
+            # Record transit through explicit buffers between source and
+            # downstream extra nodes (e.g. source → buffer → splitter).
+            # This ensures the buffer's statistics reflect actual product flow.
+            for buf in source_exit_buffers:
+                buf.total_items_entered += 1
+
             self.env.process(self._product_flow_process(product))
 
     def _acquire_operators(self, station_id: str, product: "Product"):
@@ -665,6 +714,23 @@ class Simulation:
         for resource, req, acquire_time in operator_requests:
             resource.total_busy_time += self.env.now - acquire_time
             resource.release(req)
+
+    def _resolve_output_buffer(self, station: Station, product: "Product") -> Optional["Buffer"]:
+        """Select the correct output buffer for a product leaving a station.
+
+        If the station has multiple output buffers (multi-output routing),
+        pick the one that leads to the product's next station in its routing.
+        Falls back to station.output_buffer for single-output stations.
+        """
+        if len(station.output_buffers) > 1:
+            # Look ahead: the product's routing index still points at the
+            # current station, so the *next* station is index + 1.
+            next_idx = product.current_routing_index + 1
+            if next_idx < len(product.routing):
+                next_station_id = product.routing[next_idx]
+                if next_station_id in station.output_buffers:
+                    return station.output_buffers[next_station_id]
+        return station.output_buffer
 
     # ── Validation & config logging ────────────────────────────────
 
@@ -866,6 +932,7 @@ class Simulation:
                 } if st.product_cycle_time_dists else {},
                 "shifts": st.shifts if st.shifts else None,
                 "input_buffer": st.input_buffer.id if st.input_buffer else None,
+                "input_buffers": [b.id for b in st.input_buffers] if len(st.input_buffers) > 1 else None,
                 "output_buffer": st.output_buffer.id if st.output_buffer else None,
             }
 
@@ -1029,6 +1096,7 @@ class Simulation:
         event = {
             "time": self.env.now,
             "type": event_type,
+            "entityId": entity_id,
             "entity_id": entity_id,
             "details": details,
         }
@@ -1169,17 +1237,18 @@ class Simulation:
                 station.items_processed += 1
 
             # ── Blocked: push to output buffer (may block if full) ──
-            if station.output_buffer:
-                if station.output_buffer.is_full():
+            out_buf = self._resolve_output_buffer(station, product)
+            if out_buf:
+                if out_buf.is_full():
                     station._log_state_change(StationState.BLOCKED)
-                product._log_trace("entering_output_buffer", {"buffer": station.output_buffer.id})
+                product._log_trace("entering_output_buffer", {"buffer": out_buf.id})
                 self.log_event("product_entering_buffer", product.id, {
-                    "buffer": station.output_buffer.id,
+                    "buffer": out_buf.id,
                     "station": station.id,
                     "direction": "output",
                 })
                 pre_put_time = self.env.now
-                yield station.output_buffer.put(product)
+                yield out_buf.put(product)
                 # Track time spent blocked waiting to enter the buffer
                 blocked_duration = self.env.now - pre_put_time
                 if blocked_duration > 0:
@@ -1193,16 +1262,17 @@ class Simulation:
 
             # ── Push remaining batch items to output and signal done ──
             for bp in batch[1:]:
-                if station.output_buffer:
-                    if station.output_buffer.is_full():
+                bp_out_buf = self._resolve_output_buffer(station, bp)
+                if bp_out_buf:
+                    if bp_out_buf.is_full():
                         station._log_state_change(StationState.BLOCKED)
                     self.log_event("product_entering_buffer", bp.id, {
-                        "buffer": station.output_buffer.id,
+                        "buffer": bp_out_buf.id,
                         "station": station.id,
                         "direction": "output",
                     })
                     pre_put_time = self.env.now
-                    yield station.output_buffer.put(bp)
+                    yield bp_out_buf.put(bp)
                     blocked_duration = self.env.now - pre_put_time
                     if blocked_duration > 0:
                         bp.total_waiting_time += blocked_duration
@@ -1248,7 +1318,13 @@ class Simulation:
             # Skip for products spawned by extra nodes (disassembly/depalletize)
             # to avoid re-entering the upstream node that created them.
             if product.routing and not skip_pre_chain:
-                pre_chain = self._extra_node_chains.get((None, product.routing[0]), [])
+                pre_key = (None, product.routing[0])
+                pre_chain = self._extra_node_chains.get(pre_key, [])
+                # Record transit through buffers in this chain
+                for bid in self._chain_buffers.get(pre_key, []):
+                    buf = self.buffers.get(bid)
+                    if buf:
+                        buf.total_items_entered += 1
                 for node_id in pre_chain:
                     node = self.extra_nodes.get(node_id)
                     if node:
@@ -1283,6 +1359,11 @@ class Simulation:
                     # ── Routing complete: process output chain then finish ──
                     last_station_id = product.routing[-1] if product.routing else None
                     output_chain = self._extra_node_output_chains.get(last_station_id, [])
+                    # Record transit through buffers in output chain
+                    for bid in self._output_chain_buffers.get(last_station_id, []):
+                        buf = self.buffers.get(bid)
+                        if buf:
+                            buf.total_items_entered += 1
                     for node_id in output_chain:
                         if product.is_scrap or consumed:
                             break
@@ -1350,7 +1431,7 @@ class Simulation:
                     yield product._station_done_event
                     # After worker signals done, product may be in the output buffer
                     # (scrapped products are NOT pushed to output buffer by the worker)
-                    in_buffer = station.output_buffer is not None and not product.is_scrap
+                    in_buffer = self._resolve_output_buffer(station, product) is not None and not product.is_scrap
                 else:
                     # ── No input buffer — process directly ──
                     in_buffer = False
@@ -1365,23 +1446,24 @@ class Simulation:
                         continue
 
                     # Push to output buffer if it exists (blocks if full)
-                    if station.output_buffer:
-                        if station.output_buffer.is_full():
+                    out_buf = self._resolve_output_buffer(station, product)
+                    if out_buf:
+                        if out_buf.is_full():
                             station._log_state_change(StationState.BLOCKED)
-                        product._log_trace("entering_output_buffer", {"buffer": station.output_buffer.id})
+                        product._log_trace("entering_output_buffer", {"buffer": out_buf.id})
                         self.log_event("product_entering_buffer", product.id, {
-                            "buffer": station.output_buffer.id,
+                            "buffer": out_buf.id,
                             "station": station.id,
                             "direction": "output",
                         })
                         pre_put_time = self.env.now
-                        yield station.output_buffer.put(product)
+                        yield out_buf.put(product)
                         # Track time spent blocked waiting to enter the buffer
                         blocked_duration = self.env.now - pre_put_time
                         if blocked_duration > 0:
                             product.total_waiting_time += blocked_duration
                             self.log_event("product_blocked", product.id, {
-                                "buffer": station.output_buffer.id,
+                                "buffer": out_buf.id,
                                 "blocked_duration": blocked_duration,
                             })
                         if station.state == StationState.BLOCKED:
@@ -1395,9 +1477,14 @@ class Simulation:
                         product.routing[next_idx]
                         if next_idx < len(product.routing) else None
                     )
-                    chain = self._extra_node_chains.get(
-                        (next_station_id, next_after), []
-                    )
+                    chain_key = (next_station_id, next_after)
+                    chain = self._extra_node_chains.get(chain_key, [])
+                    # Record transit through buffers in this chain
+                    if chain:
+                        for bid in self._chain_buffers.get(chain_key, []):
+                            buf = self.buffers.get(bid)
+                            if buf:
+                                buf.total_items_entered += 1
                     for node_id in chain:
                         if product.is_scrap or consumed:
                             break
@@ -1452,12 +1539,21 @@ class Simulation:
         # arrival_rate is inter-arrival time in seconds (e.g. 120 = one product every 120s)
         inter_arrival_dist = Distribution.exponential(product_type.arrival_rate, self.rng)
 
+        # Find the first station's input buffer for backpressure
+        first_station = self.stations.get(product_type.routing[0]) if product_type.routing else None
+        input_buffer = first_station.input_buffer if first_station else None
+
         while True:
             inter_arrival_time = inter_arrival_dist.sample()
             yield self.env.timeout(inter_arrival_time)
 
             if self.should_stop:
                 break
+
+            # Backpressure: wait while input buffer is full
+            if input_buffer and input_buffer.is_full():
+                while input_buffer.is_full():
+                    yield self.env.timeout(1.0)
 
             product = product_type.create_product()
             self.env.process(self._product_flow_process(product))
@@ -1624,7 +1720,7 @@ class Simulation:
             if s.mtbf is not None:
                 actual_failures = sum(
                     1 for entry in s.state_log
-                    if entry.get("state") == "failed"
+                    if entry.get("to_state") == "failed"
                 )
                 actual_mtbf_h = (
                     (self.config.duration / 3600) / actual_failures
@@ -2170,11 +2266,12 @@ class Simulation:
             }
 
         # Check for WIP warnings (monotonic growth suggests no steady state),
-        # buffer capacity warnings, and station blocking/starvation warnings
+        # buffer capacity warnings, station blocking/starvation, and source throttling
         kpis["warnings"] = (
             self._check_wip_warnings()
             + self._check_buffer_warnings()
             + self._check_station_warnings()
+            + self._check_source_warnings()
         )
 
         return kpis
@@ -2290,6 +2387,29 @@ class Simulation:
                 })
         return warnings
 
+    def _check_source_warnings(self) -> list:
+        """Check if sources are throttled significantly below their configured rate."""
+        warnings = []
+        hours = self.env.now / 3600 if self.env.now > 0 else 1
+        for src_id, src in self.sources.items():
+            if src.arrival_rate <= 0:
+                continue
+            configured_per_h = 3600 / src.arrival_rate
+            actual_per_h = src.total_generated / hours
+            # Warn if actual rate is below 80% of configured rate
+            if configured_per_h > 0 and actual_per_h < configured_per_h * 0.80:
+                pct = actual_per_h / configured_per_h * 100
+                warnings.append({
+                    "type": "source_throttled",
+                    "severity": "info",
+                    "message": (
+                        f"Source '{src.name}' achieved only {actual_per_h:.1f}/hr "
+                        f"({pct:.0f}% of configured {configured_per_h:.1f}/hr). "
+                        "Downstream backpressure is limiting the arrival rate."
+                    ),
+                })
+        return warnings
+
     def _calculate_oee(self) -> Dict[str, Any]:
         """Calculate OEE with A and P averaged across stations.
 
@@ -2330,13 +2450,33 @@ class Simulation:
         system_quality = (total_good_output / (total_good_output + total_scrapped)
                           if (total_good_output + total_scrapped) > 0 else 1.0)
 
-        # Also factor in inspection node rejects (upstream quality losses)
+        # Attribute inspection quality losses back to the upstream station
+        # so that per-station OEE reflects defects caught downstream.
         from factorysim.engine.extra_nodes import Inspection
         inspection_yield = 1.0
         for node in self.extra_nodes.values():
             if isinstance(node, Inspection) and node.items_processed > 0:
                 node_yield = 1.0 - (node.items_failed / node.items_processed)
                 inspection_yield *= node_yield
+
+                # Find the upstream station for this inspection via chains
+                upstream_sid = None
+                # Check output chains: station → [... inspection ...]
+                for sid, chain in self._extra_node_output_chains.items():
+                    if node.id in chain and sid in station_oee:
+                        upstream_sid = sid
+                        break
+                # Check between-station chains: (from, to) → [... inspection ...]
+                if upstream_sid is None:
+                    for (from_sid, to_sid), chain in self._extra_node_chains.items():
+                        if node.id in chain and from_sid in station_oee:
+                            upstream_sid = from_sid
+                            break
+                if upstream_sid is not None:
+                    oee = station_oee[upstream_sid]
+                    oee["quality"] = oee["quality"] * node_yield
+                    oee["oee"] = oee["availability"] * oee["performance"] * oee["quality"]
+
         system_quality *= inspection_yield
 
         # Use averaged A and P across all stations with system-wide Q
@@ -2451,7 +2591,9 @@ class Simulation:
                 "starve_count": stats["starve_count"],
                 "total_items": stats["total_items_entered"],
                 "is_pass_through": (
-                    avg_wip < 0.01 and stats["total_items_entered"] > 0
+                    avg_wip < 0.01
+                    and stats["total_items_entered"] > 0
+                    and stats["capacity"] <= 1
                 ),
             }
 
@@ -2460,13 +2602,16 @@ class Simulation:
         for node_id, node in self.extra_nodes.items():
             if isinstance(node, Conveyor):
                 stats = node.get_statistics()
+                avg_wip = stats.get("average_wip", 0)
                 by_buffer[node_id] = {
-                    "average_wip": stats.get("average_wip", 0),
+                    "average_wip": avg_wip,
                     "average_waiting_time": node.transit_time if node.items_entered > 0 else 0,
                     "blocking_time": 0,
                     "starving_time": 0,
                     "block_count": 0,
                     "starve_count": 0,
+                    "total_items": node.items_processed,
+                    "is_pass_through": True,  # conveyors are always pass-through by nature
                 }
 
         # WIP = only active products (buffer contents are already in active_products)

@@ -15,6 +15,8 @@ A SimPy-based discrete event simulation platform that stays synchronized with yo
 - **Predictive Dashboards**: Real-time OEE, throughput, bottleneck analysis, and KPI tracking
 - **What-If Scenarios**: Compare production configurations and test changes without disrupting operations
 - **Data Synchronization**: Connect to MES, ERP, IoT sensors, and import from CSV/Excel
+- **Parameter Sweep**: Sensitivity analysis across parameter ranges with tornado, line, and heatmap visualizations
+- **Plugin API**: Extend the simulation with custom Python plugins (lifecycle hooks, custom KPIs)
 - **Python Code Access**: Full scripting environment for advanced users with Monaco editor
 - **Role-Based Access**: Four user personas (Operator, Analyst, Engineer, Developer) with tailored interfaces
 
@@ -228,6 +230,17 @@ print(f"Throughput: {result['kpis']['throughput']['total']} units")
 | `import_csv` | Import data from CSV file |
 | `calculate_kpis` | Calculate KPIs from results |
 | `detect_bottlenecks` | Identify production bottlenecks |
+
+## Documentation
+
+Detailed documentation is available in the [`docs/`](docs/) folder:
+
+- [Getting Started](docs/getting-started.md) — Installation and first model
+- [Simulation Engine](docs/simulation-engine.md) — How the SimPy engine works
+- [Parameter Sweep](docs/parameter-sweep.md) — Sensitivity analysis guide
+- [Plugin Development](docs/plugin-development.md) — Creating custom plugins
+- [Architecture](docs/architecture.md) — System design overview
+- [FAQ](docs/faq.md) — Common questions and troubleshooting
 
 ## License
 

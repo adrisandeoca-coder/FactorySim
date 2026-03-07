@@ -18,7 +18,21 @@ export class DatabaseManager {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    const SQL = await initSqlJs();
+    // In packaged builds the WASM binary is extracted outside ASAR via asarUnpack.
+    // Point locateFile at the unpacked path so sql.js can load it.
+    const SQL = await initSqlJs({
+      locateFile: (file: string) => {
+        const { app } = require('electron');
+        if (!app.isPackaged) {
+          return path.join(__dirname, '../../node_modules/sql.js/dist', file);
+        }
+        // __dirname = resources/app.asar/dist/electron
+        // WASM is at resources/app.asar.unpacked/node_modules/sql.js/dist/
+        const asarRoot = path.join(__dirname, '../..');  // resources/app.asar
+        const unpackedRoot = asarRoot.replace('app.asar', 'app.asar.unpacked');
+        return path.join(unpackedRoot, 'node_modules', 'sql.js', 'dist', file);
+      },
+    });
 
     // Load existing database or create new one
     if (fs.existsSync(this.dbPath)) {

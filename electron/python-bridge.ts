@@ -69,6 +69,15 @@ export class PythonBridge extends EventEmitter {
 
       console.log('Using Python executable:', pythonExecutable);
 
+      // Determine plugins directory from Electron's userData path
+      let pluginsDir = '';
+      try {
+        const { app: electronApp } = require('electron');
+        pluginsDir = path.join(electronApp.getPath('userData'), 'plugins');
+      } catch {
+        // Fallback if Electron app module isn't available
+      }
+
       this.process = spawn(pythonExecutable, [serverScript], {
         cwd: this.pythonPath,
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -76,6 +85,7 @@ export class PythonBridge extends EventEmitter {
           ...process.env,
           PYTHONPATH: this.pythonPath,
           PYTHONUNBUFFERED: '1',
+          FACTORYSIM_PLUGINS_DIR: pluginsDir,
         },
       });
 
@@ -297,6 +307,27 @@ export class PythonBridge extends EventEmitter {
   // REPL for advanced users
   async executeCode(code: string): Promise<unknown> {
     return this.call('execute_code', { code });
+  }
+
+  // Plugin methods
+  async listPlugins(): Promise<unknown> {
+    return this.call('plugin_list', {});
+  }
+
+  async enablePlugin(name: string): Promise<unknown> {
+    return this.call('plugin_enable', { name });
+  }
+
+  async disablePlugin(name: string): Promise<unknown> {
+    return this.call('plugin_disable', { name });
+  }
+
+  async getPluginLogs(name: string): Promise<unknown> {
+    return this.call('plugin_logs', { name });
+  }
+
+  async reloadPlugins(): Promise<unknown> {
+    return this.call('plugin_reload', {});
   }
 
   shutdown(): void {

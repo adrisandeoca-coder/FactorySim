@@ -31,6 +31,13 @@ What actually happened. Include error messages or screenshots if available.
 - **Python version**: (e.g., 3.11.5)
 - **Node version**: (e.g., 20.11.0)
 
+## Model Info (if relevant)
+
+- Number of stations:
+- Number of products:
+- Simulation duration:
+- Special node types used (assembly, splitter, etc.):
+
 ## Additional Context
 
 Any other context, log output, or screenshots.

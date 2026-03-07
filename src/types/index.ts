@@ -453,6 +453,53 @@ export interface ScenarioParameterOverride {
 
 export type NodeType = 'station' | 'buffer' | 'source' | 'sink' | 'conveyor' | 'operator' | 'inspection' | 'assembly' | 'splitter' | 'merge' | 'disassembly' | 'palletize' | 'depalletize' | 'matchbuffer';
 
+// Parameter Sweep Types
+
+export interface SweepParameterDef {
+  entityType: ScenarioParameterOverride['entityType'];
+  entityId: string;
+  entityName: string;
+  parameter: string;
+  parameterLabel: string;
+  min: number;
+  max: number;
+  steps: number;
+}
+
+export interface SweepConfig {
+  id: string;
+  name: string;
+  parameters: SweepParameterDef[];
+  mode: 'oat' | 'full';
+  kpiTarget: string;
+  baseOptions: SimulationOptions;
+}
+
+export interface SweepPointResult {
+  parameterValues: Record<string, number>;
+  kpis: KPIData;
+  runId: string;
+}
+
+export interface SweepResult {
+  configId: string;
+  startedAt: string;
+  completedAt: string;
+  totalRuns: number;
+  pointResults: SweepPointResult[];
+}
+
+// Plugin Types
+
+export interface PluginInfo {
+  name: string;
+  version: string;
+  description: string;
+  enabled: boolean;
+  hooks: string[];
+  errors?: string[];
+}
+
 export interface FactoryNode {
   id: string;
   type: NodeType;
@@ -521,6 +568,14 @@ declare global {
       };
       window?: {
         createPopout: () => Promise<void>;
+      };
+      plugins?: {
+        list: () => Promise<PluginInfo[]>;
+        enable: (name: string) => Promise<void>;
+        disable: (name: string) => Promise<void>;
+        getLogs: (name: string) => Promise<string[]>;
+        reload: () => Promise<void>;
+        openFolder: () => Promise<void>;
       };
     };
   }

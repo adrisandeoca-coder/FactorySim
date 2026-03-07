@@ -251,7 +251,15 @@ function buildAppMenu(): void {
 }
 
 app.whenReady().then(async () => {
-  await initializeApp();
+  try {
+    await initializeApp();
+  } catch (err) {
+    console.error('App initialization failed:', err);
+    dialog.showErrorBox(
+      'Initialization Error',
+      `FactorySim failed to start:\n\n${(err as Error).message}\n\nThe app will open but simulations may not work.`
+    );
+  }
   buildAppMenu();
   await createWindow();
 

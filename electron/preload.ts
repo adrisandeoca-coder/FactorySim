@@ -455,4 +455,13 @@ contextBridge.exposeInMainWorld('factorySim', {
   window: {
     createPopout: () => ipcRenderer.invoke('window:create-popout'),
   },
+
+  plugins: {
+    list: () => ipcRenderer.invoke('plugin:list'),
+    enable: (name: string) => ipcRenderer.invoke('plugin:enable', name),
+    disable: (name: string) => ipcRenderer.invoke('plugin:disable', name),
+    getLogs: (name: string) => ipcRenderer.invoke('plugin:logs', name),
+    reload: () => ipcRenderer.invoke('plugin:reload'),
+    openFolder: () => ipcRenderer.invoke('plugin:openFolder'),
+  },
 });
