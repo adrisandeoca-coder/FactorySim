@@ -26,6 +26,13 @@ export default {
           source: '#22c55e',
           sink: '#ef4444',
         },
+        surface: {
+          900: '#0F1117',
+          800: '#12151C',
+          700: '#1A1D27',
+          600: '#242731',
+          500: '#2E313B',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

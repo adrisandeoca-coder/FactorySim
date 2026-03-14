@@ -14,6 +14,7 @@ import { UtilizationChart } from './UtilizationChart';
 import { QualityScrapChart } from './QualityScrapChart';
 import { WipTrendChart } from './WipTrendChart';
 import { WidgetConfigurator } from './WidgetConfigurator';
+import { GanttScheduleView } from './GanttScheduleView';
 import { useSimulationStore, formatPercentage, formatDuration } from '../../stores/simulationStore';
 import { useModelStore } from '../../stores/modelStore';
 import { useAppStore } from '../../stores/appStore';
@@ -24,6 +25,7 @@ import { captureScreenshot, captureToBase64, downloadEventLog, downloadEventLogC
 import { registerElement, getElement, getCachedImage, setCachedImage, clearCachedImage } from '../../services/elementRegistry';
 import { saveRunArtifacts } from '../../services/artifactService';
 import { captureAllTabScreenshots } from '../../services/tabScreenshotCapture';
+import { buildStateTimeline, getTimelineDuration } from '../../services/replayTimelineBuilder';
 import { ReplayPlayer } from './ReplayPlayer';
 import type { DashboardWidgetConfig, KPIData, SimulationResult } from '../../types';
 
@@ -40,6 +42,7 @@ const WIDGET_LABELS: Record<string, string> = {
   'utilization-chart': 'Utilization',
   'wip-trend-chart': 'WIP Trend',
   'quality-chart': 'Quality Chart',
+  'gantt-schedule': 'Schedule Gantt',
 };
 
 function WarningBanners({ warnings }: { warnings: Array<{ severity: string; message: string; type?: string }> }) {
@@ -95,6 +98,7 @@ export function Dashboard() {
   const [startDayOfWeek, setStartDayOfWeek] = useState(0);
   const [startHour, setStartHour] = useState(0);
   const [showConfigurator, setShowConfigurator] = useState(false);
+  const [layoutMode, setLayoutMode] = useState<'3d-focus' | 'balanced' | 'dashboard-focus'>('balanced');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef(false);
@@ -367,6 +371,23 @@ export function Dashboard() {
 
       setResult(result);
       addToast({ type: 'success', message: 'Simulation completed!' });
+
+      // Auto-start replay after simulation completes
+      if (result.events && result.events.length > 0) {
+        // Build buffer capacity map from model
+        const bufCaps: Record<string, number> = {};
+        for (const b of model.buffers || []) {
+          bufCaps[b.name || b.id] = b.capacity ?? 999;
+        }
+        const timeline = buildStateTimeline(result.events, bufCaps);
+        const replayDur = getTimelineDuration(timeline);
+        if (replayDur > 0) {
+          // Small delay to let result render, then start replay
+          setTimeout(() => {
+            useLiveSimulationStore.getState().startReplay(replayDur);
+          }, 500);
+        }
+      }
 
       // Artifact save is now handled by the lastResult useEffect above,
       // which captures the screenshot and saves atomically at 2000ms.
@@ -682,23 +703,154 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Live Simulation View */}
-      {isSimRunning && (
+      {/* Layout mode selector — visible during sim or replay */}
+      {(isSimRunning || isReplaying) && (
+        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5 w-fit">
+          {(['3d-focus', 'balanced', 'dashboard-focus'] as const).map(mode => (
+            <button
+              key={mode}
+              onClick={() => setLayoutMode(mode)}
+              className={`px-3 py-1 text-[10px] font-semibold rounded-md transition-colors ${
+                layoutMode === mode
+                  ? 'bg-white text-gray-800 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {mode === '3d-focus' ? '3D Focus' : mode === 'balanced' ? 'Balanced' : 'Dashboard'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Live Simulation View — layout depends on mode */}
+      {isSimRunning && layoutMode === '3d-focus' && (
         <LiveSimulationView
           progress={simulationProgress}
           elapsedSeconds={elapsedSeconds}
           simDuration={duration}
+          height="calc(100vh - 180px)"
         />
+      )}
+      {isSimRunning && layoutMode === 'balanced' && (
+        <div className="flex gap-4" style={{ height: 'calc(100vh - 220px)' }}>
+          <div className="flex-[7] min-w-0">
+            <LiveSimulationView
+              progress={simulationProgress}
+              elapsedSeconds={elapsedSeconds}
+              simDuration={duration}
+              height="100%"
+            />
+          </div>
+          <div className="flex-[3] min-w-[280px] max-w-[400px] overflow-y-auto space-y-3">
+            <div className="flex items-center gap-2 px-1 pb-1 border-b border-gray-100">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600">Projected Results</span>
+            </div>
+            {kpis && statWidgets.length > 0 && (
+              <div className="grid grid-cols-1 gap-3">
+                {statWidgets.map((w) => renderWidget(w, displayKpis, model, navigateToStation, lastResult, { startDayOfWeek, startHour }))}
+              </div>
+            )}
+            {kpis?.warnings && kpis.warnings.length > 0 && (
+              <WarningBanners warnings={kpis.warnings} />
+            )}
+          </div>
+        </div>
+      )}
+      {isSimRunning && layoutMode === 'dashboard-focus' && (
+        <div className="flex gap-4" style={{ height: 'calc(100vh - 220px)' }}>
+          <div className="flex-[3] min-w-[200px] max-w-[320px]">
+            <LiveSimulationView
+              progress={simulationProgress}
+              elapsedSeconds={elapsedSeconds}
+              simDuration={duration}
+              height="100%"
+            />
+          </div>
+          <div className="flex-[7] min-w-0 overflow-y-auto space-y-4">
+            <div className="flex items-center gap-2 px-1 pb-1 border-b border-gray-100">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600">Projected Results</span>
+            </div>
+            {kpis && statWidgets.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {statWidgets.map((w) => renderWidget(w, displayKpis, model, navigateToStation, lastResult, { startDayOfWeek, startHour }))}
+              </div>
+            )}
+            {kpis?.warnings && kpis.warnings.length > 0 && (
+              <WarningBanners warnings={kpis.warnings} />
+            )}
+          </div>
+        </div>
       )}
 
       {/* Replay View */}
-      {!isSimRunning && isReplaying && (
+      {!isSimRunning && isReplaying && layoutMode === '3d-focus' && (
         <div className="space-y-3">
           <LiveSimulationView
             progress={replayProgress}
             elapsedSeconds={0}
             simDuration={replayDuration}
+            height="calc(100vh - 220px)"
           />
+          <ReplayController />
+        </div>
+      )}
+      {!isSimRunning && isReplaying && layoutMode === 'balanced' && (
+        <div className="space-y-3">
+          <div className="flex gap-4" style={{ height: 'calc(100vh - 260px)' }}>
+            <div className="flex-[7] min-w-0">
+              <LiveSimulationView
+                progress={replayProgress}
+                elapsedSeconds={0}
+                simDuration={replayDuration}
+                height="100%"
+              />
+            </div>
+            <div className="flex-[3] min-w-[280px] max-w-[400px] overflow-y-auto space-y-3">
+              <div className="flex items-center gap-2 px-1 pb-1 border-b border-gray-100">
+                <CheckCircleIcon className="w-3 h-3 text-emerald-500" />
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600">Final Results</span>
+              </div>
+              {kpis && statWidgets.length > 0 && (
+                <div className="grid grid-cols-1 gap-3">
+                  {statWidgets.map((w) => renderWidget(w, displayKpis, model, navigateToStation, lastResult, { startDayOfWeek, startHour }))}
+                </div>
+              )}
+            </div>
+          </div>
+          <ReplayController />
+        </div>
+      )}
+      {!isSimRunning && isReplaying && layoutMode === 'dashboard-focus' && (
+        <div className="space-y-3">
+          <div className="flex gap-4" style={{ height: 'calc(100vh - 260px)' }}>
+            <div className="flex-[3] min-w-[200px] max-w-[320px]">
+              <LiveSimulationView
+                progress={replayProgress}
+                elapsedSeconds={0}
+                simDuration={replayDuration}
+                height="100%"
+              />
+            </div>
+            <div className="flex-[7] min-w-0 overflow-y-auto space-y-4">
+              <div className="flex items-center gap-2 px-1 pb-1 border-b border-gray-100">
+                <CheckCircleIcon className="w-3 h-3 text-emerald-500" />
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600">Final Results</span>
+              </div>
+              {kpis && statWidgets.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {statWidgets.map((w) => renderWidget(w, displayKpis, model, navigateToStation, lastResult, { startDayOfWeek, startHour }))}
+                </div>
+              )}
+            </div>
+          </div>
           <ReplayController />
         </div>
       )}
@@ -720,7 +872,7 @@ export function Dashboard() {
       {/* Stat Cards Row */}
       {kpis && statWidgets.length > 0 && (activeSection === 'all' || activeSection === 'overview') && (
         <div id="dash-overview" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 scroll-mt-12">
-          {statWidgets.map((w) => renderWidget(w, displayKpis, model, navigateToStation, lastResult))}
+          {statWidgets.map((w) => renderWidget(w, displayKpis, model, navigateToStation, lastResult, { startDayOfWeek, startHour }))}
           {kpis.delivery && kpis.delivery.onTimeRate != null && kpis.delivery.onTimeRate < 1.0 && (
             <StatCard
               key="delivery-summary"
@@ -744,13 +896,13 @@ export function Dashboard() {
         if (visibleRow.length === 2) {
           return (
             <div key={`row-${i}`} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {visibleRow.map((w) => <div key={w.id} id={`dash-${w.id}`} className="scroll-mt-12">{renderWidget(w, displayKpis, model, navigateToStation, lastResult)}</div>)}
+              {visibleRow.map((w) => <div key={w.id} id={`dash-${w.id}`} className="scroll-mt-12">{renderWidget(w, displayKpis, model, navigateToStation, lastResult, { startDayOfWeek, startHour })}</div>)}
             </div>
           );
         }
         return (
           <div key={`row-${i}`} id={`dash-${visibleRow[0].id}`} className="scroll-mt-12">
-            {visibleRow.map((w) => renderWidget(w, displayKpis, model, navigateToStation, lastResult))}
+            {visibleRow.map((w) => renderWidget(w, displayKpis, model, navigateToStation, lastResult, { startDayOfWeek, startHour }))}
           </div>
         );
       })}
@@ -887,7 +1039,7 @@ function StationPerformanceTable({ kpis, model, onStationClick }: { kpis: KPIDat
   );
 }
 
-function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, onStationClick?: (id: string) => void, result?: SimulationResult | null) {
+function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, onStationClick?: (id: string) => void, result?: SimulationResult | null, ganttOptions?: { startDayOfWeek: number; startHour: number }) {
   switch (config.type) {
     case 'oee-summary': {
       // Compute effective utilization (avg busy%) to contextualize OEE for batch models
@@ -1036,12 +1188,33 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
         </Card>
       );
     }
+    case 'gantt-schedule':
+      return (
+        <Card key={config.id}>
+          <CardHeader title="Schedule Gantt" subtitle="Swimlane timeline — click a job block to trace its route" />
+          <GanttScheduleView
+            result={result!}
+            stations={model.stations}
+            utilization={kpis.utilization?.byStation}
+            startDayOfWeek={ganttOptions?.startDayOfWeek}
+            startHour={ganttOptions?.startHour}
+          />
+        </Card>
+      );
     default:
       return null;
   }
 }
 
 // Icons
+function CheckCircleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
 function PlayIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -4,6 +4,7 @@ import { PythonBridge } from './python-bridge';
 import { DatabaseManager } from './database';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 
 /**
  * Recursively converts all snake_case keys in an object to camelCase.
@@ -233,7 +234,7 @@ export function registerIpcHandlers(
       name: s.name,
       modelId: s.model_id,
       createdAt: s.created_at,
-      hasResults: false, // TODO: Check if results exist
+      hasResults: false,
     }));
   });
 
@@ -499,6 +500,13 @@ export function registerIpcHandlers(
   ipcMain.handle('app:userDataPath', async () => {
     const { app } = await import('electron');
     return app.getPath('userData');
+  });
+
+  // Diagnostic: write text to a temp file (for debugging)
+  ipcMain.handle('app:writeDiag', async (_event, content: string) => {
+    const diagPath = path.join(os.tmpdir(), 'factorysim-3d-diag.txt');
+    fs.writeFileSync(diagPath, content, 'utf-8');
+    return diagPath;
   });
 
   // ============ Code Execution (Advanced) ============

@@ -41,13 +41,13 @@ export function SweepLineChart({ result, parameters, kpiPath, kpiLabel }: SweepL
       data={traces}
       layout={{
         title: `${kpiLabel} vs Parameter Values`,
-        xaxis: { title: 'Parameter Value' },
-        yaxis: { title: kpiLabel },
         height: 400,
         margin: { l: 60, r: 40, t: 40, b: 60 },
         paper_bgcolor: 'transparent',
         plot_bgcolor: 'transparent',
-        font: { color: '#374151' },
+        font: { family: 'Inter, system-ui, sans-serif', color: '#374151', size: 11 },
+        xaxis: { title: 'Parameter Value', gridcolor: '#f1f5f9', zerolinecolor: '#e2e8f0' },
+        yaxis: { title: kpiLabel, gridcolor: '#f1f5f9', zerolinecolor: '#e2e8f0' },
         legend: { orientation: 'h', y: -0.2 },
       }}
       config={{ responsive: true }}

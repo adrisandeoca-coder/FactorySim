@@ -129,6 +129,8 @@ class Station:
 
     def _log_state_change(self, new_state: StationState) -> None:
         """Log a state change for KPI tracking."""
+        if new_state == self.state:
+            return  # Skip duplicate transitions
         current_time = self.env.now
         duration = current_time - self._last_state_change
 
@@ -361,12 +363,14 @@ class Station:
                         # Failure interrupted — subtract elapsed time
                         remaining -= self.env.now - start
 
-                self.current_product_type = product.product_type
                 self.sim.log_event("setup_complete", self.id, {
                     "station": self.name,
                     "product_type": product.product_type,
                     "setup_time": setup_time,
                 })
+
+            # Always track current product type so changeover detection works
+            self.current_product_type = product.product_type
 
             # Processing — use per-product cycle time if available
             self._log_state_change(StationState.PROCESSING)

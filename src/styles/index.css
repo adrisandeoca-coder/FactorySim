@@ -15,6 +15,12 @@
   --color-conveyor: #6366f1;
   --color-source: #22c55e;
   --color-sink: #ef4444;
+
+  --sidebar-bg: #12151C;
+  --sidebar-surface: #1A1D27;
+  --sidebar-border: #2E313B;
+  --sidebar-text: #E2E8F0;
+  --sidebar-text-muted: #94A3B8;
 }
 
 * {
@@ -31,21 +37,23 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background-color: #f8fafc;
   color: #1e293b;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -74,11 +82,11 @@ body {
 
 /* Custom node styles */
 .factory-node {
-  padding: 10px 15px;
+  padding: 8px 12px;
   border-radius: 8px;
   background: white;
   border: 2px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   min-width: 120px;
 }
 
@@ -102,17 +110,18 @@ body {
   box-shadow: 0 0 0 2px var(--color-primary);
 }
 
-/* Dashboard cards */
+/* Dashboard cards — tighter, denser */
 .dashboard-card {
-  @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4;
+  @apply bg-white rounded-lg border border-gray-200 p-3;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .dashboard-card-header {
-  @apply text-sm font-medium text-gray-500 mb-2;
+  @apply text-xs font-medium text-gray-500 uppercase tracking-wider mb-1;
 }
 
 .dashboard-card-value {
-  @apply text-2xl font-semibold text-gray-900;
+  @apply text-xl font-semibold text-gray-900 font-mono tabular-nums;
 }
 
 /* KPI indicator colors */
@@ -121,16 +130,58 @@ body {
 }
 
 .kpi-warning {
-  @apply text-yellow-600;
+  @apply text-amber-600;
 }
 
 .kpi-bad {
   @apply text-red-600;
 }
 
+/* Status pills */
+.status-pill {
+  @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium;
+}
+
+.status-pill-good {
+  @apply bg-emerald-50 text-emerald-700;
+}
+
+.status-pill-warning {
+  @apply bg-amber-50 text-amber-700;
+}
+
+.status-pill-bad {
+  @apply bg-red-50 text-red-700;
+}
+
+.status-pill-neutral {
+  @apply bg-gray-100 text-gray-600;
+}
+
+/* Status dot (used inside pills or standalone) */
+.status-dot {
+  @apply w-1.5 h-1.5 rounded-full flex-shrink-0;
+}
+
+.status-dot-good {
+  @apply bg-emerald-500;
+}
+
+.status-dot-warning {
+  @apply bg-amber-500;
+}
+
+.status-dot-bad {
+  @apply bg-red-500;
+}
+
+.status-dot-neutral {
+  @apply bg-gray-400;
+}
+
 /* Button styles */
 .btn {
-  @apply px-4 py-2 rounded-md font-medium transition-colors duration-150;
+  @apply px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-150;
 }
 
 .btn-primary {
@@ -151,41 +202,50 @@ body {
 
 /* Input styles */
 .input {
-  @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  @apply w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
 }
 
 .input-label {
-  @apply block text-sm font-medium text-gray-700 mb-1;
+  @apply block text-xs font-medium text-gray-600 mb-1;
 }
 
-/* Table styles */
+/* Table styles — denser */
 .table {
   @apply w-full border-collapse;
 }
 
 .table th {
-  @apply px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50;
+  @apply px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50;
 }
 
 .table td {
-  @apply px-4 py-3 text-sm text-gray-900 border-t border-gray-200;
+  @apply px-3 py-2 text-sm text-gray-900 border-t border-gray-100;
 }
 
 .table tr:hover {
-  @apply bg-gray-50;
+  @apply bg-gray-50/50;
 }
 
-/* Sidebar styles */
+/* Sidebar styles — dark theme */
 .sidebar {
-  @apply w-64 bg-white border-r border-gray-200 flex flex-col;
+  @apply w-56 flex flex-col;
+  background-color: var(--sidebar-bg);
 }
 
 .sidebar-nav-item {
-  @apply flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 transition-colors;
+  @apply flex items-center px-3 py-2 mx-2 rounded-md text-sm transition-colors;
+  color: var(--sidebar-text-muted);
+}
+
+.sidebar-nav-item:hover {
+  background-color: var(--sidebar-surface);
+  color: var(--sidebar-text);
 }
 
 .sidebar-nav-item.active {
-  @apply bg-blue-50 text-blue-700 border-r-2 border-blue-700;
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border-right: none;
 }
 
 /* Monaco editor container */
@@ -205,7 +265,7 @@ body {
 
 /* Progress bar */
 .progress-bar {
-  @apply h-2 bg-gray-200 rounded-full overflow-hidden;
+  @apply h-1.5 bg-gray-200 rounded-full overflow-hidden;
 }
 
 .progress-bar-fill {
@@ -214,11 +274,11 @@ body {
 
 /* Notification toast */
 .toast {
-  @apply fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-lg z-50;
+  @apply fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-lg z-50 text-sm;
 }
 
 .toast-success {
-  @apply bg-green-600 text-white;
+  @apply bg-emerald-600 text-white;
 }
 
 .toast-error {
@@ -226,7 +286,7 @@ body {
 }
 
 .toast-warning {
-  @apply bg-yellow-500 text-white;
+  @apply bg-amber-500 text-white;
 }
 
 .toast-info {

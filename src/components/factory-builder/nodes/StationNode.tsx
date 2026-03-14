@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps, useStore } from 'reactflow';
+import { FlaskConical } from 'lucide-react';
 import type { Station } from '../../../types';
 
 interface StationNodeData extends Station {}
@@ -52,19 +53,19 @@ export const StationNode = memo(({ data, selected }: NodeProps<StationNodeData>)
       <Handle type="target" position={Position.Left} />
 
       <div className="flex items-center space-x-2.5">
-        <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-          <StationIcon className="w-5 h-5 text-green-600" />
+        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+          <FlaskConical className="w-4 h-4 text-green-600" strokeWidth={1.75} />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-[14px] text-gray-900 truncate leading-tight">{data.name}</div>
-          <div className="text-xs text-gray-600 mt-0.5">
+          <div className="font-semibold text-[13px] text-gray-900 truncate leading-tight">{data.name}</div>
+          <div className="text-[11px] text-gray-500 mt-0.5 font-mono tabular-nums">
             CT: {approx ? '~' : ''}{cycleTime}s{distAbbrev ? ` (${distAbbrev})` : ''}
           </div>
         </div>
       </div>
 
       {/* Additional details */}
-      <div className="mt-2 pt-2 border-t border-gray-100 grid grid-cols-2 gap-1 text-xs text-gray-600">
+      <div className="mt-1.5 pt-1.5 border-t border-gray-100 grid grid-cols-2 gap-1 text-[11px] text-gray-500 font-mono tabular-nums">
         {data.mtbf && (
           <div title="Mean Time Between Failures">
             MTBF: {data.mtbf}h
@@ -83,11 +84,3 @@ export const StationNode = memo(({ data, selected }: NodeProps<StationNodeData>)
 });
 
 StationNode.displayName = 'StationNode';
-
-function StationIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-    </svg>
-  );
-}

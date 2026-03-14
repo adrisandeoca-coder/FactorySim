@@ -426,10 +426,21 @@ class Simulation:
         (e.g., disassembly after the last routing station) to prevent
         orphaned products from accumulating in the buffer.
         """
+        # Collect all stations that are chain sources
+        chain_source_ids: set = set()
         for (from_id, to_id) in self._extra_node_chains:
-            station = self.stations.get(from_id)
-            if station and station.output_buffer:
-                station.output_buffer = None
+            if from_id:
+                chain_source_ids.add(from_id)
+
+        # Unconditionally clear ALL output buffer refs for chain sources.
+        # The product_flow_process handles the put into the next station's
+        # input buffer after the chain completes — the worker must not push.
+        for sid in chain_source_ids:
+            station = self.stations.get(sid)
+            if not station:
+                continue
+            station.output_buffer = None
+            station.output_buffers.clear()
 
         for station_id in self._extra_node_output_chains:
             station = self.stations.get(station_id)
@@ -2676,8 +2687,15 @@ class Simulation:
         # Compress periodic/redundant WIP series using RDP simplification
         time_series = self._simplify_wip_series(list(self._wip_samples))
 
+        # Compute summary statistics from WIP time series
+        wip_values = [s["level"] for s in self._wip_samples] if self._wip_samples else [total_wip]
+        average_wip = float(np.mean(wip_values)) if wip_values else 0.0
+        peak_wip = int(max(wip_values)) if wip_values else total_wip
+
         return {
             "total": total_wip,
+            "average": average_wip,
+            "peak": peak_wip,
             "by_buffer": by_buffer,
             "time_series": time_series,
         }
@@ -2704,6 +2722,7 @@ class Simulation:
 
         return {
             "mean": float(np.mean(cycle_times)),
+            "median": float(np.median(cycle_times)),
             "std": float(np.std(cycle_times)),
             "min": float(np.min(cycle_times)),
             "max": float(np.max(cycle_times)),

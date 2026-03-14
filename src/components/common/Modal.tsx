@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { X } from 'lucide-react';
 
 interface ModalProps {
   isOpen: boolean;
@@ -52,29 +53,21 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
         className={`relative bg-white rounded-lg shadow-xl w-full ${sizeClasses[size]} mx-4 animate-fade-in`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+          <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded-lg"
+            className="p-1 hover:bg-gray-100 rounded-md transition-colors"
           >
-            <CloseIcon className="w-5 h-5 text-gray-500" />
+            <X className="w-4 h-4 text-gray-400" strokeWidth={1.75} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="px-6 py-4">
+        <div className="px-5 py-4">
           {children}
         </div>
       </div>
     </div>
-  );
-}
-
-function CloseIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-    </svg>
   );
 }

@@ -11,6 +11,7 @@ python/.eggs/
 # Build outputs
 dist/
 release/
+release*/
 out/
 build/
 
@@ -32,6 +33,7 @@ build/
 venv/
 .venv/
 env/
+python/venv/
 .python-version
 
 # Logs

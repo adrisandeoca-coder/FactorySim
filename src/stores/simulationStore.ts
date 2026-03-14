@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { SimulationResult, SimulationOptions, KPIData, Scenario } from '../types';
 import { useModelStore } from './modelStore';
+import { useLiveSimulationStore } from './liveSimulationStore';
 
 interface SimulationState {
   // Current simulation
@@ -167,16 +168,21 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 }));
 
 // --- Cross-store subscription ---
-// Clear stale simulation results whenever the model changes, even when
-// Dashboard is unmounted.  This prevents the artifact-save useEffect from
-// re-saving the previous model's KPIs on Dashboard remount.
-let _prevModelId: string | undefined;
+// Clear stale simulation results whenever the model changes structurally
+// (stations/buffers/connections added/removed/edited), even when Dashboard
+// is unmounted.  This prevents stale KPIs from a previous model configuration.
+function modelFingerprint(m: { id?: string; stations: unknown[]; buffers: unknown[]; connections: unknown[]; products: unknown[] }): string {
+  return `${m.id ?? ''}|${m.stations.length}|${m.buffers.length}|${m.connections.length}|${m.products.length}|${JSON.stringify(m.stations.map((s: any) => s.id).sort())}`;
+}
+let _prevFingerprint: string | undefined;
 useModelStore.subscribe((state) => {
-  const newId = state.model?.id;
-  if (_prevModelId !== undefined && newId !== _prevModelId) {
+  const fp = modelFingerprint(state.model);
+  if (_prevFingerprint !== undefined && fp !== _prevFingerprint) {
     useSimulationStore.getState().clearResults();
+    // Also reset live simulation state (replay, utilizations, etc.)
+    useLiveSimulationStore.getState().reset();
   }
-  _prevModelId = newId;
+  _prevFingerprint = fp;
 });
 
 // Helper functions for KPI analysis

@@ -10,8 +10,9 @@ import { applyOverrides, getNestedValue, getParametersForEntityType } from '../.
 import { captureScreenshot, captureToBase64, downloadEventLog, downloadEventLogCSV } from '../../services/screenshotService';
 import { saveRunArtifacts } from '../../services/artifactService';
 import { captureAllTabScreenshots } from '../../services/tabScreenshotCapture';
-import { registerElement, setCachedImage, clearCachedImage } from '../../services/elementRegistry';
+import { registerElement, setCachedImage, clearCachedImage, getElement, getCachedImage } from '../../services/elementRegistry';
 import { v4 as uuidv4 } from 'uuid';
+import { Camera, AlertTriangle, TrendingUp, Clock, Box, FolderOpen, Trash2, X, Shield, Zap, Maximize2, Truck, Wrench, TrendingDown } from 'lucide-react';
 
 const SCENARIO_SEED = 42; // fixed seed for reproducible baseline comparisons
 
@@ -216,6 +217,19 @@ export function ScenarioManager() {
     clearCachedImage('code-editor-tab');
     clearCachedImage('orders-tab');
 
+    // Pre-capture factory model screenshot NOW, before canvas may unmount
+    let modelScreenshot: string | undefined;
+    const factoryEl = getElement('factory-canvas');
+    if (factoryEl) {
+      try {
+        modelScreenshot = await captureToBase64(factoryEl) || getCachedImage('factory-canvas') || undefined;
+      } catch {
+        modelScreenshot = getCachedImage('factory-canvas') || undefined;
+      }
+    } else {
+      modelScreenshot = getCachedImage('factory-canvas') || undefined;
+    }
+
     try {
       if (!window.factorySim?.simulation?.runSimulation) {
         throw new Error('Simulation engine not available');
@@ -247,6 +261,7 @@ export function ScenarioManager() {
           simOptions,
           scenarioName: scenario?.name || scenarioId,
           dashboardScreenshot,
+          modelScreenshot,
         }).then((savedPath) => {
           if (savedPath) {
             addToast({ type: 'info', message: 'Run artifacts saved' });
@@ -350,6 +365,18 @@ export function ScenarioManager() {
 
     // Run the simulation
     const runQuick = async () => {
+      // Pre-capture factory model screenshot NOW, before canvas may unmount
+      let quickModelScreenshot: string | undefined;
+      const quickFactoryEl = getElement('factory-canvas');
+      if (quickFactoryEl) {
+        try {
+          quickModelScreenshot = await captureToBase64(quickFactoryEl) || getCachedImage('factory-canvas') || undefined;
+        } catch {
+          quickModelScreenshot = getCachedImage('factory-canvas') || undefined;
+        }
+      } else {
+        quickModelScreenshot = getCachedImage('factory-canvas') || undefined;
+      }
       try {
         if (!window.factorySim?.simulation?.runSimulation) {
           throw new Error('Simulation engine not available');
@@ -392,6 +419,7 @@ export function ScenarioManager() {
             simOptions: { duration: scenarioDuration, warmupPeriod: 0, replications: 1, seed: SCENARIO_SEED },
             scenarioName: `quick_${scenarioId}`,
             dashboardScreenshot,
+            modelScreenshot: quickModelScreenshot,
             diagSnapshots: snapshots,
           }).then((savedPath) => {
             if (savedPath) {
@@ -1685,115 +1713,57 @@ function getComparisonColor(values: number[], higherIsBetter: boolean): string {
 
 // Icons
 function CameraIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  );
+  return <Camera className={className} strokeWidth={1.75} />;
 }
 
 function WarningIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-    </svg>
-  );
+  return <AlertTriangle className={className} strokeWidth={1.75} />;
 }
 
 function TrendUpIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-    </svg>
-  );
+  return <TrendingUp className={className} strokeWidth={1.75} />;
 }
 
 function ClockIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  );
+  return <Clock className={className} strokeWidth={1.75} />;
 }
 
 function BoxIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-    </svg>
-  );
+  return <Box className={className} strokeWidth={1.75} />;
 }
 
 function FolderIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-    </svg>
-  );
+  return <FolderOpen className={className} strokeWidth={1.75} />;
 }
 
 function TrashIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-    </svg>
-  );
+  return <Trash2 className={className} strokeWidth={1.75} />;
 }
 
 function CloseIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  );
+  return <X className={className} strokeWidth={1.75} />;
 }
 
 function ShieldIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-    </svg>
-  );
+  return <Shield className={className} strokeWidth={1.75} />;
 }
 
 function BoltIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-    </svg>
-  );
+  return <Zap className={className} strokeWidth={1.75} />;
 }
 
 function ExpandIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-    </svg>
-  );
+  return <Maximize2 className={className} strokeWidth={1.75} />;
 }
 
 function TruckIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
-    </svg>
-  );
+  return <Truck className={className} strokeWidth={1.75} />;
 }
 
 function WrenchIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  );
+  return <Wrench className={className} strokeWidth={1.75} />;
 }
 
 function TrendDownIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
-    </svg>
-  );
+  return <TrendingDown className={className} strokeWidth={1.75} />;
 }

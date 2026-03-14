@@ -29,7 +29,7 @@ export function Layout({ children }: LayoutProps) {
       <div className="flex flex-1 overflow-hidden">
         {sidebarOpen && <Sidebar />}
 
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-4">
           {isLoading ? (
             <div className="h-full flex items-center justify-center">
               <div className="spinner w-8 h-8" />

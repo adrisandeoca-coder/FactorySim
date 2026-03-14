@@ -1,33 +1,16 @@
 import { useRef, useCallback, useEffect, useMemo } from 'react';
 import { useLiveSimulationStore } from '../../stores/liveSimulationStore';
-import { useSimulationStore, formatDuration } from '../../stores/simulationStore';
+import { useSimulationStore } from '../../stores/simulationStore';
 import { useModelStore } from '../../stores/modelStore';
 import { buildStateTimeline, getStateAtTime, getTimelineDuration, StateFrame } from '../../services/replayTimelineBuilder';
-
-const SPEED_OPTIONS = [0.25, 0.5, 1, 2, 5, 10, 25];
-
-function formatSimTime(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
-  if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`;
-  return `${s}s`;
-}
 
 export function ReplayController() {
   const { lastResult } = useSimulationStore();
   const { model } = useModelStore();
   const {
     isReplaying,
-    replaySpeed,
     replayPaused,
-    replayTime,
-    replayDuration,
     startReplay,
-    stopReplay,
-    setReplaySpeed,
-    setReplayPaused,
     updateFromReplayFrame,
     addReplayEvents,
   } = useLiveSimulationStore();
@@ -51,12 +34,12 @@ export function ReplayController() {
     framesRef.current = frames;
   }, [frames]);
 
+  const simDuration = useSimulationStore((s) => s.defaultOptions.duration) ?? 28800;
   const duration = useMemo(() => {
-    if (lastResult?.duration) return lastResult.duration;
+    if (simDuration > 0) return simDuration;
     return getTimelineDuration(frames);
-  }, [frames, lastResult?.duration]);
+  }, [frames, simDuration]);
 
-  // Track last emitted frame index to collect events between ticks
   const lastFrameIdxRef = useRef(0);
 
   const tick = useCallback(
@@ -135,72 +118,7 @@ export function ReplayController() {
     }
   };
 
-  const handleStopReplay = () => {
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
-    replayTimeRef.current = 0;
-    lastTickRef.current = 0;
-    stopReplay();
-  };
-
-  const handleTogglePause = () => {
-    if (replayPaused) {
-      lastTickRef.current = 0;
-      setReplayPaused(false);
-    } else {
-      setReplayPaused(true);
-    }
-  };
-
-  // Step forward/backward by finding the next/prev frame
-  const handleStepForward = () => {
-    if (!replayPaused) setReplayPaused(true);
-    const currentIdx = framesRef.current.findIndex((f) => f.time > replayTimeRef.current);
-    if (currentIdx >= 0 && currentIdx < framesRef.current.length) {
-      const frame = framesRef.current[currentIdx];
-      replayTimeRef.current = frame.time;
-      updateFromReplayFrame({ ...frame, time: frame.time });
-    }
-  };
-
-  const handleStepBackward = () => {
-    if (!replayPaused) setReplayPaused(true);
-    let idx = -1;
-    for (let i = framesRef.current.length - 1; i >= 0; i--) {
-      if (framesRef.current[i].time < replayTimeRef.current - 0.01) {
-        idx = i;
-        break;
-      }
-    }
-    if (idx >= 0) {
-      const frame = framesRef.current[idx];
-      replayTimeRef.current = frame.time;
-      updateFromReplayFrame({ ...frame, time: frame.time });
-    }
-  };
-
-  const handleScrub = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const pct = parseFloat(e.target.value);
-    const newTime = pct * duration;
-    replayTimeRef.current = newTime;
-
-    // Reset frame index to match scrubbed position
-    lastFrameIdxRef.current = frames.findIndex((f) => f.time > newTime);
-    if (lastFrameIdxRef.current < 0) lastFrameIdxRef.current = frames.length;
-
-    const frame = getStateAtTime(frames, newTime);
-    if (frame) {
-      updateFromReplayFrame({ ...frame, time: newTime });
-    }
-  };
-
-  // Estimated real-time remaining
-  const remaining = replayDuration > 0 && replaySpeed > 0
-    ? (replayDuration - replayTime) / replaySpeed
-    : 0;
-
+  // When not replaying, show just the Replay button
   if (!isReplaying) {
     return (
       <button
@@ -216,115 +134,7 @@ export function ReplayController() {
     );
   }
 
-  const progressPct = replayDuration > 0 ? (replayTime / replayDuration) * 100 : 0;
-
-  return (
-    <div className="bg-slate-800 border border-slate-600 rounded-lg p-3 text-white">
-      {/* Top row: controls + time */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center space-x-1.5">
-          {/* Step backward */}
-          <button
-            onClick={handleStepBackward}
-            title="Step backward"
-            className="w-7 h-7 flex items-center justify-center rounded bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M6 6h2v12H6V6zm3.5 6l8.5 6V6l-8.5 6z" />
-            </svg>
-          </button>
-
-          {/* Play/Pause */}
-          <button
-            onClick={handleTogglePause}
-            className="w-9 h-9 flex items-center justify-center rounded-lg bg-indigo-500 text-white hover:bg-indigo-400 transition-colors"
-          >
-            {replayPaused ? (
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-              </svg>
-            )}
-          </button>
-
-          {/* Step forward */}
-          <button
-            onClick={handleStepForward}
-            title="Step forward"
-            className="w-7 h-7 flex items-center justify-center rounded bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M18 6h-2v12h2V6zm-3.5 6L6 6v12l8.5-6z" />
-            </svg>
-          </button>
-
-          {/* Stop */}
-          <button
-            onClick={handleStopReplay}
-            title="Stop replay"
-            className="w-7 h-7 flex items-center justify-center rounded bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white transition-colors ml-1"
-          >
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M6 6h12v12H6V6z" />
-            </svg>
-          </button>
-
-          {/* Divider */}
-          <div className="w-px h-6 bg-slate-600 mx-1" />
-
-          {/* Speed selector */}
-          <div className="flex items-center space-x-0.5">
-            {SPEED_OPTIONS.map((speed) => (
-              <button
-                key={speed}
-                onClick={() => setReplaySpeed(speed)}
-                className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded transition-colors ${
-                  replaySpeed === speed
-                    ? 'bg-indigo-500 text-white'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-700'
-                }`}
-              >
-                {speed < 1 ? speed.toString() : speed}x
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Time display */}
-        <div className="flex items-center space-x-3 text-xs">
-          <span className="font-mono text-slate-300">
-            {formatSimTime(replayTime)}
-          </span>
-          <span className="text-slate-500">/</span>
-          <span className="font-mono text-slate-400">
-            {formatSimTime(replayDuration)}
-          </span>
-          {remaining > 0 && !replayPaused && (
-            <span className="text-slate-500 text-[10px]">
-              (~{formatDuration(Math.floor(remaining))} left)
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Timeline scrubber */}
-      <div className="relative">
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.0005}
-          value={replayDuration > 0 ? replayTime / replayDuration : 0}
-          onChange={handleScrub}
-          className="w-full h-1.5 bg-slate-700 rounded-full appearance-none cursor-pointer"
-          style={{
-            background: `linear-gradient(to right, #6366f1 ${progressPct}%, #334155 ${progressPct}%)`,
-          }}
-        />
-      </div>
-    </div>
-  );
+  // Replay engine runs via useEffect hooks above — no visible UI
+  // InlineReplayControls in LiveSimulationView handles play/pause/speed
+  return null;
 }

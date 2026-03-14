@@ -172,14 +172,14 @@ export function WipTrendChart({ data, events = [], warnings = [] }: WipTrendChar
           y1={padding.top}
           x2={padding.left}
           y2={padding.top + plotHeight}
-          stroke="#d1d5db"
+          stroke="#e5e7eb"
         />
         <line
           x1={padding.left}
           y1={padding.top + plotHeight}
           x2={padding.left + plotWidth}
           y2={padding.top + plotHeight}
-          stroke="#d1d5db"
+          stroke="#e5e7eb"
         />
 
         {/* Event markers */}
@@ -218,18 +218,18 @@ export function WipTrendChart({ data, events = [], warnings = [] }: WipTrendChar
       </svg>
 
       {/* Summary */}
-      <div className="flex justify-around text-sm">
+      <div className="flex justify-around text-xs">
         <div className="text-center">
-          <div className="text-gray-500">Current WIP</div>
-          <div className="font-semibold">{data.total} items</div>
+          <div className="text-gray-500 uppercase tracking-wider">Current WIP</div>
+          <div className="font-semibold font-mono tabular-nums text-sm">{data.total} items</div>
         </div>
         <div className="text-center">
-          <div className="text-gray-500">Peak WIP</div>
-          <div className="font-semibold">{Math.max(...timeSeries.map((d) => d.wip))} items</div>
+          <div className="text-gray-500 uppercase tracking-wider">Peak WIP</div>
+          <div className="font-semibold font-mono tabular-nums text-sm">{Math.max(...timeSeries.map((d) => d.wip))} items</div>
         </div>
         <div className="text-center">
-          <div className="text-gray-500">Avg WIP</div>
-          <div className="font-semibold">
+          <div className="text-gray-500 uppercase tracking-wider">Avg WIP</div>
+          <div className="font-semibold font-mono tabular-nums text-sm">
             {Math.round(timeSeries.reduce((sum, d) => sum + d.wip, 0) / timeSeries.length)} items
           </div>
         </div>

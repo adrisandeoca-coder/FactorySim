@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
+import { GitMerge } from 'lucide-react';
 
 interface AssemblyNodeData {
   label: string;
@@ -17,9 +18,9 @@ export const AssemblyNode = memo(({ data, selected }: NodeProps<AssemblyNodeData
 
   return (
     <div
-      className={`px-4 py-3 rounded-lg border-2 min-w-[150px] ${
+      className={`px-3 py-2.5 rounded-lg border-2 min-w-[150px] ${
         selected ? 'border-indigo-500 shadow-lg' : 'border-indigo-300'
-      } bg-gradient-to-br from-indigo-50 to-indigo-100`}
+      } bg-indigo-50`}
     >
       {/* Multiple input handles */}
       {Array.from({ length: hasPerProduct ? data.inputPartsByProduct!.length : (data.inputParts || 2) }).map((_, i) => (
@@ -33,31 +34,29 @@ export const AssemblyNode = memo(({ data, selected }: NodeProps<AssemblyNodeData
         />
       ))}
       <div className="flex items-center space-x-2">
-        <div className="w-8 h-8 bg-indigo-500 rounded flex items-center justify-center">
-          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14v6m-3-3h6M6 10h2a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2zm10 0h2a2 2 0 002-2V6a2 2 0 00-2-2h-2a2 2 0 00-2 2v2a2 2 0 002 2zM6 20h2a2 2 0 002-2v-2a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2z" />
-          </svg>
+        <div className="w-7 h-7 bg-indigo-500 rounded flex items-center justify-center">
+          <GitMerge className="w-4 h-4 text-white" strokeWidth={1.75} />
         </div>
         <div>
-          <div className="font-semibold text-sm text-indigo-900">{data.label}</div>
-          <div className="text-xs text-indigo-600">Assembly</div>
+          <div className="font-semibold text-[13px] text-indigo-900">{data.label}</div>
+          <div className="text-[11px] text-indigo-600">Assembly</div>
         </div>
       </div>
-      <div className="mt-2 space-y-1 text-xs">
+      <div className="mt-1.5 space-y-1 text-[11px]">
         {hasPerProduct ? (
           data.inputPartsByProduct!.map((p, i) => (
-            <div key={i} className="bg-indigo-200 rounded px-2 py-0.5 text-indigo-800">
+            <div key={i} className="bg-indigo-100 rounded px-1.5 py-0.5 text-indigo-700 font-mono tabular-nums">
               {p.quantity}x {p.productName}
             </div>
           ))
         ) : (
-          <div className="bg-indigo-200 rounded px-2 py-0.5 text-indigo-800">
+          <div className="bg-indigo-100 rounded px-1.5 py-0.5 text-indigo-700">
             {inputParts} inputs &rarr; 1 output
           </div>
         )}
         {data.cycleTime && (
-          <div className="bg-indigo-200 rounded px-2 py-0.5 text-indigo-800">
-            Cycle: {data.cycleTime}s
+          <div className="bg-indigo-100 rounded px-1.5 py-0.5 text-indigo-700 font-mono tabular-nums">
+            CT: {data.cycleTime}s
           </div>
         )}
       </div>

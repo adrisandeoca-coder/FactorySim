@@ -106,6 +106,8 @@ export interface SimulationOptions {
   traceMode?: boolean;
   confidenceLevel?: number;
   streamEvents?: boolean;
+  /** ISO date string for simulation start (default: today 06:00) */
+  simulationStartDate?: string;
 }
 
 export interface ConfidenceInterval {
@@ -245,7 +247,8 @@ export type DashboardWidgetType =
   | 'station-table'
   | 'utilization-chart'
   | 'wip-trend-chart'
-  | 'quality-chart';
+  | 'quality-chart'
+  | 'gantt-schedule';
 
 export interface DashboardWidgetConfig {
   id: string;

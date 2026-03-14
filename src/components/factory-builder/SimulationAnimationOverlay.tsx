@@ -1,166 +1,217 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useReactFlow } from 'reactflow';
-
-interface AnimatedEntity {
-  id: string;
-  productType: string;
-  sourceNodeId: string;
-  targetNodeId: string;
-  progress: number; // 0 to 1
-  color: string;
-  startTime: number;
-  duration: number; // ms for animation
-}
-
-interface SimulationEvent {
-  time: number;
-  type: string;
-  entity_id: string;
-  details: Record<string, unknown>;
-}
+import { useLiveSimulationStore } from '../../stores/liveSimulationStore';
 
 const PRODUCT_COLORS = [
-  '#3b82f6', // blue
-  '#ef4444', // red
-  '#10b981', // green
-  '#f59e0b', // amber
-  '#8b5cf6', // purple
-  '#ec4899', // pink
-  '#06b6d4', // cyan
-  '#f97316', // orange
+  '#3b82f6', '#ef4444', '#10b981', '#f59e0b',
+  '#8b5cf6', '#ec4899', '#06b6d4', '#f97316',
 ];
 
-function getColorForProduct(_productType: string, index: number): string {
-  return PRODUCT_COLORS[index % PRODUCT_COLORS.length];
+const TRAVEL_DURATION = 1200; // ms per edge traversal
+const MAX_PRODUCTS = 60;
+
+interface AnimProduct {
+  id: string;
+  sourceX: number;
+  sourceY: number;
+  targetX: number;
+  targetY: number;
+  startTime: number;
+  duration: number;
+  color: string;
 }
 
 interface Props {
   isSimulating: boolean;
-  events: SimulationEvent[];
-  simulationSpeed?: number; // 1 = realtime, 10 = 10x
+  events: any[]; // legacy prop, ignored — we use liveSimulationStore instead
 }
 
-export function SimulationAnimationOverlay({ isSimulating, events, simulationSpeed = 10 }: Props) {
-  const [entities, setEntities] = useState<AnimatedEntity[]>([]);
-  const animationRef = useRef<number | null>(null);
-  const productTypeColors = useRef<Map<string, string>>(new Map());
-  const productTypeIndex = useRef(0);
+export function SimulationAnimationOverlay({ isSimulating }: Props) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const productsRef = useRef<AnimProduct[]>([]);
+  const processedEventsRef = useRef(new Set<string>());
+  const productColorsRef = useRef(new Map<string, string>());
+  const colorIdxRef = useRef(0);
+  const animFrameRef = useRef<number | null>(null);
   const { getNodes, getEdges } = useReactFlow();
 
-  const getProductColor = useCallback((productType: string) => {
-    if (!productTypeColors.current.has(productType)) {
-      productTypeColors.current.set(productType, getColorForProduct(productType, productTypeIndex.current++));
+  const getColor = useCallback((productType: string): string => {
+    if (!productColorsRef.current.has(productType)) {
+      productColorsRef.current.set(productType, PRODUCT_COLORS[colorIdxRef.current++ % PRODUCT_COLORS.length]);
     }
-    return productTypeColors.current.get(productType)!;
+    return productColorsRef.current.get(productType)!;
   }, []);
 
-  // Process incoming events to create animated entities
+  // Build node position and edge maps from ReactFlow
+  const getTopology = useCallback(() => {
+    const nodes = getNodes();
+    const edges = getEdges();
+    const positions = new Map<string, { x: number; y: number }>();
+    const nameToId = new Map<string, string>();
+
+    for (const node of nodes) {
+      const cx = node.position.x + (node.width || 140) / 2;
+      const cy = node.position.y + (node.height || 60) / 2;
+      positions.set(node.id, { x: cx, y: cy });
+      // Map node name/label to id
+      const name = (node.data as any)?.name || (node.data as any)?.label || node.id;
+      nameToId.set(name, node.id);
+    }
+
+    const incoming = new Map<string, string[]>();
+    const outgoing = new Map<string, string[]>();
+    for (const e of edges) {
+      if (!incoming.has(e.target)) incoming.set(e.target, []);
+      incoming.get(e.target)!.push(e.source);
+      if (!outgoing.has(e.source)) outgoing.set(e.source, []);
+      outgoing.get(e.source)!.push(e.target);
+    }
+
+    return { positions, nameToId, incoming, outgoing };
+  }, [getNodes, getEdges]);
+
+  // Spawn a product between two nodes
+  const spawnProduct = useCallback((sourceId: string, targetId: string, productType: string, positions: Map<string, { x: number; y: number }>) => {
+    const src = positions.get(sourceId);
+    const tgt = positions.get(targetId);
+    if (!src || !tgt) return;
+    if (productsRef.current.length >= MAX_PRODUCTS) return;
+
+    productsRef.current.push({
+      id: `${sourceId}-${targetId}-${Date.now()}-${Math.random()}`,
+      sourceX: src.x, sourceY: src.y,
+      targetX: tgt.x, targetY: tgt.y,
+      startTime: performance.now(),
+      duration: TRAVEL_DURATION,
+      color: getColor(productType),
+    });
+  }, [getColor]);
+
+  // Main animation loop — processes events + draws on canvas
   useEffect(() => {
-    if (!isSimulating || events.length === 0) {
-      setEntities([]);
+    if (!isSimulating) {
+      productsRef.current = [];
+      processedEventsRef.current.clear();
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
       return;
     }
 
-    const nodes = getNodes();
-    const edges = getEdges();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    // Build a map of node positions
-    const nodePositions = new Map<string, { x: number; y: number; width: number; height: number }>();
-    for (const node of nodes) {
-      nodePositions.set(node.id, {
-        x: node.position.x + (node.width || 140) / 2,
-        y: node.position.y + (node.height || 60) / 2,
-        width: node.width || 140,
-        height: node.height || 60,
-      });
-    }
+    let lastEventCheck = 0;
 
-    // Process recent events to show movement
-    const now = Date.now();
-    const recentEvents = events.slice(-50); // Only process last 50 events
-    const newEntities: AnimatedEntity[] = [];
+    const animate = () => {
+      animFrameRef.current = requestAnimationFrame(animate);
+      const now = performance.now();
 
-    for (const event of recentEvents) {
-      if (event.type === 'processing_start') {
-        const stationId = event.entity_id;
-        const productId = event.details.product_id as string;
-        const productType = event.details.product_type as string;
+      // Resize canvas to match parent
+      const parent = canvas.parentElement;
+      if (parent) {
+        const w = parent.clientWidth;
+        const h = parent.clientHeight;
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+        }
+      }
 
-        // Find an edge leading to this station
-        const incomingEdge = edges.find(e => e.target === stationId);
-        if (incomingEdge) {
-          const sourcePos = nodePositions.get(incomingEdge.source);
-          const targetPos = nodePositions.get(incomingEdge.target);
-          if (sourcePos && targetPos) {
-            newEntities.push({
-              id: `${productId}-${event.time}`,
-              productType,
-              sourceNodeId: incomingEdge.source,
-              targetNodeId: incomingEdge.target,
-              progress: Math.min(1, (now % 2000) / 2000),
-              color: getProductColor(productType),
-              startTime: now - Math.random() * 1500,
-              duration: 2000 / simulationSpeed,
-            });
+      // Process new events from liveSimulationStore (check every ~50ms)
+      if (now - lastEventCheck > 50) {
+        lastEventCheck = now;
+        const liveState = useLiveSimulationStore.getState();
+        const { positions, nameToId, incoming, outgoing } = getTopology();
+
+        for (const evt of liveState.recentEvents) {
+          const evtKey = `${evt.type}-${evt.entity_id}-${evt.time}`;
+          if (processedEventsRef.current.has(evtKey)) continue;
+          processedEventsRef.current.add(evtKey);
+
+          // Cap memory
+          if (processedEventsRef.current.size > 500) {
+            const arr = [...processedEventsRef.current];
+            processedEventsRef.current = new Set(arr.slice(-250));
+          }
+
+          const entityId = nameToId.get(evt.entity_id) || evt.entity_id;
+
+          if (evt.type === 'processing_start') {
+            const sources = incoming.get(entityId);
+            if (sources?.length) {
+              const productType = (evt.details?.product_type as string) || 'default';
+              spawnProduct(sources[0], entityId, productType, positions);
+            }
+          } else if (evt.type === 'processing_complete') {
+            const targets = outgoing.get(entityId);
+            if (targets?.length) {
+              const productType = liveState.stationProducts[evt.entity_id]?.productType || 'default';
+              spawnProduct(entityId, targets[0], productType, positions);
+            }
+          } else if (evt.type === 'source_generate') {
+            const targets = outgoing.get(entityId);
+            if (targets?.length) {
+              const productType = (evt.details?.product_type as string) || 'default';
+              spawnProduct(entityId, targets[0], productType, positions);
+            }
           }
         }
       }
-    }
 
-    setEntities(prev => {
-      // Keep entities that are still animating
-      const stillActive = prev.filter(e => (now - e.startTime) < e.duration);
-      // Add new ones, deduplicate by id
-      const existingIds = new Set(stillActive.map(e => e.id));
-      const toAdd = newEntities.filter(e => !existingIds.has(e.id));
-      return [...stillActive.slice(-30), ...toAdd.slice(-20)]; // Cap at 50 total
-    });
-  }, [isSimulating, events, getNodes, getEdges, simulationSpeed, getProductColor]);
+      // Draw
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Animation loop
-  useEffect(() => {
-    if (!isSimulating || entities.length === 0) {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-        animationRef.current = null;
+      // Update and draw products
+      const alive: AnimProduct[] = [];
+      for (const p of productsRef.current) {
+        const elapsed = now - p.startTime;
+        const t = Math.min(1, elapsed / p.duration);
+
+        if (t >= 1) continue; // dead
+
+        // Smooth easing (ease-in-out)
+        const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+        const x = p.sourceX + (p.targetX - p.sourceX) * ease;
+        const y = p.sourceY + (p.targetY - p.sourceY) * ease;
+
+        // Glow
+        ctx.beginPath();
+        ctx.arc(x, y, 10, 0, Math.PI * 2);
+        ctx.fillStyle = p.color + '33'; // 20% opacity
+        ctx.fill();
+
+        // Main dot
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        alive.push(p);
       }
-      return;
-    }
-
-    const animate = () => {
-      const now = Date.now();
-      setEntities(prev =>
-        prev
-          .map(e => ({
-            ...e,
-            progress: Math.min(1, (now - e.startTime) / e.duration),
-          }))
-          .filter(e => e.progress < 1)
-      );
-      animationRef.current = requestAnimationFrame(animate);
+      productsRef.current = alive;
     };
 
-    animationRef.current = requestAnimationFrame(animate);
+    animFrameRef.current = requestAnimationFrame(animate);
+
     return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [isSimulating, entities.length]);
+  }, [isSimulating, getTopology, spawnProduct]);
 
-  if (!isSimulating || entities.length === 0) return null;
-
-  const nodes = getNodes();
-  const nodePositions = new Map<string, { x: number; y: number }>();
-  for (const node of nodes) {
-    nodePositions.set(node.id, {
-      x: node.position.x + (node.width || 140) / 2,
-      y: node.position.y + (node.height || 60) / 2,
-    });
-  }
+  if (!isSimulating) return null;
 
   return (
-    <svg
+    <canvas
+      ref={canvasRef}
       style={{
         position: 'absolute',
         top: 0,
@@ -170,38 +221,6 @@ export function SimulationAnimationOverlay({ isSimulating, events, simulationSpe
         pointerEvents: 'none',
         zIndex: 10,
       }}
-    >
-      {entities.map(entity => {
-        const sourcePos = nodePositions.get(entity.sourceNodeId);
-        const targetPos = nodePositions.get(entity.targetNodeId);
-        if (!sourcePos || !targetPos) return null;
-
-        const x = sourcePos.x + (targetPos.x - sourcePos.x) * entity.progress;
-        const y = sourcePos.y + (targetPos.y - sourcePos.y) * entity.progress;
-
-        return (
-          <g key={entity.id}>
-            {/* Glow effect */}
-            <circle
-              cx={x}
-              cy={y}
-              r={8}
-              fill={entity.color}
-              opacity={0.2}
-            />
-            {/* Main dot */}
-            <circle
-              cx={x}
-              cy={y}
-              r={5}
-              fill={entity.color}
-              stroke="white"
-              strokeWidth={1.5}
-              opacity={0.9}
-            />
-          </g>
-        );
-      })}
-    </svg>
+    />
   );
 }

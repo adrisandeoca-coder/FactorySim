@@ -51,13 +51,13 @@ export function SweepHeatmap({ result, parameters, kpiPath, kpiLabel }: SweepHea
       ]}
       layout={{
         title: `${kpiLabel}: ${p1.entityName} vs ${p2.entityName}`,
-        xaxis: { title: `${p1.entityName}: ${p1.parameterLabel}` },
-        yaxis: { title: `${p2.entityName}: ${p2.parameterLabel}` },
         height: 450,
         margin: { l: 80, r: 40, t: 40, b: 60 },
         paper_bgcolor: 'transparent',
         plot_bgcolor: 'transparent',
-        font: { color: '#374151' },
+        font: { family: 'Inter, system-ui, sans-serif', color: '#374151', size: 11 },
+        xaxis: { title: `${p1.entityName}: ${p1.parameterLabel}`, gridcolor: '#f1f5f9', zerolinecolor: '#e2e8f0' },
+        yaxis: { title: `${p2.entityName}: ${p2.parameterLabel}`, gridcolor: '#f1f5f9', zerolinecolor: '#e2e8f0' },
       }}
       config={{ responsive: true }}
       style={{ width: '100%' }}

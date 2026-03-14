@@ -201,7 +201,7 @@ describe('helper functions', () => {
     });
 
     it('formats minutes only when < 1 hour', () => {
-      expect(formatDuration(300)).toBe('5m');
+      expect(formatDuration(300)).toBe('5m 0s');
     });
   });
 

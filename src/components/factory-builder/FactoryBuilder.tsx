@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useRef, useState, useEffect, lazy, Suspense } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -19,6 +19,11 @@ import { useAppStore } from '../../stores/appStore';
 import { captureScreenshot, captureToBase64 } from '../../services/screenshotService';
 import { registerElement, setCachedImage } from '../../services/elementRegistry';
 import { Button } from '../common/Button';
+
+// Lazy-load the 3D view to avoid loading Three.js when not needed
+const Factory3DView = lazy(() =>
+  import('./3d/Factory3DView').then(m => ({ default: m.Factory3DView }))
+);
 import { Modal } from '../common/Modal';
 import { StationNode } from './nodes/StationNode';
 import { BufferNode } from './nodes/BufferNode';
@@ -137,6 +142,7 @@ export function FactoryBuilder() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [showZones, setShowZones] = useState(false);
+  const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d');
   const searchRef = useRef<HTMLDivElement>(null);
   const factoryRef = useRef<HTMLDivElement>(null);
   const rfInstance = useRef<ReactFlowInstance | null>(null);
@@ -513,6 +519,23 @@ export function FactoryBuilder() {
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* 2D / 3D view toggle */}
+          <div className={`flex items-center rounded-md p-0.5 transition-all ${isSimulating ? 'bg-green-100 ring-2 ring-green-400/50' : 'bg-gray-100'}`}>
+            <button
+              onClick={() => setViewMode('2d')}
+              className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${viewMode === '2d' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              title="2D View"
+            >
+              2D
+            </button>
+            <button
+              onClick={() => setViewMode('3d')}
+              className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${viewMode === '3d' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              title="3D View (works during simulation)"
+            >
+              3D
+            </button>
+          </div>
           <button
             onClick={() => setShowZones(!showZones)}
             className={`px-2 py-1 text-xs rounded transition-colors ${showZones ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}
@@ -599,8 +622,20 @@ export function FactoryBuilder() {
       </div>
 
       {/* Canvas */}
-      <div className="flex-1 flex">
-        <div className="flex-1">
+      <div className="flex-1 flex min-h-0">
+        <div className="flex-1 relative">
+          {viewMode === '3d' ? (
+            <Suspense fallback={
+              <div className="w-full h-full flex items-center justify-center bg-slate-100">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                  <p className="text-sm text-gray-500">Loading 3D View...</p>
+                </div>
+              </div>
+            }>
+              <Factory3DView />
+            </Suspense>
+          ) : (
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -660,6 +695,7 @@ export function FactoryBuilder() {
               })) || []}
             />
           </ReactFlow>
+          )}
         </div>
 
         {/* Property Panel */}

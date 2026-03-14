@@ -57,6 +57,10 @@ export interface LiveSimulationState {
     };
   }>;
 
+  // 3D camera fly-to signal (increments on each click)
+  flyToBottleneck3DSignal: number;
+  triggerFlyToBottleneck3D: () => void;
+
   // Replay state
   isReplaying: boolean;
   replaySpeed: number;
@@ -123,6 +127,7 @@ const initialState = {
   stationStateTimes: {} as Record<string, Record<string, number>>,
   stationLastStateChange: {} as Record<string, { state: string; time: number }>,
   edgeFlowCounts: {} as Record<string, number>,
+  flyToBottleneck3DSignal: 0,
   capturedFrames: [] as Array<{ progress: number; base64: string; metadata?: { simTime: number; diagnostics: Record<string, unknown>; trigger?: string } }>,
   isReplaying: false,
   replaySpeed: 1,
@@ -566,6 +571,8 @@ export const useLiveSimulationStore = create<LiveSimulationState>((set) => ({
   },
 
   setSimDuration: (duration) => set({ simDuration: duration }),
+
+  triggerFlyToBottleneck3D: () => set((s) => ({ flyToBottleneck3DSignal: s.flyToBottleneck3DSignal + 1 })),
 
   reset: () => set(initialState),
 }));

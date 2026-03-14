@@ -190,8 +190,8 @@ export function ThroughputChart({ data }: ThroughputChartProps) {
         })}
 
         {/* Axes */}
-        <line x1={padding.left} y1={padding.top} x2={padding.left} y2={padding.top + plotHeight} stroke="#d1d5db" />
-        <line x1={padding.left} y1={padding.top + plotHeight} x2={padding.left + plotWidth} y2={padding.top + plotHeight} stroke="#d1d5db" />
+        <line x1={padding.left} y1={padding.top} x2={padding.left} y2={padding.top + plotHeight} stroke="#e5e7eb" />
+        <line x1={padding.left} y1={padding.top + plotHeight} x2={padding.left + plotWidth} y2={padding.top + plotHeight} stroke="#e5e7eb" />
 
         {/* Hover dots for each data point */}
         {values.map((val, i) => {
@@ -212,18 +212,18 @@ export function ThroughputChart({ data }: ThroughputChartProps) {
       </svg>
 
       {/* Summary */}
-      <div className="mt-2 flex justify-around text-sm">
+      <div className="mt-2 flex justify-around text-xs">
         <div className="text-center">
-          <div className="text-gray-500">Total Output</div>
-          <div className="font-semibold">{data.total || hourlyData.reduce((a, b) => a + b, 0)} units</div>
+          <div className="text-gray-500 uppercase tracking-wider">Total Output</div>
+          <div className="font-semibold font-mono tabular-nums text-sm">{data.total || hourlyData.reduce((a, b) => a + b, 0)} units</div>
         </div>
         <div className="text-center">
-          <div className="text-gray-500">Avg Rate</div>
-          <div className="font-semibold">{data.ratePerHour?.toFixed(0) || Math.round(hourlyData.reduce((a, b) => a + b, 0) / hourlyData.length)} /hr</div>
+          <div className="text-gray-500 uppercase tracking-wider">Avg Rate</div>
+          <div className="font-semibold font-mono tabular-nums text-sm">{data.ratePerHour?.toFixed(0) || Math.round(hourlyData.reduce((a, b) => a + b, 0) / hourlyData.length)} /hr</div>
         </div>
         <div className="text-center">
-          <div className="text-gray-500">Peak Hour</div>
-          <div className="font-semibold">{Math.max(...hourlyData)} units</div>
+          <div className="text-gray-500 uppercase tracking-wider">Peak Hour</div>
+          <div className="font-semibold font-mono tabular-nums text-sm">{Math.max(...hourlyData)} units</div>
         </div>
       </div>
     </div>

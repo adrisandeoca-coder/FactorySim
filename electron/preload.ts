@@ -404,6 +404,7 @@ contextBridge.exposeInMainWorld('factorySim', {
     getVersion: () => ipcRenderer.sendSync('app:version'),
     getPlatform: () => process.platform,
     getUserDataPath: () => ipcRenderer.invoke('app:userDataPath'),
+    writeDiag: (content: string) => ipcRenderer.invoke('app:writeDiag', content),
     onSimulationProgress: (callback: (progress: SimulationProgress) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, progress: SimulationProgress) => callback(progress);
       ipcRenderer.on('simulation:progress', handler);

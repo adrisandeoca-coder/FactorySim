@@ -6,6 +6,7 @@ import { useAppStore } from '../stores/appStore';
 import { useSimulationStore } from '../stores/simulationStore';
 import { captureToBase64 } from '../services/screenshotService';
 import { registerElement, setCachedImage } from '../services/elementRegistry';
+import { Check, X, ChevronDown } from 'lucide-react';
 
 export function Settings() {
   const { currentUser, addToast } = useAppStore();
@@ -27,6 +28,13 @@ export function Settings() {
 
   const [duration, setDuration] = useState(defaultOptions.duration);
   const [seed, setSeed] = useState(defaultOptions.seed || '');
+  const [simStartDate, setSimStartDate] = useState(() => {
+    if (defaultOptions.simulationStartDate) return defaultOptions.simulationStartDate;
+    // Default: today at 06:00
+    const d = new Date();
+    d.setHours(6, 0, 0, 0);
+    return d.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM" for datetime-local
+  });
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const handleSaveSimSettings = () => {
@@ -34,12 +42,13 @@ export function Settings() {
       duration,
       seed: seed ? Number(seed) : undefined,
       replications: 1,
+      simulationStartDate: simStartDate,
     });
     addToast({ type: 'success', message: 'Simulation settings saved' });
   };
 
   // Check if user has seen this version's release notes
-  const CURRENT_VERSION = '1.0.0';
+  const CURRENT_VERSION = '1.1.0';
   const [seenVersion] = useState(() => {
     try { return localStorage.getItem('factorysim_seen_version'); } catch { return null; }
   });
@@ -122,11 +131,24 @@ export function Settings() {
               />
               <p className="text-xs text-gray-400 mt-1">
                 Multi-replication support coming soon.{' '}
-                <a href="https://github.com/adrisanchez/FactorySim/discussions" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">
+                <a href="https://github.com/adrisandeoca-coder/FactorySim/discussions" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">
                   Vote for this feature
                 </a>
               </p>
             </div>
+          </div>
+
+          <div>
+            <label className="input-label">Simulation Start Date & Time</label>
+            <input
+              type="datetime-local"
+              value={simStartDate}
+              onChange={(e) => setSimStartDate(e.target.value)}
+              className="input"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Sets the calendar date shown during simulation. The sim clock will advance from this point.
+            </p>
           </div>
 
           <div>
@@ -299,6 +321,75 @@ export function Settings() {
         </div>
       </Card>
 
+      {/* Third-Party Licenses */}
+      <Card>
+        <details className="group">
+          <summary className="cursor-pointer list-none flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Third-Party Licenses</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Open-source software used by FactorySim</p>
+            </div>
+            <ChevronIcon className="w-5 h-5 text-gray-400 group-open:rotate-180 transition-transform" />
+          </summary>
+          <div className="mt-4 space-y-3 text-xs text-gray-600">
+            <p className="text-sm text-gray-700 pb-2 border-b border-gray-100">
+              FactorySim is built on the following open-source libraries. We are grateful to their authors and communities.
+            </p>
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="py-1.5 pr-4 font-semibold text-gray-800 text-xs">Library</th>
+                  <th className="py-1.5 pr-4 font-semibold text-gray-800 text-xs">License</th>
+                  <th className="py-1.5 font-semibold text-gray-800 text-xs">Purpose</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {[
+                  { name: 'SimPy', license: 'MIT', purpose: 'Discrete-event simulation engine (Python)' },
+                  { name: 'NumPy', license: 'BSD-3-Clause', purpose: 'Numerical computing for statistical distributions' },
+                  { name: 'Python', license: 'PSF License', purpose: 'Simulation runtime environment' },
+                  { name: 'React', license: 'MIT', purpose: 'User interface framework' },
+                  { name: 'Electron', license: 'MIT', purpose: 'Desktop application shell' },
+                  { name: 'Three.js', license: 'MIT', purpose: '3D visualization engine' },
+                  { name: '@react-three/fiber', license: 'MIT', purpose: 'React renderer for Three.js' },
+                  { name: '@react-three/drei', license: 'MIT', purpose: 'Three.js helper components' },
+                  { name: 'React Flow', license: 'MIT', purpose: 'Node-based graph editor (Factory Builder)' },
+                  { name: 'Zustand', license: 'MIT', purpose: 'State management' },
+                  { name: 'Plotly.js', license: 'MIT', purpose: 'Interactive charts and graphs' },
+                  { name: 'D3.js', license: 'ISC', purpose: 'Data visualization utilities' },
+                  { name: 'Monaco Editor', license: 'MIT', purpose: 'Code editor component' },
+                  { name: 'Vite', license: 'MIT', purpose: 'Build tool and dev server' },
+                  { name: 'TypeScript', license: 'Apache-2.0', purpose: 'Type-safe JavaScript' },
+                  { name: 'Tailwind CSS', license: 'MIT', purpose: 'Utility-first CSS framework' },
+                  { name: 'Lucide React', license: 'ISC', purpose: 'Icon library' },
+                  { name: 'PapaParse', license: 'MIT', purpose: 'CSV parsing for data import' },
+                  { name: 'SheetJS (xlsx)', license: 'Apache-2.0', purpose: 'Excel file import/export' },
+                  { name: 'sql.js', license: 'MIT', purpose: 'SQLite database (in-browser)' },
+                  { name: 'html2canvas', license: 'MIT', purpose: 'Screenshot capture' },
+                  { name: 'Lodash', license: 'MIT', purpose: 'Utility functions' },
+                  { name: 'date-fns', license: 'MIT', purpose: 'Date formatting' },
+                  { name: 'uuid', license: 'MIT', purpose: 'Unique ID generation' },
+                  { name: 'Winston', license: 'MIT', purpose: 'Logging framework' },
+                  { name: 'React Router', license: 'MIT', purpose: 'Client-side routing' },
+                  { name: 'electron-store', license: 'MIT', purpose: 'Persistent local storage' },
+                ].map(dep => (
+                  <tr key={dep.name}>
+                    <td className="py-1.5 pr-4 font-medium text-gray-800">{dep.name}</td>
+                    <td className="py-1.5 pr-4">
+                      <span className="inline-block px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 font-mono text-[10px]">{dep.license}</span>
+                    </td>
+                    <td className="py-1.5 text-gray-500">{dep.purpose}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="pt-3 text-[11px] text-gray-400 border-t border-gray-100">
+              Full license texts are available in the <code className="bg-gray-100 px-1 rounded">node_modules/</code> directory of each respective package and in the <code className="bg-gray-100 px-1 rounded">python/</code> environment for Python dependencies.
+            </p>
+          </div>
+        </details>
+      </Card>
+
       {/* Documentation */}
       <Card>
         <CardHeader title="Documentation" subtitle="How to use FactorySim" />
@@ -407,25 +498,13 @@ export function Settings() {
 }
 
 function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-    </svg>
-  );
+  return <Check className={className} strokeWidth={1.75} />;
 }
 
 function XIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  );
+  return <X className={className} strokeWidth={1.75} />;
 }
 
 function ChevronIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  );
+  return <ChevronDown className={className} strokeWidth={1.75} />;
 }

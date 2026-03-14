@@ -207,6 +207,7 @@ export function getDefaultDashboardWidgets(): DashboardWidgetConfig[] {
     { id: 'w-throughput-chart', type: 'throughput-chart', label: 'Throughput by Hour', size: 'lg' },
     { id: 'w-bottleneck-heatmap', type: 'bottleneck-heatmap', label: 'Bottleneck Analysis', size: 'full' },
     { id: 'w-station-table', type: 'station-table', label: 'Station Performance', size: 'full' },
+    { id: 'w-gantt-schedule', type: 'gantt-schedule', label: 'Schedule Gantt', size: 'full' },
   ];
 }
 

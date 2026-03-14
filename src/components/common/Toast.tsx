@@ -1,4 +1,5 @@
 import { useAppStore } from '../../stores/appStore';
+import { Check, X, AlertTriangle, Info } from 'lucide-react';
 
 export function ToastContainer() {
   const { toasts, removeToast } = useAppStore();
@@ -16,7 +17,7 @@ export function ToastContainer() {
             onClick={() => removeToast(toast.id)}
             className="ml-2 hover:opacity-80"
           >
-            <CloseIcon className="w-4 h-4" />
+            <X className="w-4 h-4" strokeWidth={1.75} />
           </button>
         </div>
       ))}
@@ -25,38 +26,15 @@ export function ToastContainer() {
 }
 
 function ToastIcon({ type }: { type: string }) {
+  const sw = 1.75;
   switch (type) {
     case 'success':
-      return (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-        </svg>
-      );
+      return <Check className="w-5 h-5" strokeWidth={sw} />;
     case 'error':
-      return (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      );
+      return <X className="w-5 h-5" strokeWidth={sw} />;
     case 'warning':
-      return (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-        </svg>
-      );
+      return <AlertTriangle className="w-5 h-5" strokeWidth={sw} />;
     default:
-      return (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      );
+      return <Info className="w-5 h-5" strokeWidth={sw} />;
   }
-}
-
-function CloseIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  );
 }

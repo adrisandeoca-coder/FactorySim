@@ -78,8 +78,8 @@ export function OEEChart({ data }: OEEChartProps) {
         ))}
 
         {/* Axes */}
-        <line x1={padding.left} y1={padding.top} x2={padding.left} y2={padding.top + plotHeight} stroke="#d1d5db" />
-        <line x1={padding.left} y1={padding.top + plotHeight} x2={padding.left + plotWidth} y2={padding.top + plotHeight} stroke="#d1d5db" />
+        <line x1={padding.left} y1={padding.top} x2={padding.left} y2={padding.top + plotHeight} stroke="#e5e7eb" />
+        <line x1={padding.left} y1={padding.top + plotHeight} x2={padding.left + plotWidth} y2={padding.top + plotHeight} stroke="#e5e7eb" />
 
         {/* Waterfall bars */}
         {columns.map((col, i) => {
@@ -168,8 +168,8 @@ export function OEEChart({ data }: OEEChartProps) {
       </svg>
 
       {/* OEE Formula */}
-      <div className="mt-1 text-center text-sm text-gray-500">
-        OEE = {(availability * 100).toFixed(0)}% × {(performance * 100).toFixed(0)}% × {(quality * 100).toFixed(0)}% = <span className="font-medium text-gray-900">{(overall * 100).toFixed(1)}%</span>
+      <div className="mt-1 text-center text-xs text-gray-500">
+        OEE = <span className="font-mono tabular-nums">{(availability * 100).toFixed(0)}%</span> × <span className="font-mono tabular-nums">{(performance * 100).toFixed(0)}%</span> × <span className="font-mono tabular-nums">{(quality * 100).toFixed(0)}%</span> = <span className="font-medium text-gray-900 font-mono tabular-nums">{(overall * 100).toFixed(1)}%</span>
       </div>
     </div>
   );

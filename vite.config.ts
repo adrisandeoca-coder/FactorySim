@@ -19,6 +19,11 @@ export default defineConfig({
       '@types': path.resolve(__dirname, './src/types'),
     },
   },
+  optimizeDeps: {
+    // Prevent Vite from bundling Three.js libs into single large minified files
+    // which triggers Windows Defender false positives (TR/JS.Prontexi.Z heuristic)
+    exclude: ['@react-three/drei'],
+  },
   server: {
     port: 3000,
     strictPort: true,

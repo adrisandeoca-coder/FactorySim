@@ -244,7 +244,11 @@ Detailed documentation is available in the [`docs/`](docs/) folder:
 
 ## License
 
-MIT License - See LICENSE file for details.
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)** — see the [LICENSE](LICENSE) file for details.
+
+### Commercial Licensing
+
+If you want to use FactorySim in a proprietary product, embed it in commercial software, or use it internally without AGPL obligations, a commercial license is available. See [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for details or contact [adrisandeoca@gmail.com](mailto:adrisandeoca@gmail.com).
 
 ## Support
 

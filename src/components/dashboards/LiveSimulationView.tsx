@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useRef, useEffect, useState } from 'react';
+import { useMemo, useCallback, useRef, useEffect, useState, lazy, Suspense } from 'react';
 import ReactFlow, {
   Background,
   MiniMap,
@@ -18,6 +18,132 @@ import { LiveGenericNode } from '../factory-builder/nodes/LiveGenericNode';
 import { LiveAnimationOverlay } from './LiveAnimationOverlay';
 import { formatDuration, useSimulationStore } from '../../stores/simulationStore';
 import { registerElement } from '../../services/elementRegistry';
+
+const Factory3DView = lazy(() =>
+  import('../factory-builder/3d/Factory3DView').then(m => ({ default: m.Factory3DView }))
+);
+
+const REPLAY_SPEEDS = [0.5, 1, 2, 5, 10, 25, 50, 100, 500];
+
+function InlineReplayControls() {
+  const isReplaying = useLiveSimulationStore((s) => s.isReplaying);
+  const replayPaused = useLiveSimulationStore((s) => s.replayPaused);
+  const replaySpeed = useLiveSimulationStore((s) => s.replaySpeed);
+  const replayTime = useLiveSimulationStore((s) => s.replayTime);
+  const replayDuration = useLiveSimulationStore((s) => s.replayDuration);
+
+  if (!isReplaying) return null;
+
+  const progressPct = replayDuration > 0 ? (replayTime / replayDuration) * 100 : 0;
+
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+    return `${m}m ${String(s).padStart(2, '0')}s`;
+  };
+
+  const remaining = replayDuration > 0 && replaySpeed > 0
+    ? (replayDuration - replayTime) / replaySpeed : 0;
+
+  return (
+    <div className="absolute top-7 left-1/2 -translate-x-1/2 z-20 bg-slate-800/95 backdrop-blur-sm rounded-lg border border-slate-600 shadow-xl px-3 py-1.5" style={{ minWidth: 480 }}>
+      {/* Top row: transport + speed + time */}
+      <div className="flex items-center space-x-2">
+        {/* Play/Pause */}
+        <button
+          onClick={() => useLiveSimulationStore.getState().setReplayPaused(!replayPaused)}
+          className="w-7 h-7 flex items-center justify-center rounded-md bg-indigo-500 text-white hover:bg-indigo-400 transition-colors"
+          title={replayPaused ? 'Play' : 'Pause'}
+        >
+          {replayPaused ? (
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+          ) : (
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" /></svg>
+          )}
+        </button>
+
+        {/* Restart (skip to beginning) */}
+        <button
+          onClick={() => {
+            useLiveSimulationStore.getState().setReplayProgress(0);
+            useLiveSimulationStore.setState({
+              replayTime: 0,
+              replayProgress: 0,
+              replayPaused: true,
+              currentTime: 0,
+              recentEvents: [],
+              stationStates: {},
+              bufferLevels: {},
+              stationProducts: {},
+              stationProcessedCounts: {},
+              sourceGeneratedCounts: {},
+              sinkExitedCounts: {},
+              stationUtilizations: {},
+              stationStateTimes: {},
+              stationLastStateChange: {},
+              edgeFlowCounts: {},
+            });
+          }}
+          className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors"
+          title="Restart from beginning"
+        >
+          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6V6zm3.5 6l8.5 6V6l-8.5 6z" /></svg>
+        </button>
+
+        {/* Stop (exit replay) */}
+        <button
+          onClick={() => useLiveSimulationStore.getState().stopReplay()}
+          className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 text-red-400 hover:bg-red-900/50 hover:text-red-300 transition-colors"
+          title="Stop & exit replay"
+        >
+          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6V6z" /></svg>
+        </button>
+
+        {/* Divider */}
+        <div className="w-px h-5 bg-slate-600" />
+
+        {/* Speed selector */}
+        <div className="flex items-center space-x-0.5">
+          {REPLAY_SPEEDS.map((speed) => (
+            <button
+              key={speed}
+              onClick={() => useLiveSimulationStore.getState().setReplaySpeed(speed)}
+              className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded transition-colors ${
+                replaySpeed === speed
+                  ? 'bg-indigo-500 text-white'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
+              }`}
+            >
+              {speed < 1 ? speed.toString() : speed}x
+            </button>
+          ))}
+        </div>
+
+        {/* Divider */}
+        <div className="w-px h-5 bg-slate-600" />
+
+        {/* Time display */}
+        <span className="text-[11px] font-mono text-slate-300 whitespace-nowrap">
+          {formatTime(replayTime)} / {formatTime(replayDuration)}
+        </span>
+        {remaining > 1 && !replayPaused && (
+          <span className="text-[10px] text-slate-500 whitespace-nowrap">
+            (~{formatTime(Math.floor(remaining))} left)
+          </span>
+        )}
+      </div>
+      {/* Bottom row: scrubber bar */}
+      <div className="mt-1.5 w-full h-1.5 bg-slate-700 rounded-full overflow-hidden cursor-pointer relative">
+        <div
+          className="h-full bg-indigo-500 transition-all duration-100"
+          style={{ width: `${progressPct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
 
 const liveNodeTypes: NodeTypes = {
   station: LiveStationNode,
@@ -440,16 +566,57 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
     return vals.reduce((a, b) => a + b, 0) / vals.length;
   }, [stationUtilizations]);
 
-  // Throughput rate based on sink exits (matches KPI ratePerHour)
-  const throughputRate = currentTime > 0 ? (totalSinkExited / currentTime) * 3600 : 0;
+  // Simulation clock — maps simulated seconds to a real date/time
+  const simStartDate = useSimulationStore((s) => s.defaultOptions.simulationStartDate);
+  const simDateTime = useMemo(() => {
+    // Default: today at 06:00 AM (typical factory shift start)
+    const base = simStartDate
+      ? new Date(simStartDate)
+      : (() => { const d = new Date(); d.setHours(6, 0, 0, 0); return d; })();
+    const current = new Date(base.getTime() + currentTime * 1000);
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const day = dayNames[current.getDay()];
+    const month = monthNames[current.getMonth()];
+    const date = current.getDate();
+    const hours = String(current.getHours()).padStart(2, '0');
+    const mins = String(current.getMinutes()).padStart(2, '0');
+    return `${day} ${month} ${date}, ${hours}:${mins}`;
+  }, [currentTime, simStartDate]);
+
+  // Throughput rate — excludes warmup period for stable reading
+  // During warmup, pipelines are filling so exits are artificially inflated
+  const effectiveTime = warmupPeriod > 0 ? Math.max(0, currentTime - warmupPeriod) : currentTime;
+  const throughputRate = effectiveTime > 60 // wait at least 1 min of effective sim time
+    ? (totalSinkExited / effectiveTime) * 3600
+    : 0;
 
   // Issue 4+5 — Extract top bottleneck entry at component level (used by HUD + fly-to)
   // Only consider utilization keys that map to actual model stations (filters out orphaned/stale keys)
+  // Falls back to lastResult KPI utilization when live data is empty (e.g. replay reset, post-sim)
+  const lastResult = useSimulationStore((s) => s.lastResult);
   const topBnEntry = useMemo(() => {
-    return Object.entries(stationUtilizations)
-      .filter(([name, u]) => u > 0 && nameToIdMap.has(name))
-      .sort((a, b) => b[1] - a[1])[0] || null;
-  }, [stationUtilizations, nameToIdMap]);
+    // Try live utilizations first
+    const liveEntries = Object.entries(stationUtilizations)
+      .filter(([name, u]) => u > 0 && nameToIdMap.has(name));
+    if (liveEntries.length > 0) {
+      return liveEntries.sort((a, b) => b[1] - a[1])[0] || null;
+    }
+    // Fallback to lastResult KPI utilization (station ID keys → need to map via name)
+    if (lastResult?.kpis?.utilization?.byStation) {
+      const byStation = lastResult.kpis.utilization.byStation;
+      const entries: [string, number][] = [];
+      for (const s of model.stations) {
+        const u = byStation[s.id];
+        if (u) {
+          const util = (u.busy || 0) + (u.setup || 0) + (u.failed || 0);
+          if (util > 0) entries.push([s.name, util]);
+        }
+      }
+      return entries.sort((a, b) => b[1] - a[1])[0] || null;
+    }
+    return null;
+  }, [stationUtilizations, nameToIdMap, lastResult, model.stations]);
 
   const topBnId = useMemo(() => {
     if (!topBnEntry) return null;
@@ -467,6 +634,7 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
       if (e.key === 'b' || e.key === 'B') {
         if (topBnId) {
           reactFlow.fitView({ nodes: [{ id: topBnId }] as any, padding: 0.5, minZoom: 0.5, maxZoom: 2, duration: 500 });
+          useLiveSimulationStore.getState().triggerFlyToBottleneck3D();
         }
       }
     };
@@ -493,57 +661,92 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
     setFullscreen(!isFullscreen);
   }, [isFullscreen, setFullscreen]);
 
+  // 3D view mode toggle — default to 3D during replay
+  const [viewMode, setViewMode] = useState<'2d' | '3d'>(isReplaying ? '3d' : '2d');
+
+  // Auto-switch to 3D when replay starts and unpause
+  useEffect(() => {
+    if (isReplaying) {
+      setViewMode('3d');
+      // Small delay to let Factory3DView mount before unpausing
+      const t = setTimeout(() => {
+        useLiveSimulationStore.getState().setReplayPaused(false);
+      }, 500);
+      return () => clearTimeout(t);
+    }
+  }, [isReplaying]);
+
   return (
     <div
       ref={containerRef}
       className="relative rounded-xl border border-slate-700 bg-slate-900 overflow-hidden shadow-xl"
       style={{ height: heightOverride ?? (isFullscreen ? '100vh' : 560) }}
     >
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={liveNodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.12, minZoom: 0.3, maxZoom: 1.5 }}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable={false}
-        panOnDrag
-        zoomOnScroll
-        zoomOnPinch
-        minZoom={0.3}
-        maxZoom={4}
-        preventScrolling={false}
-        proOptions={{ hideAttribution: true }}
-        onNodeDoubleClick={handleNodeDoubleClick}
-      >
-        <Background color="#334155" gap={24} size={1} />
+      {/* Inline replay controls overlay */}
+      <InlineReplayControls />
 
-        <LiveAnimationOverlay />
-        <MiniMap
-          nodeColor={(node) => {
-            if (node.type === 'source') return '#22c55e';
-            if (node.type === 'sink') return '#ef4444';
-            if (node.type === 'buffer' || node.type === 'matchbuffer') {
-              const bl = (node.data as any);
-              if (bl?.liveCapacity > 0 && bl?.liveLevel >= bl?.liveCapacity) return '#ef4444';
-              return '#f59e0b';
-            }
-            const state = (node.data as any)?.liveState;
-            if (state === 'processing') return '#22c55e';
-            if (state === 'blocked') return '#ef4444';
-            if (state === 'failed') return '#b91c1c';
-            if (state === 'starved') return '#eab308';
-            if (state === 'setup') return '#f97316';
-            if (state === 'off_shift') return '#a855f7';
-            return '#9ca3af';
-          }}
-          style={{ height: 150, width: 220 }}
-          maskColor="rgba(0,0,0,0.6)"
-          pannable
-          zoomable={false}
-        />
-      </ReactFlow>
+      {/* During batch simulation: max-speed indicator overlay */}
+      {!isReplaying && progress < 1 && progress > 0 && (
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 z-20 bg-slate-800/95 backdrop-blur-sm rounded-lg border border-blue-500/50 shadow-xl px-4 py-2 text-center">
+          <div className="flex items-center space-x-2">
+            <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+            <span className="text-[12px] font-bold text-blue-300 uppercase tracking-wider">Computing at max speed</span>
+          </div>
+          <span className="text-[10px] text-slate-400 block mt-0.5">3D replay will start automatically when done</span>
+        </div>
+      )}
+
+      {viewMode === '3d' ? (
+        <Suspense fallback={<div className="flex items-center justify-center h-full text-slate-400">Loading 3D view...</div>}>
+          <Factory3DView />
+        </Suspense>
+      ) : (
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={liveNodeTypes}
+          fitView
+          fitViewOptions={{ padding: 0.12, minZoom: 0.3, maxZoom: 1.5 }}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          elementsSelectable={false}
+          panOnDrag
+          zoomOnScroll
+          zoomOnPinch
+          minZoom={0.3}
+          maxZoom={4}
+          preventScrolling={false}
+          proOptions={{ hideAttribution: true }}
+          onNodeDoubleClick={handleNodeDoubleClick}
+        >
+          <Background color="#334155" gap={24} size={1} />
+
+          <LiveAnimationOverlay />
+          <MiniMap
+            nodeColor={(node) => {
+              if (node.type === 'source') return '#22c55e';
+              if (node.type === 'sink') return '#ef4444';
+              if (node.type === 'buffer' || node.type === 'matchbuffer') {
+                const bl = (node.data as any);
+                if (bl?.liveCapacity > 0 && bl?.liveLevel >= bl?.liveCapacity) return '#ef4444';
+                return '#f59e0b';
+              }
+              const state = (node.data as any)?.liveState;
+              if (state === 'processing') return '#22c55e';
+              if (state === 'blocked') return '#ef4444';
+              if (state === 'failed') return '#b91c1c';
+              if (state === 'starved') return '#eab308';
+              if (state === 'setup') return '#f97316';
+              if (state === 'off_shift') return '#a855f7';
+              return '#9ca3af';
+            }}
+            style={{ height: 150, width: 220 }}
+            maskColor="rgba(0,0,0,0.6)"
+            pannable
+            zoomable={false}
+          />
+        </ReactFlow>
+      )}
 
       {/* P6 — Progress bar with hour markers */}
       <div className="absolute top-0 left-0 right-0 h-5 bg-slate-800">
@@ -610,20 +813,8 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
         </div>
       </div>
 
-      {/* #3 — Persistent state legend (top-left, offset for progress bar) */}
-      <div className="absolute top-7 left-3 bg-slate-800/90 backdrop-blur-sm rounded-lg border border-slate-600 shadow-lg px-2.5 py-1.5 z-10">
-        <div className="flex items-center space-x-2.5">
-          {STATE_LEGEND.map((item) => (
-            <div key={item.label} className="flex items-center space-x-1">
-              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-              <span className="text-[9px] text-slate-400 font-medium">{item.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* State filter (below legend) */}
-      <div className="absolute top-14 left-3 bg-slate-800/90 backdrop-blur-sm rounded-lg border border-slate-600 shadow-lg px-2 py-1 z-10">
+      {/* State filter + legend (single bar, top-left) */}
+      <div className="absolute top-7 left-3 bg-slate-800/90 backdrop-blur-sm rounded-lg border border-slate-600 shadow-lg px-2 py-1 z-10">
         <div className="flex items-center space-x-1">
           <button
             onClick={() => setStateFilter(null)}
@@ -759,19 +950,28 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
             </span>
           </div>
 
-          {/* Fly-to-bottleneck button — always visible, disabled when no bottleneck */}
+          {/* Fly-to-bottleneck button — always visible, shows warning when no clear bottleneck */}
           <button
             className={`w-full text-[9px] font-bold rounded py-1 mb-1.5 transition-colors uppercase tracking-wider ${
               topBnId
                 ? 'text-slate-400 hover:text-white bg-slate-800 hover:bg-red-900/50'
-                : 'text-slate-600 bg-slate-800/50 cursor-not-allowed'
+                : 'text-amber-500/80 bg-slate-800/50 cursor-not-allowed'
             }`}
-            onClick={() => topBnId && reactFlow.fitView({ nodes: [{ id: topBnId }] as any, padding: 0.5, minZoom: 0.5, maxZoom: 2, duration: 500 })}
+            onClick={() => {
+              if (!topBnId) return;
+              reactFlow.fitView({ nodes: [{ id: topBnId }] as any, padding: 0.5, minZoom: 0.5, maxZoom: 2, duration: 500 });
+              useLiveSimulationStore.getState().triggerFlyToBottleneck3D();
+            }}
             disabled={!topBnId}
-            title={topBnId ? 'Zoom to bottleneck station (B)' : 'No bottleneck detected'}
+            title={topBnId ? 'Zoom to bottleneck station (B)' : 'No clear bottleneck — all stations have similar utilization'}
           >
-            {topBnId ? 'Fly to Bottleneck' : 'No Bottleneck'}
+            {topBnId ? 'Fly to Bottleneck' : 'No Clear Bottleneck'}
           </button>
+          {!topBnId && (
+            <div className="text-[8px] text-amber-400/70 leading-tight mb-1 px-0.5">
+              All stations have similar utilization — no dominant bottleneck detected
+            </div>
+          )}
 
           {/* Active failures — always visible */}
           <div className="mb-1">
@@ -810,6 +1010,7 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
         </div>
 
       {/* P0 + P9 — Fullscreen toggle + Pop-out buttons */}
+      {/* View mode + layout controls */}
       <div
         className="absolute z-20 flex items-center space-x-1"
         style={{
@@ -817,31 +1018,56 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
           right: 12,
         }}
       >
-        {/* P0 — Fullscreen toggle */}
+        {/* 2D/3D view mode toggle */}
+        <button
+          onClick={() => {
+            const newMode = viewMode === '2d' ? '3d' : '2d';
+            setViewMode(newMode);
+            if (newMode === '3d') {
+              const ls = useLiveSimulationStore.getState();
+              if (ls.isReplaying && ls.replayProgress >= 1) {
+                ls.setReplayProgress(0);
+                useLiveSimulationStore.setState({
+                  replayTime: 0, replayProgress: 0, replayPaused: false,
+                  currentTime: 0, recentEvents: [], stationStates: {},
+                  bufferLevels: {}, stationProducts: {}, stationProcessedCounts: {},
+                  sourceGeneratedCounts: {}, sinkExitedCounts: {},
+                  stationUtilizations: {}, stationStateTimes: {},
+                  stationLastStateChange: {}, edgeFlowCounts: {},
+                });
+              } else if (ls.isReplaying && ls.replayPaused) {
+                ls.setReplayPaused(false);
+              }
+            }
+          }}
+          className={`backdrop-blur-sm rounded-lg border shadow-lg px-2 py-1.5 transition-colors text-[11px] font-bold tracking-wider ${
+            viewMode === '3d'
+              ? 'bg-blue-600/90 border-blue-400 text-white'
+              : 'bg-slate-800/90 border-slate-600 text-slate-300 hover:bg-slate-700'
+          }`}
+          title={viewMode === '2d' ? 'Switch to 3D view' : 'Switch to 2D view'}
+        >
+          {viewMode === '2d' ? '3D' : '2D'}
+        </button>
+        {/* Fullscreen / 3D Focus toggle */}
         <button
           onClick={toggleFullscreen}
-          className="bg-slate-800/90 backdrop-blur-sm rounded-lg border border-slate-600 shadow-lg p-1.5 hover:bg-slate-700 transition-colors"
-          title={isFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}
+          className={`backdrop-blur-sm rounded-lg border shadow-lg p-1.5 transition-colors ${
+            isFullscreen
+              ? 'bg-indigo-600/90 border-indigo-400 text-white'
+              : 'bg-slate-800/90 border-slate-600 text-slate-300 hover:bg-slate-700'
+          }`}
+          title={isFullscreen ? 'Exit 3D Focus (Esc)' : '3D Focus — fullscreen view'}
         >
           {isFullscreen ? (
-            <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
             </svg>
           ) : (
-            <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
             </svg>
           )}
-        </button>
-        {/* P9 — Pop-out button */}
-        <button
-          onClick={() => window.factorySim?.window?.createPopout()}
-          className="bg-slate-800/90 backdrop-blur-sm rounded-lg border border-slate-600 shadow-lg p-1.5 hover:bg-slate-700 transition-colors"
-          title="Pop out animation"
-        >
-          <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-          </svg>
         </button>
       </div>
 
@@ -951,53 +1177,39 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
         );
       })()}
 
-      {/* Status bar at bottom */}
+      {/* Unified status bar at bottom */}
       <div className="absolute bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-sm text-white border-t border-slate-700/50">
-        <div className="px-4 py-2 flex items-center justify-between">
-          {/* Left: mode indicator + time */}
-          <div className="flex items-center space-x-4">
+        <div className="px-3 py-1.5 flex items-center justify-between">
+          {/* Left: mode indicator + sim clock */}
+          <div className="flex items-center space-x-3">
             <span className="flex items-center space-x-1.5">
               <span className={`w-2 h-2 rounded-full ${isReplaying ? 'bg-indigo-400' : 'bg-green-400'} animate-pulse`} />
               <span className="text-[11px] font-bold uppercase tracking-wider">
                 {isReplaying ? 'Replay' : 'Live'}
               </span>
             </span>
+            {/* Simulation date/time clock */}
+            {currentTime > 0 && (
+              <span className="text-[11px] text-blue-300 font-mono font-medium" title="Simulated date & time">
+                {simDateTime}
+              </span>
+            )}
             {!isReplaying && (
-              <span className="text-[10px] text-slate-500">
-                Elapsed: {formatDuration(elapsedSeconds)}
+              <span className="text-[10px] text-slate-500 font-mono">
+                {formatDuration(elapsedSeconds)}
               </span>
             )}
           </div>
 
-          {/* Center: station state pills */}
-          <div className="flex items-center space-x-2">
-            <StatePill label="Processing" count={stateCounts.processing} color="bg-green-500" />
-            <StatePill label="Idle" count={stateCounts.idle} color="bg-gray-400" />
-            <StatePill label="Blocked" count={stateCounts.blocked} color="bg-red-500" />
-            <StatePill label="Starved" count={stateCounts.starved} color="bg-yellow-500" />
-            {(stateCounts.failed ?? 0) > 0 && (
-              <StatePill label="Failed" count={stateCounts.failed} color="bg-red-700" />
-            )}
-            {(stateCounts.setup ?? 0) > 0 && (
-              <StatePill label="Setup" count={stateCounts.setup} color="bg-orange-500" />
-            )}
-            {(stateCounts.off_shift ?? 0) > 0 && (
-              <StatePill label="Off" count={stateCounts.off_shift} color="bg-purple-500" />
-            )}
-          </div>
-
-          {/* Right: metrics + OEE gauge + sparkline */}
+          {/* Right: metrics + OEE gauge */}
           <div className="flex items-center space-x-3 text-sm">
-            {/* P10 — Enlarged metrics */}
             <Metric label="WIP" value={activeProducts} warn={activeProducts > 50} />
             <Metric label="Buffers" value={totalBufferItems} />
             <Metric label="Done" value={totalSinkExited} accent />
             {throughputRate > 0 && (
               <span className="text-[10px] text-slate-400 font-mono">{throughputRate.toFixed(0)}/hr</span>
             )}
-            {/* P5 — Mini OEE Gauge */}
             {approxUtilization > 0 && <MiniGauge value={approxUtilization} />}
-            {/* Progress % removed — shown in gradient progress bar above */}
           </div>
         </div>
       </div>
@@ -1005,16 +1217,6 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
   );
 }
 
-function StatePill({ label, count, color }: { label: string; count?: number; color: string }) {
-  if (!count || count === 0) return null;
-  return (
-    <span className="flex items-center space-x-1" title={label}>
-      <span className={`w-2 h-2 rounded-full ${color}`} />
-      <span className="text-[10px] text-slate-500 font-medium">{label}</span>
-      <span className="text-[10px] text-slate-300 font-bold">{count}</span>
-    </span>
-  );
-}
 
 // P10 — Enlarged metric counters with colored icon badges
 function Metric({ label, value, accent, warn }: { label: string; value: number; accent?: boolean; warn?: boolean }) {

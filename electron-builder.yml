@@ -58,5 +58,6 @@ dmg:
       path: /Applications
 
 publish:
-  provider: generic
-  url: https://example.com/releases
+  provider: github
+  owner: adrisandeoca-coder
+  repo: FactorySim

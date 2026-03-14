@@ -68,13 +68,13 @@ export function TornadoChart({ result, parameters, kpiPath, kpiLabel }: TornadoC
       layout={{
         title: `Sensitivity: ${kpiLabel}`,
         barmode: 'overlay',
-        xaxis: { title: `Change from baseline (${baselineKpi.toFixed(2)})` },
         yaxis: { automargin: true },
         height: Math.max(300, impacts.length * 50 + 100),
         margin: { l: 200, r: 40, t: 40, b: 60 },
         paper_bgcolor: 'transparent',
         plot_bgcolor: 'transparent',
-        font: { color: '#374151' },
+        font: { family: 'Inter, system-ui, sans-serif', color: '#374151', size: 11 },
+        xaxis: { title: `Change from baseline (${baselineKpi.toFixed(2)})`, gridcolor: '#f1f5f9', zerolinecolor: '#e2e8f0' },
       }}
       config={{ responsive: true }}
       style={{ width: '100%' }}

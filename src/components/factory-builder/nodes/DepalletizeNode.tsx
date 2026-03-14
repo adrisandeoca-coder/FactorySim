@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
+import { PackageOpen } from 'lucide-react';
 
 interface DepalletizeNodeData {
   label: string;
@@ -10,28 +11,26 @@ interface DepalletizeNodeData {
 export const DepalletizeNode = memo(({ data, selected }: NodeProps<DepalletizeNodeData>) => {
   return (
     <div
-      className={`px-4 py-3 rounded-lg border-2 min-w-[140px] ${
+      className={`px-3 py-2.5 rounded-lg border-2 min-w-[140px] ${
         selected ? 'border-yellow-600 shadow-lg' : 'border-yellow-400'
-      } bg-gradient-to-br from-yellow-50 to-yellow-100`}
+      } bg-yellow-50`}
     >
       <Handle type="target" position={Position.Left} className="w-3 h-3 bg-yellow-600" />
       <div className="flex items-center space-x-2">
-        <div className="w-8 h-8 bg-yellow-600 rounded flex items-center justify-center">
-          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-          </svg>
+        <div className="w-7 h-7 bg-yellow-600 rounded flex items-center justify-center">
+          <PackageOpen className="w-4 h-4 text-white" strokeWidth={1.75} />
         </div>
         <div>
-          <div className="font-semibold text-sm text-yellow-900">{data.label}</div>
-          <div className="text-xs text-yellow-700">Depalletize</div>
+          <div className="font-semibold text-[13px] text-yellow-900">{data.label}</div>
+          <div className="text-[11px] text-yellow-700">Depalletize</div>
         </div>
       </div>
-      <div className="mt-2 space-y-1 text-xs">
-        <div className="bg-yellow-200 rounded px-2 py-0.5 text-yellow-800">
+      <div className="mt-1.5 space-y-1 text-[11px]">
+        <div className="bg-yellow-100 rounded px-1.5 py-0.5 text-yellow-700">
           Unloads until empty
         </div>
         {data.cycleTime && (
-          <div className="bg-yellow-200 rounded px-2 py-0.5 text-yellow-800">
+          <div className="bg-yellow-100 rounded px-1.5 py-0.5 text-yellow-700 font-mono tabular-nums">
             {data.cycleTime}s per item
           </div>
         )}

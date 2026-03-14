@@ -77,11 +77,16 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
+    "@types/three": "^0.183.1",
     "d3": "^7.8.5",
     "date-fns": "^3.3.1",
     "electron-store": "^8.1.0",
     "html2canvas": "^1.4.1",
     "lodash": "^4.17.21",
+    "lucide-react": "^0.577.0",
+    "monaco-editor": "^0.55.1",
     "papaparse": "^5.4.1",
     "plotly.js": "^2.29.1",
     "react": "^18.2.0",
@@ -90,6 +95,7 @@
     "react-router-dom": "^6.22.0",
     "reactflow": "^11.10.4",
     "sql.js": "^1.10.0",
+    "three": "^0.183.2",
     "uuid": "^9.0.1",
     "winston": "^3.11.0",
     "xlsx": "^0.18.5",
@@ -123,13 +129,13 @@
     "vitest": "^1.2.2"
   },
   "author": "Adrian Sanchez",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "https://github.com/adrisanchez/FactorySim.git"
+    "url": "https://github.com/adrisandeoca-coder/FactorySim.git"
   },
   "bugs": {
-    "url": "https://github.com/adrisanchez/FactorySim/issues"
+    "url": "https://github.com/adrisandeoca-coder/FactorySim/issues"
   },
-  "homepage": "https://github.com/adrisanchez/FactorySim#readme"
+  "homepage": "https://github.com/adrisandeoca-coder/FactorySim#readme"
 }

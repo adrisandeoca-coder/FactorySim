@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
+import { Merge } from 'lucide-react';
 
 interface MergeNodeData {
   label: string;
@@ -13,9 +14,9 @@ export const MergeNode = memo(({ data, selected }: NodeProps<MergeNodeData>) => 
 
   return (
     <div
-      className={`px-4 py-3 rounded-lg border-2 min-w-[140px] ${
+      className={`px-3 py-2.5 rounded-lg border-2 min-w-[140px] ${
         selected ? 'border-emerald-500 shadow-lg' : 'border-emerald-300'
-      } bg-gradient-to-br from-emerald-50 to-emerald-100`}
+      } bg-emerald-50`}
     >
       {/* Multiple input handles */}
       {Array.from({ length: inputs }).map((_, i) => (
@@ -29,23 +30,21 @@ export const MergeNode = memo(({ data, selected }: NodeProps<MergeNodeData>) => 
         />
       ))}
       <div className="flex items-center space-x-2">
-        <div className="w-8 h-8 bg-emerald-500 rounded flex items-center justify-center">
-          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-4m0 0l4 4m-4-4v18" />
-          </svg>
+        <div className="w-7 h-7 bg-emerald-500 rounded flex items-center justify-center">
+          <Merge className="w-4 h-4 text-white" strokeWidth={1.75} />
         </div>
         <div>
-          <div className="font-semibold text-sm text-emerald-900">{data.label}</div>
-          <div className="text-xs text-emerald-600">Merge</div>
+          <div className="font-semibold text-[13px] text-emerald-900">{data.label}</div>
+          <div className="text-[11px] text-emerald-600">Merge</div>
         </div>
       </div>
-      <div className="mt-2 space-y-1 text-xs">
-        <div className="bg-emerald-200 rounded px-2 py-0.5 text-emerald-800">
-          {inputs} inputs → 1 output
+      <div className="mt-1.5 space-y-1 text-[11px]">
+        <div className="bg-emerald-100 rounded px-1.5 py-0.5 text-emerald-700 font-mono tabular-nums">
+          {inputs} inputs &rarr; 1 output
         </div>
         {data.mergeType && (
-          <div className="bg-emerald-200 rounded px-2 py-0.5 text-emerald-800">
-            Type: {data.mergeType.toUpperCase()}
+          <div className="bg-emerald-100 rounded px-1.5 py-0.5 text-emerald-700">
+            {data.mergeType.toUpperCase()}
           </div>
         )}
       </div>
