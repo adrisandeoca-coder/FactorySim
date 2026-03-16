@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
 <style>
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -1015,6 +1015,15 @@ document.getElementById('showcase-img').style.transition = 'opacity 0.2s';
     console.error('WebGL not supported:', e);
     return;
   }
+
+  // Helper: configure a mesh without overwriting read-only Object3D properties
+  function M3(mesh, opts) {
+    if (opts.position) { mesh.position.copy(opts.position); delete opts.position; }
+    if (opts.rotation) { mesh.rotation.copy(opts.rotation); delete opts.rotation; }
+    if (opts.scale) { mesh.scale.copy(opts.scale); delete opts.scale; }
+    Object.assign(mesh, opts);
+    return mesh;
+  }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -1085,7 +1094,7 @@ document.getElementById('showcase-img').style.transition = 'opacity 0.2s';
   // ────────────────────────────────────────────
   function mkConveyor(x, z, len, rotY) {
     const g = new THREE.Group();
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(len, 0.05, 0.8), M.conveyor), { position: new THREE.Vector3(0, 0.68, 0), castShadow: true, receiveShadow: true }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(len, 0.05, 0.8), M.conveyor), { position: new THREE.Vector3(0, 0.68, 0), castShadow: true, receiveShadow: true }));
     const rGeo = new THREE.CylinderGeometry(0.055, 0.055, 0.72, 10);
     const n = Math.max(2, Math.floor(len / 0.32));
     for (let i = 0; i < n; i++) {
@@ -1113,29 +1122,29 @@ document.getElementById('showcase-img').style.transition = 'opacity 0.2s';
     const g = new THREE.Group();
     const mat = color === 'dark' ? M.blueDark : M.blue;
     // Base
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.1, 1.2), M.metal), { position: new THREE.Vector3(0, 0.05, 0), castShadow: true }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.1, 1.2), M.metal), { position: new THREE.Vector3(0, 0.05, 0), castShadow: true }));
     // Main housing
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.0, 1.0), mat), { position: new THREE.Vector3(0, 0.6, 0), castShadow: true, receiveShadow: true }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.0, 1.0), mat), { position: new THREE.Vector3(0, 0.6, 0), castShadow: true, receiveShadow: true }));
     // Top housing
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.18, 0.9), M.blueDark), { position: new THREE.Vector3(0, 1.19, 0), castShadow: true }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.18, 0.9), M.blueDark), { position: new THREE.Vector3(0, 1.19, 0), castShadow: true }));
     // Control panel
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 0.02), M.dark), { position: new THREE.Vector3(0, 0.7, 0.51), castShadow: true }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 0.02), M.dark), { position: new THREE.Vector3(0, 0.7, 0.51), castShadow: true }));
     // Screen
     const screen = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.2, 0.01), M.screenOff);
     screen.position.set(0, 0.75, 0.525); g.add(screen);
     // Intake/output openings
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.32, 0.38), M.dark), { position: new THREE.Vector3(-0.71, 0.5, 0) }));
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.32, 0.38), M.dark), { position: new THREE.Vector3(0.71, 0.5, 0) }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.32, 0.38), M.dark), { position: new THREE.Vector3(-0.71, 0.5, 0) }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.32, 0.38), M.dark), { position: new THREE.Vector3(0.71, 0.5, 0) }));
     // Spindle
     const spindle = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.28, 12), M.metalLight);
     spindle.position.set(0, 1.42, 0); spindle.castShadow = true; g.add(spindle);
-    g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.07, 0.07, 12), M.metal), { position: new THREE.Vector3(0, 1.58, 0) }));
+    g.add(M3(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.07, 0.07, 12), M.metal), { position: new THREE.Vector3(0, 1.58, 0) }));
     // Arm (piston on top)
     const armPivot = new THREE.Group(); armPivot.position.set(0.4, 1.3, 0);
     const arm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.4, 0.06), M.metalLight);
     arm.position.y = 0.2; arm.castShadow = true; armPivot.add(arm); g.add(armPivot);
     // Ventilation slits (back)
-    for (let i = 0; i < 4; i++) g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.035, 0.015), M.dark), { position: new THREE.Vector3(0, 0.38 + i * 0.18, -0.51) }));
+    for (let i = 0; i < 4; i++) g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.035, 0.015), M.dark), { position: new THREE.Vector3(0, 0.38 + i * 0.18, -0.51) }));
     // Status light
     const slMat = new THREE.MeshStandardMaterial({ color: 0xeab308, emissive: 0xeab308, emissiveIntensity: 0.3 });
     const statusLight = new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 12), slMat);
@@ -1151,13 +1160,13 @@ document.getElementById('showcase-img').style.transition = 'opacity 0.2s';
   // ────────────────────────────────────────────
   function mkSource(x, z) {
     const g = new THREE.Group();
-    g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 0.1, 16), M.metal), { position: new THREE.Vector3(0, 0.05, 0), castShadow: true }));
-    g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.58, 0.78, 16), M.green), { position: new THREE.Vector3(0, 0.54, 0), castShadow: true }));
-    g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.61, 0.58, 0.04, 16), M.greenDark), { position: new THREE.Vector3(0, 0.95, 0), castShadow: true }));
-    g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.1, 12), M.metal), { position: new THREE.Vector3(0, 0.08, 0) }));
+    g.add(M3(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 0.1, 16), M.metal), { position: new THREE.Vector3(0, 0.05, 0), castShadow: true }));
+    g.add(M3(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.58, 0.78, 16), M.green), { position: new THREE.Vector3(0, 0.54, 0), castShadow: true }));
+    g.add(M3(new THREE.Mesh(new THREE.CylinderGeometry(0.61, 0.58, 0.04, 16), M.greenDark), { position: new THREE.Vector3(0, 0.95, 0), castShadow: true }));
+    g.add(M3(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.1, 12), M.metal), { position: new THREE.Vector3(0, 0.08, 0) }));
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2;
-      g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.48, 8), M.metal), { position: new THREE.Vector3(Math.cos(a) * 0.44, 0.24, Math.sin(a) * 0.44), castShadow: true }));
+      g.add(M3(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.48, 8), M.metal), { position: new THREE.Vector3(Math.cos(a) * 0.44, 0.24, Math.sin(a) * 0.44), castShadow: true }));
     }
     // Animated arrow
     const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.18, 8), new THREE.MeshStandardMaterial({ color: 0xbbf7d0, emissive: 0x22c55e, emissiveIntensity: 0.3, transparent: true, opacity: 0.85 }));
@@ -1170,12 +1179,12 @@ document.getElementById('showcase-img').style.transition = 'opacity 0.2s';
   // ────────────────────────────────────────────
   function mkSink(x, z) {
     const g = new THREE.Group();
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.6, 0.8), M.red), { position: new THREE.Vector3(0, 0.3, 0), castShadow: true, receiveShadow: true }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.6, 0.8), M.red), { position: new THREE.Vector3(0, 0.3, 0), castShadow: true, receiveShadow: true }));
     for (const [bx, bz, w, d] of [[-0.5,0,0.05,0.85],[0.5,0,0.05,0.85],[0,-0.4,1.0,0.05],[0,0.4,1.0,0.05]])
-      g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d), M.redDark), { position: new THREE.Vector3(bx, 0.62, bz), castShadow: true }));
+      g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d), M.redDark), { position: new THREE.Vector3(bx, 0.62, bz), castShadow: true }));
     // Items inside
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.15, 0.2), M.amberLight), { position: new THREE.Vector3(-0.2, 0.45, 0) }));
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.14, 0.18), M.product2), { position: new THREE.Vector3(0.15, 0.44, -0.05) }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.15, 0.2), M.amberLight), { position: new THREE.Vector3(-0.2, 0.45, 0) }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.14, 0.18), M.product2), { position: new THREE.Vector3(0.15, 0.44, -0.05) }));
     g.position.set(x, 0, z); scene.add(g); return g;
   }
 
@@ -1185,16 +1194,16 @@ document.getElementById('showcase-img').style.transition = 'opacity 0.2s';
   function mkBuffer(x, z) {
     const g = new THREE.Group();
     for (const bx of [-0.48, 0.48]) for (const bz of [-0.22, 0.22])
-      g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.055, 1.35, 0.055), M.metalLight), { position: new THREE.Vector3(bx, 0.68, bz), castShadow: true }));
+      g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(0.055, 1.35, 0.055), M.metalLight), { position: new THREE.Vector3(bx, 0.68, bz), castShadow: true }));
     for (const y of [0.14, 0.52, 0.9])
-      g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.035, 0.48), M.shelf), { position: new THREE.Vector3(0, y, 0), castShadow: true, receiveShadow: true }));
+      g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.035, 0.48), M.shelf), { position: new THREE.Vector3(0, y, 0), castShadow: true, receiveShadow: true }));
     // Items
     const itemColors = [M.amber, M.amberLight, M.product1];
     for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++)
-      g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.14, 0.17), itemColors[row]), { position: new THREE.Vector3(-0.28 + col * 0.28, 0.24 + row * 0.38, 0) }));
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.04, 0.48), M.metalLight), { position: new THREE.Vector3(0, 1.36, 0), castShadow: true }));
+      g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.14, 0.17), itemColors[row]), { position: new THREE.Vector3(-0.28 + col * 0.28, 0.24 + row * 0.38, 0) }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.04, 0.48), M.metalLight), { position: new THREE.Vector3(0, 1.36, 0), castShadow: true }));
     // Label
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.1, 0.01), new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.8 })), { position: new THREE.Vector3(0, 1.25, 0.245) }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.1, 0.01), new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.8 })), { position: new THREE.Vector3(0, 1.25, 0.245) }));
     g.position.set(x, 0, z); scene.add(g); return g;
   }
 
@@ -1203,16 +1212,16 @@ document.getElementById('showcase-img').style.transition = 'opacity 0.2s';
   // ────────────────────────────────────────────
   function mkInspection(x, z) {
     const g = new THREE.Group();
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.1, 0.95), M.metal), { position: new THREE.Vector3(0, 0.05, 0), castShadow: true }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.1, 0.95), M.metal), { position: new THREE.Vector3(0, 0.05, 0), castShadow: true }));
     for (const sx of [-0.42, 0.42])
-      g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.95, 0.14), M.cyan), { position: new THREE.Vector3(sx, 0.53, 0), castShadow: true }));
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.93, 0.09, 0.14), M.cyan), { position: new THREE.Vector3(0, 1.01, 0), castShadow: true }));
+      g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.95, 0.14), M.cyan), { position: new THREE.Vector3(sx, 0.53, 0), castShadow: true }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(0.93, 0.09, 0.14), M.cyan), { position: new THREE.Vector3(0, 1.01, 0), castShadow: true }));
     // Scan beam
     const beamMat = new THREE.MeshStandardMaterial({ color: 0x67e8f9, emissive: 0x06b6d4, emissiveIntensity: 0.15, transparent: true, opacity: 0.7 });
     const beam = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.008, 0.008), beamMat);
     beam.position.set(0, 0.53, 0); g.add(beam); g._beam = beam; g._beamMat = beamMat;
     // Camera sensor on top
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.09, 0.14), M.dark), { position: new THREE.Vector3(0, 1.1, 0), castShadow: true }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.09, 0.14), M.dark), { position: new THREE.Vector3(0, 1.1, 0), castShadow: true }));
     g.position.set(x, 0, z); scene.add(g); return g;
   }
 
@@ -1221,23 +1230,23 @@ document.getElementById('showcase-img').style.transition = 'opacity 0.2s';
   // ────────────────────────────────────────────
   function mkAssembly(x, z) {
     const g = new THREE.Group();
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.1, 1.35), M.metal), { position: new THREE.Vector3(0, 0.05, 0), castShadow: true }));
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.85, 1.15), M.indigo), { position: new THREE.Vector3(0, 0.53, 0), castShadow: true, receiveShadow: true }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.1, 1.35), M.metal), { position: new THREE.Vector3(0, 0.05, 0), castShadow: true }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.85, 1.15), M.indigo), { position: new THREE.Vector3(0, 0.53, 0), castShadow: true, receiveShadow: true }));
     // Input ports
     for (const bz of [-0.24, 0.24])
-      g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.28, 0.28), M.dark), { position: new THREE.Vector3(-0.76, 0.44, bz) }));
+      g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.28, 0.28), M.dark), { position: new THREE.Vector3(-0.76, 0.44, bz) }));
     // Output port
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.33, 0.38), M.dark), { position: new THREE.Vector3(0.76, 0.44, 0) }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.33, 0.38), M.dark), { position: new THREE.Vector3(0.76, 0.44, 0) }));
     // Robotic arm
     const armPivot = new THREE.Group(); armPivot.position.set(0, 1.0, 0);
-    armPivot.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.12, 12), M.metal), {}));
+    armPivot.add(M3(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.12, 12), M.metal), {}));
     const armBar = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.05, 0.05), M.metalLight);
     armBar.position.set(0.22, 0.08, 0); armBar.castShadow = true; armPivot.add(armBar);
-    armPivot.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 0.08), M.metal), { position: new THREE.Vector3(0.45, 0.03, 0) }));
+    armPivot.add(M3(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 0.08), M.metal), { position: new THREE.Vector3(0.45, 0.03, 0) }));
     g.add(armPivot); g._arm = armPivot;
     // + symbol on front
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.035, 0.01), new THREE.MeshStandardMaterial({ color: 0xc7d2fe })), { position: new THREE.Vector3(0, 0.53, 0.58) }));
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.22, 0.01), new THREE.MeshStandardMaterial({ color: 0xc7d2fe })), { position: new THREE.Vector3(0, 0.53, 0.58) }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.035, 0.01), new THREE.MeshStandardMaterial({ color: 0xc7d2fe })), { position: new THREE.Vector3(0, 0.53, 0.58) }));
+    g.add(M3(new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.22, 0.01), new THREE.MeshStandardMaterial({ color: 0xc7d2fe })), { position: new THREE.Vector3(0, 0.53, 0.58) }));
     // Status light
     const slMat = new THREE.MeshStandardMaterial({ color: 0xeab308, emissive: 0xeab308, emissiveIntensity: 0.3 });
     const statusLight = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 10), slMat);
