@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardHeader } from '../common/Card';
 import { Button } from '../common/Button';
 import { ConfirmDialog } from '../common/ConfirmDialog';
@@ -9,8 +9,7 @@ import { useAppStore } from '../../stores/appStore';
 import { ProductManager } from './ProductManager';
 import { DeliveryPredictions } from './DeliveryPredictions';
 import { Plus, Sparkles, Eye, Pencil, Trash2, ClipboardList } from 'lucide-react';
-import { captureToBase64 } from '../../services/screenshotService';
-import { registerElement, setCachedImage } from '../../services/elementRegistry';
+import { useElementScreenshot } from '../../hooks/useElementScreenshot';
 import type { Order } from '../../types';
 
 /** Display-only extension with fields derived at render time */
@@ -43,20 +42,7 @@ export function OrderManager() {
   const { model } = modelStore;
   const { addToast } = useAppStore();
   const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'predictions'>('orders');
-  const ordersRef = useRef<HTMLDivElement>(null);
-
-  // Register orders tab for cross-tab screenshot capture
-  useEffect(() => {
-    registerElement('orders-tab', ordersRef.current);
-    return () => {
-      if (ordersRef.current) {
-        captureToBase64(ordersRef.current)
-          .then((base64) => setCachedImage('orders-tab', base64))
-          .catch(() => {});
-      }
-      registerElement('orders-tab', null);
-    };
-  }, []);
+  const ordersRef = useElementScreenshot('orders-tab');
 
   const lastResult = useSimulationStore((s) => s.lastResult);
   const throughputByProduct = lastResult?.kpis?.throughput?.byProduct || {};
@@ -181,25 +167,16 @@ export function OrderManager() {
     addToast({ type: 'success', message: `Generated ${count} orders` });
   };
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityDot = (priority: string) => {
     switch (priority) {
-      case 'urgent': return 'bg-red-100 text-red-800 border-red-300';
-      case 'high': return 'bg-orange-100 text-orange-800 border-orange-300';
-      case 'medium': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'low': return 'bg-gray-100 text-gray-800 border-gray-300';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'urgent': return '#F31260';
+      case 'high': return '#F5A524';
+      case 'medium': return '#2563EB';
+      case 'low': return '#9ca3af';
+      default: return '#9ca3af';
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'in_progress': return 'bg-blue-100 text-blue-800';
-      case 'late': return 'bg-red-100 text-red-800';
-      case 'pending': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
 
   const getProgressColor = (order: DisplayOrder) => {
     const progress = order.completedQuantity / order.quantity;
@@ -514,39 +491,43 @@ export function OrderManager() {
                           className="rounded text-blue-600"
                         />
                       </td>
-                      <td className="font-mono text-sm">{order.id}</td>
+                      <td className="font-mono text-xs text-gray-400">{order.id.length > 20 ? `ORD-${order.id.slice(-4)}` : order.id}</td>
                       <td>{order.productName}</td>
-                      <td>
-                        {order.isWip ? (
-                          <span className="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800">
-                            {model.stations.find(s => s.id === order.initialStationId)?.name || 'Station'}
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-800">{sourceName}</span>
-                        )}
+                      <td className="text-sm text-gray-600">
+                        {order.isWip
+                          ? (model.stations.find(s => s.id === order.initialStationId)?.name || 'Station')
+                          : sourceName}
                       </td>
                       <td>{order.completedQuantity} / {order.quantity}</td>
                       <td>
                         <div className="w-32">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span>{Math.round((order.completedQuantity / order.quantity) * 100)}%</span>
-                          </div>
-                          <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full ${getProgressColor(order)} transition-all`}
-                              style={{ width: `${(order.completedQuantity / order.quantity) * 100}%` }}
-                            />
-                          </div>
+                          {order.completedQuantity === 0 ? (
+                            <span className="text-xs text-gray-400">Not started</span>
+                          ) : (
+                            <>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span>{Math.round((order.completedQuantity / order.quantity) * 100)}%</span>
+                              </div>
+                              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full ${getProgressColor(order)} transition-all rounded-full`}
+                                  style={{ width: `${(order.completedQuantity / order.quantity) * 100}%` }}
+                                />
+                              </div>
+                            </>
+                          )}
                         </div>
                       </td>
                       <td>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getPriorityColor(order.priority)}`}>
-                          {order.priority.toUpperCase()}
+                        <span className="inline-flex items-center gap-1.5 text-xs text-gray-700">
+                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: getPriorityDot(order.priority) }} />
+                          {order.priority.charAt(0).toUpperCase() + order.priority.slice(1)}
                         </span>
                       </td>
                       <td>{order.dueDate}</td>
                       <td>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                        <span className="inline-flex items-center gap-1.5 text-xs text-gray-700 capitalize">
+                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: order.status === 'completed' ? '#16a34a' : order.status === 'in_progress' ? '#2563EB' : order.status === 'late' ? '#F31260' : '#9ca3af' }} />
                           {order.status.replace('_', ' ')}
                         </span>
                       </td>

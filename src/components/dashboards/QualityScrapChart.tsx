@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import type { OEEData, SimulationResult } from '../../types';
 import { useModelStore } from '../../stores/modelStore';
+import { ChartEmptyState } from './ChartEmptyState';
 
 interface QualityScrapChartProps {
   data: OEEData;
@@ -20,12 +21,12 @@ const CHART_WIDTH = 620;
 const MAX_WIDGET_HEIGHT = 600;
 
 function qualityColor(q: number): string {
-  if (q >= 0.98) return '#22c55e'; // green
-  if (q >= 0.95) return '#f59e0b'; // orange
-  return '#ef4444'; // red
+  if (q >= 0.98) return '#2563EB'; // blue — healthy
+  if (q >= 0.95) return '#F5A524'; // amber — warning
+  return '#F31260'; // red — problem
 }
 
-export function QualityScrapChart({ data, result }: QualityScrapChartProps) {
+const QualityScrapChart = React.memo(function QualityScrapChart({ data, result }: QualityScrapChartProps) {
   const { model } = useModelStore();
   const stations = model.stations;
   const [hoveredStation, setHoveredStation] = useState<string | null>(null);
@@ -33,12 +34,8 @@ export function QualityScrapChart({ data, result }: QualityScrapChartProps) {
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [showAll, setShowAll] = useState(false);
 
-  if (stations.length === 0) {
-    return (
-      <div className="h-48 flex items-center justify-center text-gray-400 text-sm">
-        No stations in model
-      </div>
-    );
+  if (!data || stations.length === 0) {
+    return <ChartEmptyState message="No quality data available" height="h-48" />;
   }
 
   // Build station data with quality values, sorted ascending (worst first)
@@ -154,7 +151,7 @@ export function QualityScrapChart({ data, result }: QualityScrapChartProps) {
                     y={y}
                     width={scrapWidth}
                     height={effectiveBarHeight}
-                    fill="#ef4444"
+                    fill="#F31260"
                     rx={scrapWidth === barAreaWidth ? 3 : 0}
                     opacity={isHovered ? 1 : 0.7}
                   />
@@ -164,7 +161,7 @@ export function QualityScrapChart({ data, result }: QualityScrapChartProps) {
                 <text
                   x={LABEL_WIDTH + barAreaWidth + 8}
                   y={y + effectiveBarHeight / 2 + 4}
-                  fill={qualPct >= 0.98 ? '#16a34a' : qualPct >= 0.95 ? '#d97706' : '#dc2626'}
+                  fill={qualPct >= 0.98 ? '#374151' : qualPct >= 0.95 ? '#F5A524' : '#F31260'}
                   fontSize="11"
                   fontWeight="600"
                   fontFamily="monospace"
@@ -267,20 +264,21 @@ export function QualityScrapChart({ data, result }: QualityScrapChartProps) {
       })()}
 
       {/* Legend */}
-      <div className="flex flex-wrap justify-center gap-x-5 gap-y-1 pt-1 border-t border-gray-100">
-        <div className="flex items-center space-x-1.5">
-          <div className="w-3 h-3 rounded-sm bg-green-500" />
-          <span className="text-xs text-gray-600">Quality (&ge;98%)</span>
+      <div className="flex flex-wrap gap-3.5" style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border-subtle, #F0F0EF)' }}>
+        <div className="flex items-center gap-1.5" style={{ fontSize: '11.5px', color: 'var(--t2, #52525B)', fontWeight: 500 }}>
+          <div className="rounded" style={{ width: 10, height: 10, background: '#2563EB' }} />
+          Quality (&ge;98%)
+        </div>
+        <div className="flex items-center gap-1.5" style={{ fontSize: '11.5px', color: 'var(--t2, #52525B)', fontWeight: 500 }}>
+          <div className="rounded" style={{ width: 10, height: 10, background: '#F5A524' }} />
+          Quality (95-98%)
         </div>
         <div className="flex items-center space-x-1.5">
-          <div className="w-3 h-3 rounded-sm bg-amber-500" />
-          <span className="text-xs text-gray-600">Quality (95-98%)</span>
-        </div>
-        <div className="flex items-center space-x-1.5">
-          <div className="w-3 h-3 rounded-sm bg-red-500" />
+          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#F31260' }} />
           <span className="text-xs text-gray-600">Scrap / Quality &lt;95%</span>
         </div>
       </div>
     </div>
   );
-}
+});
+export { QualityScrapChart };

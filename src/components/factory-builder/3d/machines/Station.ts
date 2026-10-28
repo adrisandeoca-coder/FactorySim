@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { box, cyl, sph, createStatusLight } from '../shared/helpers';
+import { box, cyl, sph, beveledBox, createStatusLight } from '../shared/helpers';
+import { boltHead } from '../shared/RoundedGeometry';
 import { M, mat } from '../shared/materials';
 
 /**
@@ -9,8 +10,9 @@ import { M, mat } from '../shared/materials';
 export function buildStation(): THREE.Group {
   const g = new THREE.Group();
 
-  // ── Base cabinet (heavy cast-iron) ──
-  const base = box(1.6, 0.3, 1.2, M.bodyDark, 0, 0.15, 0);
+  // ── Base cabinet (heavy cast-iron) with edge detail ──
+  const base = beveledBox(1.6, 0.3, 1.2, M.bodyDark);
+  base.position.set(0, 0.15, 0);
   base.name = 'base';
   g.add(base);
 
@@ -24,10 +26,28 @@ export function buildStation(): THREE.Group {
     g.add(cyl(0.035, 0.035, 0.06, 8, legMat, lx, 0.04, lz));
   }
 
-  // ── Column / upright on back ──
-  const column = box(0.35, 1.2, 0.3, M.bodyGray, 0, 0.9, -0.45);
+  // ── Column / upright on back with edge detail ──
+  const column = beveledBox(0.35, 1.2, 0.3, M.bodyGray);
+  column.position.set(0, 0.9, -0.45);
   column.name = 'column';
   g.add(column);
+
+  // Corner bolt heads on column front face (z = -0.45 + 0.15 = -0.30)
+  const boltMat = new THREE.MeshStandardMaterial({ color: 0x2a2e34, metalness: 0.9, roughness: 0.3 });
+  const boltGeo = boltHead(0.012, 0.008);
+  const columnFaceZ = -0.45 + 0.15 + 0.001; // front face of column + tiny offset
+  const boltPositions: [number, number][] = [
+    [-0.35 / 2 + 0.04,  1.2 / 2 - 0.04],
+    [ 0.35 / 2 - 0.04,  1.2 / 2 - 0.04],
+    [-0.35 / 2 + 0.04, -1.2 / 2 + 0.04],
+    [ 0.35 / 2 - 0.04, -1.2 / 2 + 0.04],
+  ];
+  for (const [bx, by] of boltPositions) {
+    const bolt = new THREE.Mesh(boltGeo, boltMat);
+    bolt.rotation.x = Math.PI / 2;
+    bolt.position.set(bx, 0.9 + by, columnFaceZ);
+    g.add(bolt);
+  }
 
   // Column reinforcement ribs (2 triangular-ish fins)
   g.add(box(0.04, 0.5, 0.2, M.bodyDark, -0.12, 0.55, -0.35));

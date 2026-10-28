@@ -287,6 +287,10 @@ class ProductType:
 
     def get_statistics(self) -> Dict[str, Any]:
         """Get comprehensive statistics for this product type."""
+        # Compute the mean once: recomputing it inside the variance sum made
+        # this O(n^2) and long runs (tens of thousands of parts) hung here.
+        mean_ct = self.get_average_cycle_time()
+        n = len(self.cycle_times)
         return {
             "id": self.id,
             "name": self.name,
@@ -294,10 +298,10 @@ class ProductType:
             "total_completed": self.total_completed,
             "total_scrapped": self.total_scrapped,
             "yield_rate": self.get_yield_rate(),
-            "average_cycle_time": self.get_average_cycle_time(),
+            "average_cycle_time": mean_ct,
             "cycle_time_std": (
-                (sum((ct - self.get_average_cycle_time()) ** 2 for ct in self.cycle_times) / len(self.cycle_times)) ** 0.5
-                if len(self.cycle_times) > 1 else 0.0
+                (sum((ct - mean_ct) ** 2 for ct in self.cycle_times) / (n - 1)) ** 0.5
+                if n > 1 else 0.0
             ),
         }
 

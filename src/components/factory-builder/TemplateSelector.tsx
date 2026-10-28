@@ -4,6 +4,7 @@ import { useModelStore } from '../../stores/modelStore';
 import { useAppStore } from '../../stores/appStore';
 import type { Template } from '../../types';
 import { masterTestTemplate } from './masterTemplate';
+import { WAREHOUSE_DEFAULTS } from '../../utils/warehouseDefaults';
 
 const templates: Template[] = [
   {
@@ -36,6 +37,137 @@ const templates: Template[] = [
       extraNodes: [
         { id: 'src-1', type: 'source', data: { id: 'src-1', name: 'Source', arrivalRate: 70, feedMode: 'interval' }, position: { x: 50, y: 250 } },
         { id: 'sink-1', type: 'sink', data: { id: 'sink-1', name: 'Sink' }, position: { x: 950, y: 250 } },
+      ],
+    },
+  },
+  {
+    id: 'distribution-centre',
+    name: 'Distribution Centre',
+    description: 'Rack warehouse: inbound trucks, (s,Q) replenishment, order picking, packing and shipping waves',
+    category: 'logistics',
+    template: {
+      stations: [],
+      buffers: [],
+      connections: [],
+      products: [],
+      resources: [],
+      extraNodes: [
+        { id: 'wh-dc', type: 'warehouse', position: { x: 450, y: 250 }, data: {
+          id: 'wh-dc', name: 'DC', ...structuredClone(WAREHOUSE_DEFAULTS),
+          layout: { ...WAREHOUSE_DEFAULTS.layout, aisles: 4, baysPerAisle: 5, levels: 4 },
+          slotting: 'abc',
+          forklifts: { ...WAREHOUSE_DEFAULTS.forklifts, count: 3 },
+          pickers: { ...WAREHOUSE_DEFAULTS.pickers, count: 4 },
+          inbound: { ...WAREHOUSE_DEFAULTS.inbound, enabled: false, doors: 3 }, // supply comes from (s,Q) reorders
+          orders: { ...WAREHOUSE_DEFAULTS.orders, enabled: true, interarrival: { type: 'exponential', parameters: { mean: 90 } }, packStations: 2, departureInterval: 3600 },
+          // Demand ≈ 40 orders/h × 4 lines × 3 units ≈ 10 pallets/h, split by share.
+          // Reorder point = lead-time demand + 30 % safety; order qty = 1 day of demand.
+          // Racks start ~75 % full and average ~65 % (engine-calibrated).
+          skus: ['Coffee beans', 'Tea', 'Sugar', 'Flour', 'Rice', 'Pasta', 'Olive oil', 'Canned tomatoes', 'Spices', 'Honey'].map((name, i) => {
+            const share = [30, 20, 12, 10, 8, 6, 5, 4, 3, 2][i];
+            const palletsPerHour = (10 * share) / 100;
+            const leadHours = 8;
+            const reorderPoint = Math.ceil(palletsPerHour * leadHours * 1.3) + 1;
+            const orderQuantity = Math.max(2, Math.ceil(palletsPerHour * 24));
+            return {
+              id: `sku-${i + 1}`, name, class: i < 2 ? 'A' : i < 5 ? 'B' : 'C',
+              unitsPerPallet: 48, initialPallets: reorderPoint + Math.floor(orderQuantity / 2),
+              reorderPoint, orderQuantity,
+              leadTime: { type: 'constant', parameters: { value: leadHours * 3600 } },
+              demandShare: share,
+            };
+          }),
+        } },
+      ],
+    },
+  },
+  {
+    id: 'asrs-dc',
+    name: 'High-bay AS/RS',
+    description: 'Automated high-bay store: stacker crane per aisle, goods-to-person picking, cross-docking, hourly outbound trucks',
+    category: 'logistics',
+    template: {
+      stations: [],
+      buffers: [],
+      connections: [],
+      products: [],
+      resources: [],
+      extraNodes: [
+        { id: 'wh-asrs', type: 'warehouse', position: { x: 450, y: 250 }, data: {
+          id: 'wh-asrs', name: 'AS/RS', ...structuredClone(WAREHOUSE_DEFAULTS),
+          storageType: 'asrs',
+          layout: { ...WAREHOUSE_DEFAULTS.layout, aisles: 3, baysPerAisle: 10, levels: 8, palletsPerBay: 1, bayWidth: 1.4, levelHeight: 1.6, aisleWidth: 1.6, rackDepth: 1.2, frontClearance: 6 },
+          pickers: { ...WAREHOUSE_DEFAULTS.pickers, count: 2 },
+          inbound: { ...WAREHOUSE_DEFAULTS.inbound, enabled: false, doors: 3 },
+          crossDock: true,
+          orders: { ...WAREHOUSE_DEFAULTS.orders, enabled: true, interarrival: { type: 'exponential', parameters: { mean: 120 } }, packStations: 2, departureInterval: 3600 },
+          // ≈ 30 orders/h × 4 lines × 3 units ≈ 5.6 pallets/h. Reorder point = lead-time
+          // demand + 30 %; order qty = 2 days. Engine-calibrated: cranes 50–70 % busy,
+          // racks ~40 % full, fill rate ≥ 98 %.
+          skus: ['Pumps', 'Valves', 'Gaskets', 'Motors', 'Filters', 'Sensors', 'Cables', 'Fittings'].map((name, i) => {
+            const share = [30, 20, 15, 10, 10, 6, 5, 4][i];
+            const palletsPerHour = (5.6 * share) / 100;
+            const leadHours = 8;
+            const reorderPoint = Math.ceil(palletsPerHour * leadHours * 1.3) + 1;
+            const orderQuantity = Math.max(3, Math.ceil(palletsPerHour * 48));
+            return {
+              id: `sku-${i + 1}`, name, class: i < 2 ? 'A' : i < 5 ? 'B' : 'C',
+              unitsPerPallet: 48, initialPallets: reorderPoint + Math.floor(orderQuantity / 2),
+              reorderPoint, orderQuantity,
+              leadTime: { type: 'constant', parameters: { value: leadHours * 3600 } },
+              demandShare: share,
+            };
+          }),
+        } },
+      ],
+    },
+  },
+  {
+    id: 'line-with-stores',
+    name: 'Line with Stores',
+    description: 'Raw-material store feeds a 2-station line; finished goods are palletised, stored and picked for customer orders',
+    category: 'logistics',
+    template: {
+      stations: [
+        { id: 's1', name: 'Machining', cycleTime: { type: 'normal', parameters: { mean: 50, std: 5 } }, position: { x: 400, y: 250 } },
+        { id: 's2', name: 'Assembly', cycleTime: { type: 'normal', parameters: { mean: 45, std: 6 } }, position: { x: 650, y: 250 } },
+      ],
+      buffers: [
+        { id: 'b1', name: 'Buffer', capacity: 8, queueRule: 'FIFO', position: { x: 525, y: 250 } },
+      ],
+      connections: [
+        { id: 'c0', source: 'src-1', target: 'wh-rm' },
+        { id: 'c1', source: 'wh-rm', target: 's1' },
+        { id: 'c2', source: 's1', target: 'b1' },
+        { id: 'c3', source: 'b1', target: 's2' },
+        { id: 'c4', source: 's2', target: 'wh-fg' },
+        { id: 'c5', source: 'wh-fg', target: 'sink-1' },
+      ],
+      products: [
+        { id: 'p1', name: 'Bracket', routing: ['s1', 's2'], arrivalRate: 60 },
+      ],
+      resources: [],
+      extraNodes: [
+        { id: 'src-1', type: 'source', data: { id: 'src-1', name: 'Release', arrivalRate: 60, feedMode: 'interval' }, position: { x: 50, y: 250 } },
+        { id: 'wh-rm', type: 'warehouse', position: { x: 220, y: 250 }, data: {
+          id: 'wh-rm', name: 'Raw material store', ...structuredClone(WAREHOUSE_DEFAULTS),
+          layout: { ...WAREHOUSE_DEFAULTS.layout, aisles: 1, baysPerAisle: 4, levels: 3 },
+          forklifts: { ...WAREHOUSE_DEFAULTS.forklifts, count: 1 },
+          // ~8 pallets per shift: start with 3 shifts of stock, reorder 2 shifts' worth
+          skus: [{ id: 'rm-steel', name: 'Steel blanks', productId: 'p1', class: 'A', unitsPerPallet: 60, initialPallets: 24,
+            reorderPoint: 8, orderQuantity: 16, leadTime: { type: 'constant', parameters: { value: 3 * 3600 } }, demandShare: 0 }],
+        } },
+        { id: 'wh-fg', type: 'warehouse', position: { x: 830, y: 250 }, data: {
+          id: 'wh-fg', name: 'Finished goods store', ...structuredClone(WAREHOUSE_DEFAULTS),
+          layout: { ...WAREHOUSE_DEFAULTS.layout, aisles: 1, baysPerAisle: 4, levels: 3 },
+          forklifts: { ...WAREHOUSE_DEFAULTS.forklifts, count: 1 },
+          pickers: { ...WAREHOUSE_DEFAULTS.pickers, count: 1 },
+          orders: { ...WAREHOUSE_DEFAULTS.orders, enabled: true, interarrival: { type: 'exponential', parameters: { mean: 900 } },
+            linesPerOrder: { type: 'constant', parameters: { value: 1 } }, unitsPerLine: { type: 'triangular', parameters: { min: 4, mode: 12, max: 20 } } },
+          skus: [{ id: 'fg-bracket', name: 'Bracket', productId: 'p1', class: 'A', unitsPerPallet: 40, initialPallets: 16,
+            reorderPoint: -1, orderQuantity: 1, demandShare: 1 }],
+        } },
+        { id: 'sink-1', type: 'sink', data: { id: 'sink-1', name: 'Shipped to store' }, position: { x: 1000, y: 250 } },
       ],
     },
   },
@@ -1113,6 +1245,59 @@ const templates: Template[] = [
       ],
     },
   },
+  {
+    id: 'smart-factory',
+    name: 'Smart Factory (AGV + Robotics + Humanoids)',
+    description: 'Automated production line with AGVs for transport, robotic cells for welding/assembly, and humanoid robots for inspection and packing alongside human operators',
+    category: 'manufacturing',
+    template: {
+      stations: [
+        { id: 's-weld', name: 'Weld Station', cycleTime: { type: 'normal', parameters: { mean: 45, std: 5 } }, position: { x: 400, y: 150 } },
+        { id: 's-paint', name: 'Paint Booth', cycleTime: { type: 'constant', parameters: { value: 60 } }, position: { x: 700, y: 150 } },
+        { id: 's-pack', name: 'Packing', cycleTime: { type: 'constant', parameters: { value: 20 } }, position: { x: 1100, y: 300 } },
+      ],
+      buffers: [
+        { id: 'b-in', name: 'Raw Material', capacity: 30, queueRule: 'FIFO', position: { x: 100, y: 300 } },
+        { id: 'b-weld', name: 'Weld Queue', capacity: 10, queueRule: 'FIFO', position: { x: 300, y: 150 } },
+        { id: 'b-paint', name: 'Paint Queue', capacity: 8, queueRule: 'FIFO', position: { x: 600, y: 150 } },
+        { id: 'b-assy', name: 'Assembly Queue', capacity: 12, queueRule: 'FIFO', position: { x: 700, y: 400 } },
+        { id: 'b-insp', name: 'Inspection Queue', capacity: 10, queueRule: 'FIFO', position: { x: 900, y: 300 } },
+        { id: 'b-pack', name: 'Pack Queue', capacity: 15, queueRule: 'FIFO', position: { x: 1000, y: 300 } },
+      ],
+      connections: [
+        { id: 'c0', source: 'src-1', target: 'b-in' },
+        { id: 'c1', source: 'b-in', target: 'agv-1' },
+        { id: 'c2', source: 'agv-1', target: 'b-weld' },
+        { id: 'c3', source: 'b-weld', target: 'rc-weld' },
+        { id: 'c4', source: 'rc-weld', target: 'b-paint' },
+        { id: 'c5', source: 'b-paint', target: 's-paint' },
+        { id: 'c6', source: 's-paint', target: 'agv-2' },
+        { id: 'c7', source: 'agv-2', target: 'b-assy' },
+        { id: 'c8', source: 'b-assy', target: 'rc-assy' },
+        { id: 'c9', source: 'rc-assy', target: 'b-insp' },
+        { id: 'c10', source: 'b-insp', target: 'hum-insp' },
+        { id: 'c11', source: 'hum-insp', target: 'b-pack' },
+        { id: 'c12', source: 'b-pack', target: 's-pack' },
+        { id: 'c13', source: 's-pack', target: 'sink-1' },
+        // Engine wiring
+        { id: 'cw1', source: 'b-in', target: 's-weld' },
+        { id: 'cw2', source: 's-weld', target: 'b-paint' },
+      ],
+      products: [
+        { id: 'p-chassis', name: 'Chassis', routing: ['s-weld', 's-paint', 's-pack'], arrivalRate: 45 },
+      ],
+      resources: [],
+      extraNodes: [
+        { id: 'src-1', type: 'source', data: { id: 'src-1', name: 'Raw Parts In', arrivalRate: 45, feedMode: 'interval' }, position: { x: 30, y: 300 } },
+        { id: 'agv-1', type: 'agv', data: { id: 'agv-1', name: 'Material AGV', count: 2, speed: 1.5, capacity: 1 }, position: { x: 200, y: 300 } },
+        { id: 'rc-weld', type: 'roboticcell', data: { id: 'rc-weld', name: 'Welding Robot', cycleTime: 45, program: 'Weld-MIG-01' }, position: { x: 500, y: 150 } },
+        { id: 'agv-2', type: 'agv', data: { id: 'agv-2', name: 'Transfer AGV', count: 1, speed: 2.0, capacity: 1 }, position: { x: 800, y: 250 } },
+        { id: 'rc-assy', type: 'roboticcell', data: { id: 'rc-assy', name: 'Assembly Robot', cycleTime: 35, program: 'Assy-Clip-02' }, position: { x: 800, y: 400 } },
+        { id: 'hum-insp', type: 'humanoid', data: { id: 'hum-insp', name: 'Inspector Bot', count: 1, efficiency: 95, skill: 'Visual QC' }, position: { x: 950, y: 200 } },
+        { id: 'sink-1', type: 'sink', data: { id: 'sink-1', name: 'Shipping' }, position: { x: 1250, y: 300 } },
+      ],
+    },
+  },
   masterTestTemplate,
 ];
 
@@ -1135,27 +1320,30 @@ export function TemplateSelector({ isOpen, onClose }: TemplateSelectorProps) {
     <Modal isOpen={isOpen} onClose={onClose} title="Select Template" size="lg">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[32rem] overflow-y-auto">
         {templates.map((template) => (
-          <div
+          <button
+            type="button"
             key={template.id}
-            className="border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-colors"
+            className="group text-left border border-gray-200 rounded-lg p-4 bg-white hover:border-blue-500 hover:shadow-sm cursor-pointer transition-all flex flex-col"
             onClick={() => handleSelect(template)}
           >
-            <div className="flex items-start justify-between">
-              <div>
-                <h4 className="font-medium text-gray-900">{template.name}</h4>
-                <p className="text-sm text-gray-500 mt-1">{template.description}</p>
-              </div>
-              <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
+            <div className="flex items-center justify-between gap-3 w-full">
+              <h4 className="font-semibold text-gray-900 group-hover:text-blue-700">{template.name}</h4>
+              <span className="shrink-0 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-gray-100 text-gray-600 rounded">
                 {template.category}
               </span>
             </div>
-            <div className="mt-3 text-xs text-gray-400">
-              {template.template.stations?.length || 0} stations,{' '}
-              {template.template.buffers?.length || 0} buffers,{' '}
-              {template.template.products?.length || 0} products,{' '}
-              {template.template.extraNodes?.length || 0} extra nodes
+            <p className="text-sm text-gray-600 mt-1.5 leading-snug">{template.description}</p>
+            <div className="mt-auto pt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 tabular-nums">
+              {([
+                [template.template.stations?.length || 0, 'station'],
+                [template.template.buffers?.length || 0, 'buffer'],
+                [template.template.products?.length || 0, 'product'],
+                [template.template.extraNodes?.length || 0, 'other element'],
+              ] as const).map(([n, label]) => (
+                <span key={label}><span className="font-semibold text-gray-700">{n}</span> {label}{n === 1 ? '' : 's'}</span>
+              ))}
             </div>
-          </div>
+          </button>
         ))}
       </div>
 

@@ -37,6 +37,7 @@ class SimulationConfig:
     stream_events: bool = False  # Stream events in real-time for animation
     start_day_of_week: int = 0  # 0=Monday, 6=Sunday
     start_hour: float = 0.0  # Hour of day simulation starts (0.0-23.99)
+    warm_start: Optional[Dict[str, int]] = None  # Station ID -> initial WIP count
 
 
 class Simulation:
@@ -90,8 +91,13 @@ class Simulation:
         # Hourly completion tracking for throughput by_hour
         self.hourly_completions: List[int] = []
 
-        # Event log
+        # Event log — capped to prevent unbounded memory growth on long runs.
+        # Keeps the first 1000 events (startup/config) and last 50000 events (recent activity).
         self.event_log: List[Dict[str, Any]] = []
+        self._event_log_max = 50000
+        self._event_log_head: List[Dict[str, Any]] = []  # preserved startup events
+        self._event_log_head_size = 1000
+        self._event_log_overflowed = False
 
         # Progress callback
         self.progress_callback: Optional[Callable[[float, str], None]] = None
@@ -109,8 +115,28 @@ class Simulation:
         # WIP time-series sampler (tracks active_products count periodically)
         self._wip_samples: List[Dict[str, Any]] = []
 
+        # Scripting engine
+        from factorysim.engine.scripting import ScriptEngine
+        self.script_engine = ScriptEngine(self)
+
+        # Flatten hierarchy (sub-models / frames) before building
+        from factorysim.engine.hierarchy import flatten_hierarchy
+        self.model = flatten_hierarchy(self.model)
+
         # Build model
         self._build_model()
+
+        # Load user scripts if present
+        scripts = self.model.get("scripts", [])
+        if scripts:
+            self.script_engine.load_scripts(scripts)
+
+    def _start_extra_nodes(self) -> None:
+        """Start self-driven elements (warehouses run their own processes)."""
+        for node in self.extra_nodes.values():
+            start = getattr(node, "start", None)
+            if callable(start):
+                start()
 
     def _build_model(self) -> None:
         """Build simulation components from model definition."""
@@ -136,6 +162,9 @@ class Simulation:
             node = ExtraNode.from_dict(entry, self.env, self)
             if node is not None:
                 self.extra_nodes[node.id] = node
+
+        # Inject transport network into AGV nodes
+        self._wire_transport_network()
 
         # Parse source / sink / operator from extraNodes
         for entry in self.model.get("extraNodes", []):
@@ -167,6 +196,62 @@ class Simulation:
         self._ensure_arrival_buffers()
         self._validate_model()
         self._log_model_config()
+
+    def _wire_transport_network(self) -> None:
+        """Pass transport network data to all AGV extra nodes."""
+        from factorysim.engine.extra_nodes import AGV as _AGV
+
+        transport_network = self.model.get("transportNetwork")
+        if not transport_network or not transport_network.get("enabled"):
+            return
+
+        for node in self.extra_nodes.values():
+            if isinstance(node, _AGV):
+                node.set_transport_network(transport_network)
+
+    def _inject_warm_start(self) -> None:
+        """Inject initial WIP items into station input buffers for warm start."""
+        warm_start = self.config.warm_start
+        if not warm_start:
+            return
+
+        for station_id, count in warm_start.items():
+            station = self.stations.get(station_id)
+            if not station or not station.input_buffer:
+                continue
+            buf = station.input_buffer
+            # Determine product type from the first product type whose routing includes this station
+            product_type_id = None
+            for pt in self.product_types.values():
+                if station_id in pt.routing:
+                    product_type_id = pt.id
+                    break
+            if not product_type_id:
+                product_type_id = "warm_start"
+
+            for i in range(int(count)):
+                # Only inject up to buffer capacity
+                if len(buf._items) >= buf.capacity:
+                    break
+                p = Product(
+                    product_type=product_type_id,
+                    routing=[station_id],
+                    sim=self,
+                    priority=0,
+                )
+                p.id = f"ws_{station_id[:6]}_{i}"
+                buf._items.append(p)
+                buf.total_items_entered += 1
+                if len(buf._items) > buf.max_level:
+                    buf.max_level = len(buf._items)
+                self.active_products[p.id] = p
+
+            # Signal item availability so workers wake up
+            if buf._items and not buf._item_available.triggered:
+                buf._item_available.succeed()
+                buf._item_available = self.env.event()
+
+            buf._record_wip()
 
     def _wire_connections(self) -> None:
         """Wire up input/output connections between stations and buffers.
@@ -317,11 +402,24 @@ class Simulation:
         queue = deque()
         visited = {from_id}
 
-        # Seed with ONLY extra-node neighbors (skip direct station→buffer edges)
+        # Seed with extra-node neighbors first.
+        # Also seed with buffer neighbors that do NOT connect directly to the
+        # target station, so extra nodes behind buffers are still discoverable
+        # (e.g. station → buffer → AGV → buffer → station).
         for neighbor in graph.get(from_id, []):
-            if neighbor in self.extra_nodes and neighbor not in visited:
-                visited.add(neighbor)
-                queue.append((neighbor, [neighbor], []))
+            if neighbor not in visited:
+                if neighbor in self.extra_nodes:
+                    visited.add(neighbor)
+                    queue.append((neighbor, [neighbor], []))
+        for neighbor in graph.get(from_id, []):
+            if neighbor not in visited and neighbor in self.buffers:
+                # Skip buffers that lead directly to the target — those are
+                # normal station-to-station buffer connections, not chains.
+                buf_neighbors = graph.get(neighbor, [])
+                if to_id not in buf_neighbors:
+                    visited.add(neighbor)
+                    new_bufs = [neighbor] if not neighbor.startswith('__arrival_') else []
+                    queue.append((neighbor, [], new_bufs))
 
         while queue:
             current, path, bufs = queue.popleft()
@@ -707,7 +805,9 @@ class Simulation:
             # Backpressure: wait while ALL downstream buffers are full
             if downstream_buffers and all(buf.is_full() for buf in downstream_buffers):
                 while all(buf.is_full() for buf in downstream_buffers):
-                    yield self.env.timeout(1.0)  # Poll every 1s
+                    yield self.env.any_of([
+                        buf.space_available() for buf in downstream_buffers
+                    ])
 
             # Round-robin across target product types with batch support
             pt = target_types[type_index % len(target_types)]
@@ -757,8 +857,24 @@ class Simulation:
                 yield req
                 acquire_time = self.env.now
                 requests.append((resource, req, acquire_time))
-                if resource.efficiency < min_efficiency:
-                    min_efficiency = resource.efficiency
+
+                # Use fatigue-aware efficiency for Operators
+                from factorysim.engine.resource import Operator as _Operator
+                if isinstance(resource, _Operator):
+                    eff = resource.get_current_efficiency()
+                    # Walking time: operator moves from last position to station
+                    station = self.stations.get(station_id)
+                    if station and hasattr(resource, 'last_position') and resource.last_position:
+                        walk_time = resource.calculate_walking_time(station.position)
+                        if walk_time > 0:
+                            yield self.env.timeout(walk_time)
+                        resource.last_position = station.position
+                    elif station:
+                        resource.last_position = station.position
+                else:
+                    eff = resource.efficiency
+                if eff < min_efficiency:
+                    min_efficiency = eff
 
         if min_efficiency < 1.0:
             product.set_attribute("_operator_efficiency", min_efficiency)
@@ -770,6 +886,16 @@ class Simulation:
         for resource, req, acquire_time in operator_requests:
             resource.total_busy_time += self.env.now - acquire_time
             resource.release(req)
+
+    def _acquire_kanban_if_needed(self, buffer: "Buffer", product: "Product"):
+        """Acquire a kanban card from the buffer if kanban is enabled.
+
+        Stores the request on the product so it can be released when the product
+        exits the buffer.
+        """
+        if buffer.kanban_enabled and buffer._kanban_resource is not None:
+            req = yield self.env.process(buffer.acquire_kanban())
+            product._kanban_req = req
 
     def _resolve_output_buffer(self, station: Station, product: "Product") -> Optional["Buffer"]:
         """Select the correct output buffer for a product leaving a station.
@@ -1153,7 +1279,12 @@ class Simulation:
                 station.input_buffer = implicit_buf
 
     def log_event(self, event_type: str, entity_id: str, details: Dict[str, Any]) -> None:
-        """Log a simulation event."""
+        """Log a simulation event.
+
+        Uses a capped buffer to prevent unbounded memory growth on long runs.
+        The first _event_log_head_size events are preserved (startup/config),
+        and the main list is trimmed to _event_log_max most recent events.
+        """
         event = {
             "time": self.env.now,
             "type": event_type,
@@ -1162,6 +1293,15 @@ class Simulation:
             "details": details,
         }
         self.event_log.append(event)
+
+        # Cap event log to prevent unbounded memory growth
+        if len(self.event_log) > self._event_log_max * 1.2:
+            if not self._event_log_overflowed:
+                # Preserve startup events on first overflow
+                self._event_log_head = self.event_log[:self._event_log_head_size]
+                self._event_log_overflowed = True
+            # Trim to keep only the most recent events
+            self.event_log = self.event_log[-self._event_log_max:]
 
         # Stream event in real-time if enabled
         if self.config.stream_events and self.event_stream_callback:
@@ -1185,7 +1325,7 @@ class Simulation:
             was_starved = False
 
             if len(station.input_buffers) > 1:
-                # ── Multi-buffer merge: round-robin poll ──
+                # ── Multi-buffer merge: event-based wait ──
                 product = None
                 source_buffer = None
                 if all(buf.is_empty() for buf in station.input_buffers):
@@ -1202,7 +1342,10 @@ class Simulation:
                             merge_buf_idx = (idx + 1) % len(station.input_buffers)
                             break
                     if product is None:
-                        yield self.env.timeout(1.0)  # Poll every 1s when all empty
+                        # Wait for any buffer to signal an item is available
+                        yield self.env.any_of([
+                            buf.item_available() for buf in station.input_buffers
+                        ])
 
                 self.log_event("product_exiting_buffer", product.id, {
                     "buffer": source_buffer.id,
@@ -1254,7 +1397,9 @@ class Simulation:
                                     merge_buf_idx = (idx + 1) % len(station.input_buffers)
                                     break
                             if next_item is None:
-                                yield self.env.timeout(1.0)
+                                yield self.env.any_of([
+                                    buf.item_available() for buf in station.input_buffers
+                                ])
                         batch.append(next_item)
                     else:
                         next_item = yield station.input_buffer.get()
@@ -1271,7 +1416,9 @@ class Simulation:
             # ── Process (op_requests passed so operators can be released during failure) ──
             product.state = ProductState.IN_PROCESS
             product._log_trace("entering_station", {"station": station.id})
+            self.script_engine.execute(station.id, "on_enter", node=station, product=product)
             yield station.process(product, op_requests=op_requests)
+            self.script_engine.execute(station.id, "on_exit", node=station, product=product)
 
             # ── Release operators ──
             self._release_operators(op_requests)
@@ -1279,27 +1426,37 @@ class Simulation:
             # Get the cycle time that was used for processing (from the product's record)
             batch_cycle_time = product.station_times.get(station.id, 0.0)
 
-            # ── Handle scrap for the entire batch ──
-            if product.is_scrap:
-                # Batch-level scrap: all items in batch are scrapped
-                for bp in batch[1:]:
+            # ── Per-item scrap check for remaining batch items ──
+            # The first product already had its scrap roll in station.process().
+            # Each remaining batch item gets an independent quality check.
+            for bp in batch[1:]:
+                bp.record_station_time(station.id, batch_cycle_time)
+                bp_is_scrap = self.rng.random() < station.scrap_rate
+                if bp_is_scrap:
                     bp.is_scrap = True
                     station.items_scrapped += 1
-                    bp.record_station_time(station.id, batch_cycle_time)
-                    if hasattr(bp, '_station_done_event') and not bp._station_done_event.triggered:
-                        bp._station_done_event.succeed()
+                    self.log_event("scrap", station.id, {
+                        "station": station.name,
+                        "product_id": bp.id,
+                    })
+                else:
+                    station.items_processed += 1
+                if hasattr(bp, '_station_done_event') and not bp._station_done_event.triggered:
+                    bp._station_done_event.succeed()
+
+            # Signal the first product done (regardless of scrap status)
+            if product.is_scrap:
                 if hasattr(product, '_station_done_event') and not product._station_done_event.triggered:
                     product._station_done_event.succeed()
                 continue
 
-            # ── Record remaining batch items as processed ──
-            for bp in batch[1:]:
-                bp.record_station_time(station.id, batch_cycle_time)
-                station.items_processed += 1
-
             # ── Blocked: push to output buffer (may block if full) ──
             out_buf = self._resolve_output_buffer(station, product)
             if out_buf:
+                # Kanban: acquire card before pushing
+                if out_buf.kanban_enabled and out_buf._kanban_resource is not None:
+                    yield self.env.process(out_buf.acquire_kanban())
+                    product._kanban_req = out_buf._kanban_resource.users[-1] if out_buf._kanban_resource.users else None
                 if out_buf.is_full():
                     station._log_state_change(StationState.BLOCKED)
                 product._log_trace("entering_output_buffer", {"buffer": out_buf.id})
@@ -1321,8 +1478,11 @@ class Simulation:
             if hasattr(product, '_station_done_event') and not product._station_done_event.triggered:
                 product._station_done_event.succeed()
 
-            # ── Push remaining batch items to output and signal done ──
+            # ── Push remaining non-scrap batch items to output ──
+            # (done_events were already signalled during the per-item scrap check)
             for bp in batch[1:]:
+                if bp.is_scrap:
+                    continue  # Scrapped items don't enter the output buffer
                 bp_out_buf = self._resolve_output_buffer(station, bp)
                 if bp_out_buf:
                     if bp_out_buf.is_full():
@@ -1339,8 +1499,6 @@ class Simulation:
                         bp.total_waiting_time += blocked_duration
                     if station.state == StationState.BLOCKED:
                         station._log_state_change(StationState.IDLE)
-                if hasattr(bp, '_station_done_event') and not bp._station_done_event.triggered:
-                    bp._station_done_event.succeed()
 
     def _product_flow_process(self, product: Product, skip_pre_chain: bool = False):
         """
@@ -1371,8 +1529,12 @@ class Simulation:
             "attributes": product.attributes,
         })
 
+        # Script hook: on_create
+        self.script_engine.execute("__global__", "on_create", product=product)
+
         in_buffer = False  # True when product is already sitting in the next input buffer
         consumed = False   # True when an extra node consumed this product
+        aborted = False    # True when the process is closed before the product finishes
 
         try:
             # ── Pre-routing chain: extra nodes before the first station ──
@@ -1504,7 +1666,9 @@ class Simulation:
                     op_requests = yield self.env.process(self._acquire_operators(next_station_id, product))
                     product.state = ProductState.IN_PROCESS
                     product._log_trace("entering_station", {"station": station.id})
+                    self.script_engine.execute(station.id, "on_enter", node=station, product=product)
                     yield station.process(product, op_requests=op_requests)
+                    self.script_engine.execute(station.id, "on_exit", node=station, product=product)
                     self._release_operators(op_requests)
 
                     # Scrapped products skip the output buffer
@@ -1514,6 +1678,10 @@ class Simulation:
                     # Push to output buffer if it exists (blocks if full)
                     out_buf = self._resolve_output_buffer(station, product)
                     if out_buf:
+                        # Kanban: acquire card before pushing
+                        if out_buf.kanban_enabled and out_buf._kanban_resource is not None:
+                            yield self.env.process(out_buf.acquire_kanban())
+                            product._kanban_req = out_buf._kanban_resource.users[-1] if out_buf._kanban_resource.users else None
                         if out_buf.is_full():
                             station._log_state_change(StationState.BLOCKED)
                         product._log_trace("entering_output_buffer", {"buffer": out_buf.id})
@@ -1591,10 +1759,23 @@ class Simulation:
                 # removed from the flow.  Scrap counts are tracked per-station
                 # (station.items_scrapped) and in product_type completion stats.
 
+        except GeneratorExit:
+            # The generator is being closed without finishing: either the run
+            # ended with this product still in flight, or a new replication
+            # replaced self.env and the old process was garbage-collected.
+            # Neither is a completion. Previously the finally-block below
+            # appended these products to completed_products, which in
+            # replication mode leaked the previous replication's in-flight
+            # products into the next replication's throughput.
+            aborted = True
+            raise
+
         finally:
-            if product.id in self.active_products:
+            # Identity check: a garbage-collected process from a previous
+            # replication must not remove a live product that shares its id.
+            if self.active_products.get(product.id) is product:
                 del self.active_products[product.id]
-            if not getattr(product, '_consumed', False):
+            if not aborted and not getattr(product, '_consumed', False):
                 self.completed_products.append(product)
 
     def _arrival_process(self, product_type: ProductType):
@@ -1616,10 +1797,17 @@ class Simulation:
             if self.should_stop:
                 break
 
-            # Backpressure: wait while input buffer is full
+            # Backpressure: wait while input buffer is full.  While waiting,
+            # the arrival clock is paused, so demand is lost.  Track it so the
+            # throttling is reported instead of silently lowering throughput.
             if input_buffer and input_buffer.is_full():
+                blocked_since = self.env.now
                 while input_buffer.is_full():
-                    yield self.env.timeout(1.0)
+                    yield input_buffer.space_available()
+                product_type.arrivals_delayed = getattr(product_type, "arrivals_delayed", 0) + 1
+                product_type.arrival_blocked_time = (
+                    getattr(product_type, "arrival_blocked_time", 0.0) + self.env.now - blocked_since
+                )
 
             product = product_type.create_product()
             self.env.process(self._product_flow_process(product))
@@ -1732,23 +1920,22 @@ class Simulation:
         """
         # Check all buffers for products still waiting
         for buf_id, buf in self.buffers.items():
-            for part in list(getattr(buf, '_store', {}).get('items', [])):
-                self._log_event("product_abandoned", getattr(part, 'id', 'unknown'), {
+            for part in list(buf._items):
+                self.log_event("product_abandoned", getattr(part, 'id', 'unknown'), {
                     "location": buf.name,
                     "location_type": "buffer",
                     "product_type": getattr(part, 'product_type', 'unknown'),
                     "reason": "simulation_ended",
                 })
-        # Check stations for products mid-processing
-        for station_id, station in self.stations.items():
-            if hasattr(station, '_current_part') and station._current_part is not None:
-                part = station._current_part
-                self._log_event("product_abandoned", getattr(part, 'id', 'unknown'), {
-                    "location": station.name,
-                    "location_type": "station",
-                    "product_type": getattr(part, 'product_type', 'unknown'),
-                    "reason": "simulation_ended",
-                })
+        # Check active products still in the system
+        for product_id, product in self.active_products.items():
+            self.log_event("product_abandoned", product.id, {
+                "location": product.completed_stations[-1] if product.completed_stations else "in_transit",
+                "location_type": "active",
+                "product_type": product.product_type,
+                "state": product.state.value,
+                "reason": "simulation_ended",
+            })
 
     def _log_simulation_summary(self):
         """Log a summary event at the end of the simulation.
@@ -1903,6 +2090,20 @@ class Simulation:
                     "timeout": n.timeout_duration,
                     "items_matched": n.items_processed,
                 }
+            elif n.node_type == "agv":
+                stats["configured_vs_actual"] = {
+                    "fleet_size": n.count,
+                    "speed": n.speed,
+                    "capacity": n.capacity,
+                    "total_distance": round(n.total_distance, 2),
+                    "total_transit_time": round(n.total_transit_time, 2),
+                    "total_wait_for_agv": round(n.total_wait_for_agv, 2),
+                    "trips": n.trips,
+                    "avg_transit_time": round(n.total_transit_time / max(1, n.trips), 2),
+                    "fleet_utilization": round(
+                        n.total_transit_time / max(1, self.config.duration * n.count), 4
+                    ),
+                }
             extra_node_summaries[nid] = stats
 
         # ── product configured-vs-actual ──────────────────────────
@@ -2037,6 +2238,10 @@ class Simulation:
         self.env.process(self._snapshot_process())
         self.env.process(self._wip_sampler())
 
+        # Warm start: inject initial WIP into station input buffers
+        self._inject_warm_start()
+        self._start_extra_nodes()
+
         # Run
         self.env.run(until=self.config.duration)
 
@@ -2093,6 +2298,11 @@ class Simulation:
                 self.env.process(self._progress_reporter())
                 self.env.process(self._snapshot_process())
                 self.env.process(self._wip_sampler())
+
+                # Warm start: inject initial WIP into station input buffers
+                self._inject_warm_start()
+                self._start_extra_nodes()
+
                 self.env.run(until=self.config.duration)
                 self.end_time = time.time()
 
@@ -2111,21 +2321,25 @@ class Simulation:
                     "run_id": self.run_id,
                     "status": "completed",
                     "kpis": kpis,
-                    "events": self.event_log,
+                    "events": (self._event_log_head + self.event_log) if self._event_log_overflowed else self.event_log,
                     "duration": self.end_time - self.start_time,
                     "simulated_time": self.config.duration,
                     "replications": 1,
                 }
             else:
                 # Multiple replications — aggregate with confidence intervals
-                base_seed = self.config.seed or 42
+                base_seed = 42 if self.config.seed is None else self.config.seed
+                # Independent, non-overlapping streams per replication.
+                # (Previously rep_seed = base_seed + rep, so seed 42 and seed 43
+                # shared 9 of 10 replications and seed=0 silently became 42.)
+                rep_seeds = np.random.SeedSequence(base_seed).spawn(n_reps)
                 all_kpis: List[Dict[str, Any]] = []
 
                 for rep in range(n_reps):
                     if self.should_stop:
                         break
 
-                    rep_seed = base_seed + rep
+                    rep_seed = rep_seeds[rep]
                     if self.progress_callback:
                         self.progress_callback(
                             rep / n_reps,
@@ -2144,7 +2358,7 @@ class Simulation:
                     "run_id": self.run_id,
                     "status": "completed",
                     "kpis": aggregated,
-                    "events": self.event_log,
+                    "events": (self._event_log_head + self.event_log) if self._event_log_overflowed else self.event_log,
                     "duration": self.end_time - self.start_time,
                     "simulated_time": self.config.duration,
                     "replications": len(all_kpis),
@@ -2318,6 +2532,9 @@ class Simulation:
                 nid: node.get_statistics()
                 for nid, node in self.extra_nodes.items()
             }
+            warehouses = {nid: st for nid, st in kpis["extra_nodes"].items() if st.get("warehouse")}
+            if warehouses:
+                kpis["warehouses"] = warehouses
 
         if self.sources:
             kpis["sources"] = {
@@ -2331,6 +2548,26 @@ class Simulation:
                 for sid, snk in self.sinks.items()
             }
 
+        # Cost calculation
+        cost_data = self._calculate_costs(self.config.duration)
+        if cost_data:
+            kpis["cost"] = cost_data
+
+        # Energy calculation
+        energy_data = self._calculate_energy()
+        if energy_data:
+            kpis["energy"] = energy_data
+
+        # Maintenance calculation
+        maintenance_data = self._calculate_maintenance()
+        if maintenance_data:
+            kpis["maintenance"] = maintenance_data
+
+        # Script engine summary
+        script_summary = self.script_engine.get_script_summary()
+        if script_summary["total_scripts"] > 0:
+            kpis["scripts"] = script_summary
+
         # Check for WIP warnings (monotonic growth suggests no steady state),
         # buffer capacity warnings, station blocking/starvation, and source throttling
         kpis["warnings"] = (
@@ -2338,9 +2575,182 @@ class Simulation:
             + self._check_buffer_warnings()
             + self._check_station_warnings()
             + self._check_source_warnings()
+            + self._check_arrival_warnings()
+            + [w for node in self.extra_nodes.values()
+               for w in (node.warnings() if callable(getattr(node, "warnings", None)) else [])]
         )
 
         return kpis
+
+    def _check_arrival_warnings(self) -> List[Dict[str, Any]]:
+        """Warn when product-type arrivals were held back by a full first buffer.
+
+        A held-back arrival pauses the arrival clock, so the model processes
+        less demand than configured. Stations without an explicit input buffer
+        get an implicit arrival queue (capacity = downstream buffer capacity,
+        default 1), which makes this easy to trigger unintentionally.
+        """
+        warnings: List[Dict[str, Any]] = []
+        duration = self.config.duration
+        for pt in self.product_types.values():
+            blocked = getattr(pt, "arrival_blocked_time", 0.0)
+            if not pt.arrival_rate or duration <= 0 or blocked <= 0:
+                continue
+            share = blocked / duration
+            if share < 0.01:
+                continue
+            first = pt.routing[0] if pt.routing else None
+            station = self.stations.get(first) if first else None
+            buf = station.input_buffer if station else None
+            implicit = bool(buf and buf.id.startswith("__arrival_"))
+            expected = duration / pt.arrival_rate
+            hint = (
+                f" Station '{station.name}' has no input buffer, so an implicit "
+                f"queue of capacity {buf.capacity} was used; add a buffer in front "
+                "of it if parts should queue."
+                if implicit else
+                " Increase the capacity of the first buffer if parts should queue."
+            )
+            warnings.append({
+                "type": "arrivals_throttled",
+                "severity": "warning",
+                "product_type": pt.id,
+                "blocked_share": round(share, 4),
+                "arrivals_delayed": getattr(pt, "arrivals_delayed", 0),
+                "created": pt.total_created,
+                "expected_arrivals": round(expected),
+                "message": (
+                    f"Arrivals of '{pt.name}' were held back {share:.0%} of the time "
+                    f"because the first buffer was full: {pt.total_created} parts "
+                    f"created vs ~{expected:.0f} configured." + hint
+                ),
+            })
+        return warnings
+
+    def _calculate_costs(self, duration: float) -> Optional[Dict]:
+        """Calculate cost breakdown from station cost configs."""
+        duration_hrs = duration / 3600
+        by_station = {}
+        total_operating = 0.0
+        total_variable = 0.0
+        total_scrap_cost = 0.0
+        has_cost_data = False
+
+        for sid, station in self.stations.items():
+            config = station.config if hasattr(station, 'config') else None
+            cost_per_hour = getattr(config, 'cost_per_hour', 0) or 0
+            cost_per_unit = getattr(config, 'cost_per_unit', 0) or 0
+            scrap_cost_per_unit = getattr(config, 'scrap_cost_per_unit', 0) or 0
+
+            if cost_per_hour > 0 or cost_per_unit > 0 or scrap_cost_per_unit > 0:
+                has_cost_data = True
+
+            operating = cost_per_hour * duration_hrs
+            variable = cost_per_unit * station.items_processed
+            scrap_cost = scrap_cost_per_unit * station.items_scrapped
+
+            by_station[sid] = {
+                "operating": round(operating, 2),
+                "variable": round(variable, 2),
+                "scrapCost": round(scrap_cost, 2),
+                "total": round(operating + variable + scrap_cost, 2),
+            }
+            total_operating += operating
+            total_variable += variable
+            total_scrap_cost += scrap_cost
+
+        if not has_cost_data:
+            return None
+
+        total = total_operating + total_variable + total_scrap_cost
+        throughput = sum(s.items_processed for s in self.stations.values())
+
+        return {
+            "totalCost": round(total, 2),
+            "costPerUnit": round(total / max(1, throughput), 2),
+            "operatingCost": round(total_operating, 2),
+            "variableCost": round(total_variable, 2),
+            "scrapCost": round(total_scrap_cost, 2),
+            "byStation": by_station,
+        }
+
+    def _calculate_energy(self) -> Optional[Dict]:
+        """Calculate energy consumption breakdown across all stations."""
+        energy_cost_per_kwh = self.model.get("energyCostPerKwh", 0.0)
+        co2_emission_factor = self.model.get("co2EmissionFactor", 0.0)
+        by_station = {}
+        total_energy = 0.0
+        has_energy_data = False
+
+        throughput = sum(s.items_processed for s in self.stations.values())
+
+        for sid, station in self.stations.items():
+            station._flush_state_time()
+            kwh = station.total_energy_kwh
+            if kwh > 0 or station.energy_processing_kw > 0:
+                has_energy_data = True
+            per_unit = kwh / max(1, station.items_processed) if station.items_processed > 0 else 0.0
+            cost = kwh * energy_cost_per_kwh
+            co2 = kwh * co2_emission_factor
+            by_station[sid] = {
+                "kwh": round(kwh, 4),
+                "perUnit": round(per_unit, 4),
+                "cost": round(cost, 2),
+                "co2Kg": round(co2, 4),
+            }
+            total_energy += kwh
+
+        if not has_energy_data:
+            return None
+
+        return {
+            "totalEnergy": round(total_energy, 4),
+            "energyPerUnit": round(total_energy / max(1, throughput), 4),
+            "totalCost": round(total_energy * energy_cost_per_kwh, 2),
+            "co2Kg": round(total_energy * co2_emission_factor, 4),
+            "byStation": by_station,
+        }
+
+    def _calculate_maintenance(self) -> Optional[Dict]:
+        """Calculate maintenance breakdown (planned PM vs unplanned failures)."""
+        by_station = {}
+        total_planned = 0.0
+        total_unplanned = 0.0
+        total_pm_events = 0
+        total_pm_cost = 0.0
+        has_pm_data = False
+
+        for sid, station in self.stations.items():
+            station._flush_state_time()
+            pm_time = station.total_pm_time
+            unplanned_time = station.total_failed_time - pm_time
+            pm_cost = station.pm_events * station.pm_cost_per_event
+
+            if station.pm_events > 0 or station.pm_interval:
+                has_pm_data = True
+
+            by_station[sid] = {
+                "plannedDowntime": round(pm_time, 2),
+                "unplannedDowntime": round(max(0, unplanned_time), 2),
+                "pmEvents": station.pm_events,
+                "pmCost": round(pm_cost, 2),
+            }
+            total_planned += pm_time
+            total_unplanned += max(0, unplanned_time)
+            total_pm_events += station.pm_events
+            total_pm_cost += pm_cost
+
+        if not has_pm_data:
+            return None
+
+        return {
+            "totalDowntime": round(total_planned + total_unplanned, 2),
+            "plannedDowntime": round(total_planned, 2),
+            "unplannedDowntime": round(total_unplanned, 2),
+            "pmEvents": total_pm_events,
+            "pmCost": round(total_pm_cost, 2),
+            "byStation": by_station,
+        }
 
     def _check_wip_warnings(self) -> list:
         """Check WIP timeseries for signs that steady state was not reached."""
@@ -2509,10 +2919,13 @@ class Simulation:
             sum_quality += oee["quality"]
 
         # Calculate system-wide quality using system-boundary counts:
-        # good output = completed products that aren't scrap
+        # good output = completed products that aren't scrap (excluding warmup)
         # This avoids double-counting products processed by multiple stations
-        total_good_output = len([p for p in self.completed_products if not p.is_scrap])
-        total_scrapped = sum(s.items_scrapped for s in self.stations.values())
+        warmup = self.config.warmup_period
+        total_good_output = len([p for p in self.completed_products
+                                 if not p.is_scrap and self._exited_after(p, warmup)])
+        total_scrapped = len([p for p in self.completed_products
+                              if p.is_scrap and self._exited_after(p, warmup)])
         system_quality = (total_good_output / (total_good_output + total_scrapped)
                           if (total_good_output + total_scrapped) > 0 else 1.0)
 
@@ -2559,13 +2972,27 @@ class Simulation:
             "by_station": station_oee,
         }
 
+    def _exited_after(self, product: Product, warmup: float) -> bool:
+        """True if the product left the system at or after the warm-up end.
+
+        Output statistics are filtered on EXIT time (standard steady-state
+        practice). Filtering on creation time undercounts throughput and
+        biases cycle time low whenever queues are long, because parts created
+        late in the run never finish.
+        """
+        t = product.completion_time if product.completion_time is not None else self.env.now
+        return t >= warmup
+
     def _calculate_throughput(self) -> Dict[str, Any]:
-        total_completed = len([p for p in self.completed_products if not p.is_scrap])
+        warmup = self.config.warmup_period
+        total_completed = len([p for p in self.completed_products
+                               if not p.is_scrap and self._exited_after(p, warmup)])
         total_in_progress = len(self.active_products)
 
-        by_product = {}
-        for product_type in self.product_types.values():
-            by_product[product_type.id] = product_type.total_completed
+        by_product = {pt_id: 0 for pt_id in self.product_types}
+        for p in self.completed_products:
+            if not p.is_scrap and self._exited_after(p, warmup):
+                by_product[p.product_type] = by_product.get(p.product_type, 0) + 1
 
         # When sinks are present, use sink-based counts for accurate
         # "finished goods" throughput (avoids counting intermediate products
@@ -2578,10 +3005,11 @@ class Simulation:
                     by_product_sink[pt] = by_product_sink.get(pt, 0) + count
             by_product = by_product_sink
 
-        hours = self.config.duration / 3600
+        effective_duration = self.config.duration - warmup
+        hours = effective_duration / 3600 if effective_duration > 0 else self.config.duration / 3600
 
         # Use actual per-hour-bucket completions
-        n_hours = int(hours) if hours > 0 else 0
+        n_hours = int(self.config.duration / 3600) if self.config.duration > 0 else 0
         by_hour = list(self.hourly_completions[:n_hours])
         # Pad with zeros if simulation had fewer completions than hours
         while len(by_hour) < n_hours:
@@ -2703,34 +3131,39 @@ class Simulation:
     def _calculate_cycle_time(self) -> Dict[str, Any]:
         warmup = self.config.warmup_period
         completed = [p for p in self.completed_products
-                     if not p.is_scrap and p.creation_time >= warmup]
+                     if not p.is_scrap and self._exited_after(p, warmup)]
 
         if not completed:
             return {"mean": 0, "std": 0, "min": 0, "max": 0, "by_product": {}}
 
         cycle_times = [p.get_cycle_time() for p in completed]
 
-        by_product = {}
-        for product_type in self.product_types.values():
-            if product_type.total_completed == 0:
-                continue  # Omit products with no completions (avoids misleading 0s)
-            stats = product_type.get_statistics()
-            by_product[product_type.id] = {
-                "mean": stats["average_cycle_time"],
-                "std": stats["cycle_time_std"],
+        # Per product, using the same warm-up filter as the overall figure
+        # (ProductType.get_statistics() includes warm-up parts).
+        per_type: Dict[str, List[float]] = {}
+        for p, ct in zip(completed, cycle_times):
+            per_type.setdefault(p.product_type, []).append(ct)
+        by_product = {
+            pt_id: {
+                "mean": float(np.mean(cts)),
+                "std": float(np.std(cts, ddof=1)) if len(cts) > 1 else 0.0,
             }
+            for pt_id, cts in per_type.items()
+        }
 
         return {
             "mean": float(np.mean(cycle_times)),
             "median": float(np.median(cycle_times)),
-            "std": float(np.std(cycle_times)),
+            "std": float(np.std(cycle_times, ddof=1)) if len(cycle_times) > 1 else 0.0,
             "min": float(np.min(cycle_times)),
             "max": float(np.max(cycle_times)),
             "by_product": by_product,
         }
 
     def _calculate_delivery(self) -> Dict[str, Any]:
-        completed = [p for p in self.completed_products if not p.is_scrap]
+        warmup = self.config.warmup_period
+        completed = [p for p in self.completed_products
+                     if not p.is_scrap and self._exited_after(p, warmup)]
 
         if not completed:
             return {"on_time_rate": None, "average_lateness": 0, "orders_at_risk": 0}
@@ -3240,6 +3673,11 @@ class Simulation:
             cfg["cycle_time"] = node.cycle_time
         elif node.node_type == "depalletize":
             cfg["cycle_time"] = node.cycle_time
+        elif node.node_type == "agv":
+            cfg["count"] = node.count
+            cfg["speed"] = node.speed
+            cfg["capacity"] = node.capacity
+            cfg["fallback_transit_time"] = node.fallback_transit_time
         return cfg
 
     def _export_header(self, L):
@@ -3758,6 +4196,26 @@ class Simulation:
             L.append('')
             L.append('')
 
+        if "agv" in types_used:
+            L.append('_agv_fleets = {}  # name -> simpy.Resource')
+            L.append('')
+            L.append('def process_agv(env, part, node_cfg, rng, results):')
+            L.append('    """AGV transport with fleet resource contention."""')
+            L.append('    name = node_cfg.get("name", "AGV")')
+            L.append('    count = node_cfg.get("count", 1)')
+            L.append('    speed = node_cfg.get("speed", 1.5)')
+            L.append('    transit_time = node_cfg.get("fallback_transit_time", 30)')
+            L.append('    if name not in _agv_fleets:')
+            L.append('        _agv_fleets[name] = simpy.Resource(env, capacity=count)')
+            L.append('    fleet = _agv_fleets[name]')
+            L.append('    req = fleet.request()')
+            L.append('    yield req')
+            L.append('    yield env.timeout(transit_time)')
+            L.append('    fleet.release(req)')
+            L.append('    return part')
+            L.append('')
+            L.append('')
+
         # Dispatcher
         L.append('def process_extra_node(env, part, node_cfg, rng, results, queues):')
         L.append('    """Dispatch to the appropriate extra-node processor."""')
@@ -3780,6 +4238,8 @@ class Simulation:
             L.append('        "depalletize": process_depalletize,')
         if "matchbuffer" in types_used:
             L.append('        "matchbuffer": process_matchbuffer,')
+        if "agv" in types_used:
+            L.append('        "agv": process_agv,')
         L.append('    }')
         L.append('    processor = processors.get(node_cfg["type"])')
         L.append('    if processor:')
@@ -4606,5 +5066,6 @@ class Simulation:
             warmup_period=data["config"].get("warmup_period", 0),
             seed=data["config"].get("seed"),
             replications=data["config"].get("replications", 1),
+            warm_start=data["config"].get("warm_start", data["config"].get("warmStart")),
         )
         return cls(data["model"], config)

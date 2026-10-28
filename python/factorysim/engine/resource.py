@@ -107,9 +107,12 @@ class Resource:
         hours_in_day = 24 * 3600  # seconds
         seconds_per_hour = 3600
 
-        # Assuming simulation starts at midnight Monday
-        day_of_week = int((current_time // hours_in_day) % 7)
-        hour_of_day = (current_time % hours_in_day) / seconds_per_hour
+        # Offset by simulation start day/hour from config (matches Station.is_in_shift)
+        start_offset = (self.sim.config.start_day_of_week * hours_in_day
+                        + self.sim.config.start_hour * seconds_per_hour)
+        adjusted_time = current_time + start_offset
+        day_of_week = int((adjusted_time // hours_in_day) % 7)
+        hour_of_day = (adjusted_time % hours_in_day) / seconds_per_hour
 
         # Check if current time falls within any shift
         for shift in self.shifts:
@@ -283,6 +286,12 @@ class Operator(Resource):
         self.last_break_time = 0.0
         self.fatigue_factor = 1.0  # Starts at 100% efficiency
 
+        # Walking / position tracking
+        self.walking_speed = 1.2  # m/s (typical walking speed)
+        self.last_position: Optional[Dict[str, float]] = None
+        self.total_walking_time = 0.0
+        self.total_walking_distance = 0.0
+
         # Start break process
         env.process(self._break_process())
 
@@ -302,6 +311,23 @@ class Operator(Resource):
 
             self.sim.log_event("break_end", self.id, {"operator": self.name})
 
+    def calculate_walking_time(self, target_position: Dict[str, float]) -> float:
+        """Calculate walking time from last position to target.
+
+        Returns walking time in seconds. Updates cumulative stats.
+        """
+        if not self.last_position or not target_position:
+            return 0.0
+        dx = target_position.get("x", 0) - self.last_position.get("x", 0)
+        dy = target_position.get("y", 0) - self.last_position.get("y", 0)
+        distance = (dx * dx + dy * dy) ** 0.5
+        if distance < 0.01:
+            return 0.0
+        walk_time = distance / self.walking_speed
+        self.total_walking_distance += distance
+        self.total_walking_time += walk_time
+        return walk_time
+
     def get_current_efficiency(self) -> float:
         """Get current efficiency considering fatigue."""
         # Simple fatigue model: efficiency decreases linearly since last break
@@ -313,3 +339,11 @@ class Operator(Resource):
         self.fatigue_factor = 1.0 - fatigue_loss
 
         return self.efficiency * self.fatigue_factor
+
+    def get_statistics(self) -> Dict[str, Any]:
+        stats = super().get_statistics()
+        stats["fatigue_factor"] = round(self.fatigue_factor, 4)
+        stats["current_efficiency"] = round(self.get_current_efficiency(), 4)
+        stats["total_walking_time"] = round(self.total_walking_time, 2)
+        stats["total_walking_distance"] = round(self.total_walking_distance, 2)
+        return stats

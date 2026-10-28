@@ -22,13 +22,19 @@ export function ReplayController() {
 
   // Build timeline from events
   const frames = useMemo(() => {
-    if (!lastResult?.events) return [];
     const bufferCaps: Record<string, number> = {};
     for (const buf of model.buffers) {
       bufferCaps[buf.name] = buf.capacity;
     }
-    return buildStateTimeline(lastResult.events, bufferCaps);
-  }, [lastResult?.events, model.buffers]);
+    const timeline = lastResult?.events ? buildStateTimeline(lastResult.events, bufferCaps) : [];
+    // A warehouse-only model (distribution centre) has no station events; its
+    // racks and forklifts replay from their own move log, so a bare time axis
+    // is enough to drive the replay clock.
+    if (timeline.length === 0 && lastResult?.kpis?.warehouses) {
+      return [{ time: 0, stationStates: {}, bufferLevels: {}, events: [] }];
+    }
+    return timeline;
+  }, [lastResult?.events, lastResult?.kpis, model.buffers]);
 
   useEffect(() => {
     framesRef.current = frames;
@@ -124,9 +130,10 @@ export function ReplayController() {
       <button
         onClick={handleStartReplay}
         disabled={frames.length === 0}
-        className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="ribbon-sbtn"
+        title="Replay the run as an animation"
       >
-        <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
         Replay

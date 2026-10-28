@@ -138,7 +138,7 @@ class ThroughputCalculator:
 
         return {
             "mean": float(np.mean(cycle_times)),
-            "std": float(np.std(cycle_times)),
+            "std": float(np.std(cycle_times, ddof=1)) if len(cycle_times) > 1 else 0.0,
             "min": float(np.min(cycle_times)),
             "max": float(np.max(cycle_times)),
             "p50": float(np.percentile(cycle_times, 50)),

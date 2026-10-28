@@ -8,11 +8,14 @@ import { useAppStore } from '../../stores/appStore';
 import type { Scenario, ScenarioParameterOverride, SimulationResult } from '../../types';
 import { applyOverrides, getNestedValue, getParametersForEntityType } from '../../services/scenarioModelBuilder';
 import { captureScreenshot, captureToBase64, downloadEventLog, downloadEventLogCSV } from '../../services/screenshotService';
+import { createLogger } from '../../services/logger';
+
+const log = createLogger('ScenarioManager');
 import { saveRunArtifacts } from '../../services/artifactService';
 import { captureAllTabScreenshots } from '../../services/tabScreenshotCapture';
 import { registerElement, setCachedImage, clearCachedImage, getElement, getCachedImage } from '../../services/elementRegistry';
 import { v4 as uuidv4 } from 'uuid';
-import { Camera, AlertTriangle, TrendingUp, Clock, Box, FolderOpen, Trash2, X, Shield, Zap, Maximize2, Truck, Wrench, TrendingDown } from 'lucide-react';
+import { Camera, AlertTriangle, TrendingUp, Clock, Box, FolderOpen, Trash2, X, Shield, Zap, Maximize2, Truck, Wrench, TrendingDown, Download } from 'lucide-react';
 
 const SCENARIO_SEED = 42; // fixed seed for reproducible baseline comparisons
 
@@ -232,7 +235,12 @@ export function ScenarioManager() {
 
     try {
       if (!window.factorySim?.simulation?.runSimulation) {
-        throw new Error('Simulation engine not available');
+        throw new Error(
+          'Simulation engine not available. ' +
+          (!window.factorySim ? 'Electron bridge not loaded.' :
+           !window.factorySim.simulation ? 'Python simulation bridge not initialized — the engine may have failed to start.' :
+           'runSimulation method not found.')
+        );
       }
 
       const simOptions = { duration, warmupPeriod: 0, replications: 1, seed: SCENARIO_SEED };
@@ -266,7 +274,7 @@ export function ScenarioManager() {
           if (savedPath) {
             addToast({ type: 'info', message: 'Run artifacts saved' });
           }
-        }).catch(() => {});
+        }).catch((err) => { log.warn('Failed to save scenario run artifacts:', err); });
       }, 800);
     } catch (error) {
       addToast({ type: 'error', message: `Simulation error: ${error}` });
@@ -425,7 +433,7 @@ export function ScenarioManager() {
             if (savedPath) {
               addToast({ type: 'info', message: 'Run artifacts saved' });
             }
-          }).catch(() => {});
+          }).catch((err) => { log.warn('Failed to save quick scenario artifacts:', err); });
         }, 800);
       } catch (error) {
         addToast({ type: 'error', message: `Simulation error: ${error}` });
@@ -1001,6 +1009,168 @@ export function ScenarioManager() {
     addToast({ type: 'success', message: `Scenario log downloaded (${format.toUpperCase()})` });
   };
 
+  const handleExportComparison = () => {
+    if (comparisonScenarios.length < 2) return;
+
+    // Build metric rows: [label, getValue, unit, higherIsBetter]
+    const metrics: Array<{
+      label: string;
+      getValue: (s: Scenario) => number;
+      unit: string;
+      higherIsBetter: boolean;
+      format: (v: number) => string;
+    }> = [
+      {
+        label: 'OEE',
+        getValue: (s) => s.results!.kpis.oee.overall * 100,
+        unit: '%',
+        higherIsBetter: true,
+        format: (v) => v.toFixed(1),
+      },
+      {
+        label: 'Availability',
+        getValue: (s) => s.results!.kpis.oee.availability * 100,
+        unit: '%',
+        higherIsBetter: true,
+        format: (v) => v.toFixed(1),
+      },
+      {
+        label: 'Performance',
+        getValue: (s) => s.results!.kpis.oee.performance * 100,
+        unit: '%',
+        higherIsBetter: true,
+        format: (v) => v.toFixed(1),
+      },
+      {
+        label: 'Quality',
+        getValue: (s) => s.results!.kpis.oee.quality * 100,
+        unit: '%',
+        higherIsBetter: true,
+        format: (v) => v.toFixed(1),
+      },
+      {
+        label: 'Throughput',
+        getValue: (s) => s.results!.kpis.throughput.total,
+        unit: ' units',
+        higherIsBetter: true,
+        format: (v) => v.toLocaleString(),
+      },
+      {
+        label: 'Rate/hr',
+        getValue: (s) => s.results!.kpis.throughput.ratePerHour,
+        unit: ' units/hr',
+        higherIsBetter: true,
+        format: (v) => v.toFixed(1),
+      },
+      {
+        label: 'Avg Cycle Time',
+        getValue: (s) => s.results!.kpis.cycleTime.mean,
+        unit: 's',
+        higherIsBetter: false,
+        format: (v) => v.toFixed(0),
+      },
+      {
+        label: 'WIP Level',
+        getValue: (s) => s.results!.kpis.wip.total,
+        unit: ' items',
+        higherIsBetter: false,
+        format: (v) => v.toString(),
+      },
+    ];
+
+    // Build the report
+    const lines: string[] = [];
+    lines.push('# Scenario Comparison Report');
+    lines.push(`Generated: ${new Date().toLocaleString()}`);
+    lines.push(`Scenarios compared: ${comparisonScenarios.length}`);
+    lines.push('');
+
+    // Header row
+    const colWidths = {
+      metric: Math.max(16, ...metrics.map((m) => m.label.length)),
+      scenario: Math.max(12, ...comparisonScenarios.map((s) => s.name.length + 2)),
+    };
+    const pad = (s: string, w: number) => s.padEnd(w);
+
+    lines.push('## KPI Comparison');
+    lines.push('');
+    const headerParts = [pad('Metric', colWidths.metric)];
+    for (const s of comparisonScenarios) {
+      headerParts.push(pad(s.name, colWidths.scenario));
+    }
+    headerParts.push('Winner');
+    lines.push('| ' + headerParts.join(' | ') + ' |');
+    lines.push('| ' + headerParts.map((p) => '-'.repeat(p.length)).join(' | ') + ' |');
+
+    // Track wins per scenario
+    const wins: Record<string, number> = {};
+    for (const s of comparisonScenarios) wins[s.id] = 0;
+
+    for (const m of metrics) {
+      const values = comparisonScenarios.map((s) => ({ id: s.id, name: s.name, value: m.getValue(s) }));
+      const best = m.higherIsBetter
+        ? values.reduce((a, b) => (b.value > a.value ? b : a))
+        : values.reduce((a, b) => (b.value < a.value ? b : a));
+
+      // Check if all values are effectively equal
+      const allEqual = values.every((v) => Math.abs(v.value - values[0].value) < 0.01);
+
+      const rowParts = [pad(m.label, colWidths.metric)];
+      for (const v of values) {
+        const formatted = m.format(v.value) + m.unit;
+        const marker = !allEqual && v.id === best.id ? ' *' : '';
+        rowParts.push(pad(formatted + marker, colWidths.scenario));
+      }
+      if (allEqual) {
+        rowParts.push('Tie');
+      } else {
+        rowParts.push(best.name);
+        wins[best.id]++;
+      }
+      lines.push('| ' + rowParts.join(' | ') + ' |');
+    }
+
+    lines.push('');
+    lines.push('(*) = best value for that metric');
+    lines.push('');
+
+    // Summary / recommendation
+    lines.push('## Summary');
+    lines.push('');
+
+    const sortedWins = Object.entries(wins)
+      .map(([id, count]) => ({ name: comparisonScenarios.find((s) => s.id === id)!.name, count }))
+      .sort((a, b) => b.count - a.count);
+
+    for (const w of sortedWins) {
+      lines.push(`- **${w.name}**: wins ${w.count} of ${metrics.length} metrics`);
+    }
+
+    lines.push('');
+    if (sortedWins[0].count > sortedWins[1].count) {
+      lines.push(
+        `**Recommendation**: "${sortedWins[0].name}" is the strongest scenario, winning on ${sortedWins[0].count} out of ${metrics.length} KPIs.`
+      );
+    } else {
+      lines.push(
+        `**Recommendation**: "${sortedWins[0].name}" and "${sortedWins[1].name}" are closely matched. Review the specific metrics most important to your goals.`
+      );
+    }
+
+    const report = lines.join('\n');
+
+    // Download as .md file
+    const blob = new Blob([report], { type: 'text/markdown' });
+    const link = document.createElement('a');
+    const ts = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    link.download = `scenario-comparison-${ts}.md`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
+
+    addToast({ type: 'success', message: 'Comparison report exported' });
+  };
+
   return (
     <div className="space-y-6" ref={scenarioRef}>
       {/* Header */}
@@ -1304,13 +1474,23 @@ export function ScenarioManager() {
               </tbody>
             </table>
           </div>
+          <div className="mt-4 flex justify-end">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportComparison}
+              icon={<DownloadIcon className="w-4 h-4" />}
+            >
+              Export Comparison
+            </Button>
+          </div>
         </Card>
       )}
 
       {comparisonMode && comparisonScenarios.length < 2 && selectedScenarioIds.length >= 2 && (
         <Card>
           <div className="text-center py-8 text-gray-500">
-            <p>Some selected scenarios don't have results yet.</p>
+            <p>Some selected scenarios don&apos;t have results yet.</p>
             <p className="text-sm">Run simulations on selected scenarios before comparing.</p>
           </div>
         </Card>
@@ -1388,7 +1568,7 @@ export function ScenarioManager() {
               <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded text-center">
                 No overrides. The scenario will use current model parameters.
                 <br />
-                <span className="text-xs">Click "+ Add Override" to modify parameters for this scenario.</span>
+                <span className="text-xs">Click &ldquo;+ Add Override&rdquo; to modify parameters for this scenario.</span>
               </p>
             ) : (
               <div className="space-y-3 max-h-64 overflow-y-auto">
@@ -1766,4 +1946,8 @@ function WrenchIcon({ className }: { className?: string }) {
 
 function TrendDownIcon({ className }: { className?: string }) {
   return <TrendingDown className={className} strokeWidth={1.75} />;
+}
+
+function DownloadIcon({ className }: { className?: string }) {
+  return <Download className={className} strokeWidth={1.75} />;
 }

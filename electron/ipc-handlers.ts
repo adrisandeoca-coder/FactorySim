@@ -20,9 +20,12 @@ const KEY_ALIASES: Record<string, string> = {
   processing: 'busy',  // station state breakdown: "processing" → "busy"
 };
 
-function transformKeys(obj: unknown): unknown {
+const MAX_TRANSFORM_DEPTH = 50;
+
+function transformKeys(obj: unknown, depth = 0): unknown {
   if (obj === null || obj === undefined) return obj;
-  if (Array.isArray(obj)) return obj.map(transformKeys);
+  if (depth > MAX_TRANSFORM_DEPTH) return obj;
+  if (Array.isArray(obj)) return obj.map(item => transformKeys(item, depth + 1));
   if (typeof obj === 'object') {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
@@ -30,7 +33,7 @@ function transformKeys(obj: unknown): unknown {
       // these are entity names used as dictionary keys, not API fields.
       let camelKey = key.startsWith('__') ? key : snakeToCamel(key);
       camelKey = KEY_ALIASES[camelKey] ?? camelKey;
-      result[camelKey] = transformKeys(value);
+      result[camelKey] = transformKeys(value, depth + 1);
     }
     return result;
   }
@@ -146,6 +149,16 @@ export function registerIpcHandlers(
     return pythonBridge.validateModel(model);
   });
 
+  ipcMain.handle('simulation:runExperiment', async (_event, model: object, simOptions: object, experimentConfig: object) => {
+    const rawResult = await pythonBridge.runExperiment(model, simOptions, experimentConfig);
+    return transformKeys(rawResult);
+  });
+
+  ipcMain.handle('simulation:mlOptimize', async (_event, model: object, simOptions: object, mlConfig: object) => {
+    const rawResult = await pythonBridge.mlOptimize(model, simOptions, mlConfig);
+    return transformKeys(rawResult);
+  });
+
   ipcMain.handle('simulation:stop', async (_event, runId: string) => {
     return pythonBridge.stopSimulation(runId);
   });
@@ -173,12 +186,21 @@ export function registerIpcHandlers(
   ipcMain.handle('model:list', async () => {
     const models = dbManager.listModels();
     return models.map(m => {
-      const modelData = JSON.parse((dbManager.loadModel(m.id) as { model_json: string }).model_json);
+      let stationCount = 0;
+      try {
+        const row = dbManager.loadModel(m.id);
+        if (row) {
+          const modelData = JSON.parse(row.model_json);
+          stationCount = modelData.stations?.length || 0;
+        }
+      } catch {
+        // Skip corrupted model data — return 0 station count
+      }
       return {
         id: m.id,
         name: m.name,
         description: m.description,
-        stationCount: modelData.stations?.length || 0,
+        stationCount,
         createdAt: m.created_at,
         updatedAt: m.updated_at,
       };
@@ -451,6 +473,50 @@ export function registerIpcHandlers(
     // No-op until a connector is integrated
   });
 
+  // ============ MQTT Connector Handlers ============
+
+  ipcMain.handle('mqtt:connect', async (_event, config: object) => {
+    return pythonBridge.call('mqtt_connect', config);
+  });
+
+  ipcMain.handle('mqtt:disconnect', async () => {
+    return pythonBridge.call('mqtt_disconnect', {});
+  });
+
+  ipcMain.handle('mqtt:status', async (_event, options?: object) => {
+    return pythonBridge.call('mqtt_status', options || {});
+  });
+
+  ipcMain.handle('mqtt:publish', async (_event, data: object) => {
+    return pythonBridge.call('mqtt_publish', data);
+  });
+
+  ipcMain.handle('mqtt:subscribe', async (_event, data: object) => {
+    return pythonBridge.call('mqtt_subscribe', data);
+  });
+
+  // ============ OPC-UA Connector Handlers ============
+
+  ipcMain.handle('opcua:connect', async (_event, config: object) => {
+    return pythonBridge.call('opcua_connect', config);
+  });
+
+  ipcMain.handle('opcua:disconnect', async () => {
+    return pythonBridge.call('opcua_disconnect', {});
+  });
+
+  ipcMain.handle('opcua:status', async () => {
+    return pythonBridge.call('opcua_status', {});
+  });
+
+  ipcMain.handle('opcua:read', async (_event, data: object) => {
+    return pythonBridge.call('opcua_read', data);
+  });
+
+  ipcMain.handle('opcua:browse', async (_event, data?: object) => {
+    return pythonBridge.call('opcua_browse', data || {});
+  });
+
   // ============ Template Handlers ============
 
   ipcMain.handle('template:list', async (_event, category?: string) => {
@@ -490,11 +556,11 @@ export function registerIpcHandlers(
 
   // ============ App Handlers ============
 
-  ipcMain.on('app:version', (event) => {
+  ipcMain.handle('app:version', async () => {
     const packageJson = JSON.parse(
       fs.readFileSync(path.join(__dirname, '../../package.json'), 'utf-8')
     );
-    event.returnValue = packageJson.version;
+    return packageJson.version;
   });
 
   ipcMain.handle('app:userDataPath', async () => {

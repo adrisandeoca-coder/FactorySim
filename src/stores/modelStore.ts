@@ -1,7 +1,19 @@
 import { create } from 'zustand';
-import type { FactoryModel, Station, Buffer, Connection, Product, Resource, Template, ExtraNodeEntry, ExtraNodeData, NodeType, Order } from '../types';
+import { WAREHOUSE_DEFAULTS } from '../utils/warehouseDefaults';
+import type { FactoryModel, Station, Buffer, Connection, Product, Resource, Template, ExtraNodeEntry, ExtraNodeData, NodeType, Order, LayoutData, TransportWaypoint, TransportLane } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { autoLayout } from '../services/autoLayout';
+import { autoAssignLibraryModels } from '../services/modelAutoAssign';
+
+// Debounced history saving — batches rapid edits into a single snapshot
+let _historyTimer: ReturnType<typeof setTimeout> | null = null;
+const HISTORY_DEBOUNCE_MS = 500;
+
+function debouncedSaveToHistory(save: () => void) {
+  if (_historyTimer) clearTimeout(_historyTimer);
+  _historyTimer = setTimeout(save, HISTORY_DEBOUNCE_MS);
+}
+
 
 interface SavedModelSummary {
   id: string;
@@ -74,6 +86,22 @@ interface ModelState {
   updateExtraNodePosition: (id: string, position: { x: number; y: number }) => void;
   removeExtraNode: (id: string) => void;
 
+  // Actions - Visual Customization
+  setLibraryModelId: (nodeId: string, libraryModelId: string | undefined) => void;
+
+  // Actions - Background Image
+  setBackgroundImage: (image: string | undefined) => void;
+  setBackgroundSettings: (settings: Partial<Pick<LayoutData, 'backgroundOpacity' | 'backgroundScale' | 'backgroundOffsetX' | 'backgroundOffsetY' | 'backgroundLocked'>>) => void;
+
+  // Actions - Transport Network
+  addWaypoint: (waypoint: TransportWaypoint) => void;
+  updateWaypoint: (id: string, updates: Partial<TransportWaypoint>) => void;
+  removeWaypoint: (id: string) => void;
+  addLane: (lane: TransportLane) => void;
+  updateLane: (id: string, updates: Partial<TransportLane>) => void;
+  removeLane: (id: string) => void;
+  setTransportNetworkEnabled: (enabled: boolean) => void;
+
   // Actions - Selection
   setSelectedNode: (id: string | null) => void;
   setSelectedEdge: (id: string | null) => void;
@@ -131,6 +159,66 @@ function getDefaultExtraNodeData(type: NodeType, id: string): ExtraNodeData {
       return { id, name: 'Depalletize', cycleTime: 5 };
     case 'matchbuffer':
       return { id, name: 'Match Buffer', capacity: 20, matchKey: 'order', requiredParts: [] };
+    case 'agv':
+      return { id, name: 'AGV', count: 1, speed: 1.5, capacity: 1 };
+    case 'roboticcell':
+      return { id, name: 'Robotic Cell', cycleTime: 30 };
+    case 'humanoid':
+      return { id, name: 'Humanoid', count: 1, efficiency: 100, skill: 'General' };
+    case 'warehouse':
+      return { id, name: 'Warehouse', ...structuredClone(WAREHOUSE_DEFAULTS) };
+    case 'loadingdock':
+      return { id, name: 'Loading Dock', dockCount: 2, loadTime: 1800, unloadTime: 1200, truckArrivalRate: 3600, mode: 'both' };
+    case 'crane':
+      return { id, name: 'Crane', craneType: 'bridge', liftCapacity: 5000, travelSpeed: 1.0, liftSpeed: 0.3, spanWidth: 15 };
+    case 'forklift':
+      return { id, name: 'Forklift', count: 1, liftCapacity: 2500, speed: 2.5, liftHeight: 6 };
+    case 'coldstorage':
+      return { id, name: 'Cold Storage', capacity: 200, temperature: -20, putTime: 60, pickTime: 45 };
+    case 'press':
+      return { id, name: 'Press', cycleTime: 15, tonnage: 200, setupTime: 600, scrapRate: 0.02 };
+    case 'lasercutter':
+      return { id, name: 'Laser Cutter', cycleTime: 45, sheetSize: '1500x3000', laserPower: 4000, setupTime: 300 };
+    case 'weldingcell':
+      return { id, name: 'Welding Cell', cycleTime: 60, weldType: 'MIG', fixtureCount: 2, setupTime: 180 };
+    case 'paintbooth':
+      return { id, name: 'Paint Booth', cycleTime: 120, cureTime: 300, boothType: 'spray', batchSize: 4 };
+    case 'packager':
+      return { id, name: 'Packager', cycleTime: 20, packType: 'stretchwrap', unitsPerPack: 1 };
+    case 'washer':
+      return { id, name: 'Washer', cycleTime: 180, batchSize: 8, washType: 'aqueous', temperature: 55 };
+    case 'cncmachine':
+      return { id, name: 'CNC Machine', cycleTime: 45, toolChangeTime: 12, spindleSpeed: 8000, machineType: 'mill' };
+    case 'oven':
+      return { id, name: 'Oven', rampUpTime: 300, holdTime: 1800, coolDownTime: 600, batchSize: 20, temperature: 200 };
+    case 'injectionmolder':
+      return { id, name: 'Injection Molder', cycleTime: 30, cavityCount: 4, coolingTime: 15, clampForce: 250 };
+    case 'sortingstation':
+      return { id, name: 'Sorting Station', outputs: 3, scanTime: 0.5, divertSpeed: 60, sortMode: 'barcode' };
+    case 'accumulator':
+      return { id, name: 'Accumulator', capacity: 50, releaseSize: 10, releaseInterval: 60, mode: 'batch' };
+    case 'turntable':
+      return { id, name: 'Turntable', rotationTime: 3, transferTime: 2, positions: 4 };
+    case 'elevator':
+      return { id, name: 'Elevator', loadTime: 5, unloadTime: 5, travelSpeed: 0.5, floors: 3, floorHeight: 4 };
+    case 'overheadconveyor':
+      return { id, name: 'Overhead Conveyor', carrierCount: 10, carrierSpeed: 0.5, loadTime: 8, unloadTime: 8, trackLength: 50 };
+    case 'sorter':
+      return { id, name: 'Sorter', sortDelay: 1, errorRate: 0.01, outputs: 4 };
+    case 'shuttle':
+      return { id, name: 'Shuttle', travelSpeed: 2, laneCount: 4, loadTime: 5, unloadTime: 5 };
+    case 'rollerconveyor':
+      return { id, name: 'Roller Conveyor', length: 10, speed: 0.5, capacity: 20 };
+    case 'trackguidedvehicle':
+      return { id, name: 'Track Guided Vehicle', count: 2, speed: 1.5, capacity: 1, trackLength: 100 };
+    case 'crossover':
+      return { id, name: 'Crossover', transferTime: 2, laneCount: 2 };
+    case 'pickstation':
+      return { id, name: 'Pick Station', pickerCount: 2, pickTime: 5, errorRate: 0.02 };
+    case 'weighing':
+      return { id, name: 'Weighing', measureTime: 3, rejectRate: 0.01 };
+    case 'labeler':
+      return { id, name: 'Labeler', labelTime: 2, errorRate: 0.005 };
     default:
       return { id, name };
   }
@@ -168,6 +256,10 @@ export const useModelStore = create<ModelState>((set, get) => ({
       description: template.description,
       ...template.template,
     };
+    // Auto-assign 3D library models so the template renders with diverse,
+    // visually distinct geometry in 3D World instead of all stations falling
+    // back to the same default. User-set libraryModelIds are preserved.
+    autoAssignLibraryModels(model);
     set({ model, selectedNodeId: null, selectedEdgeId: null });
     get().applyAutoLayout();
   },
@@ -204,7 +296,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
     set((state) => ({
       model: { ...state.model, name },
     }));
-    get().saveToHistory();
+    debouncedSaveToHistory(() => get().saveToHistory());
   },
 
   saveModel: async () => {
@@ -346,7 +438,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
         ),
       },
     }));
-    get().saveToHistory();
+    debouncedSaveToHistory(() => get().saveToHistory());
   },
 
   removeStation: (id) => {
@@ -392,7 +484,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
         ),
       },
     }));
-    get().saveToHistory();
+    debouncedSaveToHistory(() => get().saveToHistory());
   },
 
   removeBuffer: (id) => {
@@ -473,7 +565,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
         ),
       },
     }));
-    get().saveToHistory();
+    debouncedSaveToHistory(() => get().saveToHistory());
   },
 
   removeProduct: (id) => {
@@ -515,7 +607,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
         ),
       },
     }));
-    get().saveToHistory();
+    debouncedSaveToHistory(() => get().saveToHistory());
   },
 
   removeResource: (id) => {
@@ -559,7 +651,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
         ),
       },
     }));
-    get().saveToHistory();
+    debouncedSaveToHistory(() => get().saveToHistory());
   },
 
   removeOrder: (id) => {
@@ -611,7 +703,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
         ),
       },
     }));
-    get().saveToHistory();
+    debouncedSaveToHistory(() => get().saveToHistory());
   },
 
   updateExtraNodePosition: (id, position) => {
@@ -623,7 +715,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
         ),
       },
     }));
-    get().saveToHistory();
+    debouncedSaveToHistory(() => get().saveToHistory());
   },
 
   removeExtraNode: (id) => {
@@ -637,6 +729,173 @@ export const useModelStore = create<ModelState>((set, get) => ({
       },
       selectedNodeId: state.selectedNodeId === id ? null : state.selectedNodeId,
     }));
+    get().saveToHistory();
+  },
+
+  // Visual Customization
+  setLibraryModelId: (nodeId, libraryModelId) => {
+    set((state) => {
+      const model = { ...state.model };
+      // Check stations
+      const sIdx = model.stations.findIndex((s) => s.id === nodeId);
+      if (sIdx >= 0) {
+        model.stations = model.stations.map((s) =>
+          s.id === nodeId ? { ...s, libraryModelId } : s
+        );
+        return { model };
+      }
+      // Check buffers
+      const bIdx = model.buffers.findIndex((b) => b.id === nodeId);
+      if (bIdx >= 0) {
+        model.buffers = model.buffers.map((b) =>
+          b.id === nodeId ? { ...b, libraryModelId } : b
+        );
+        return { model };
+      }
+      // Check extra nodes
+      model.extraNodes = model.extraNodes.map((n) =>
+        n.id === nodeId ? { ...n, libraryModelId } : n
+      );
+      return { model };
+    });
+    debouncedSaveToHistory(() => get().saveToHistory());
+  },
+
+  // Background Image actions
+  setBackgroundImage: (image) => {
+    set((state) => ({
+      model: {
+        ...state.model,
+        layout: { ...state.model.layout, backgroundImage: image },
+      },
+    }));
+    get().saveToHistory();
+  },
+
+  setBackgroundSettings: (settings) => {
+    set((state) => ({
+      model: {
+        ...state.model,
+        layout: { ...state.model.layout, ...settings },
+      },
+    }));
+    debouncedSaveToHistory(() => get().saveToHistory());
+  },
+
+  // Transport Network actions
+  addWaypoint: (waypoint) => {
+    set((state) => {
+      const network = state.model.transportNetwork || { waypoints: [], lanes: [], enabled: false };
+      return {
+        model: {
+          ...state.model,
+          transportNetwork: {
+            ...network,
+            waypoints: [...network.waypoints, waypoint],
+          },
+        },
+      };
+    });
+    get().saveToHistory();
+  },
+
+  updateWaypoint: (id, updates) => {
+    set((state) => {
+      const network = state.model.transportNetwork || { waypoints: [], lanes: [], enabled: false };
+      return {
+        model: {
+          ...state.model,
+          transportNetwork: {
+            ...network,
+            waypoints: network.waypoints.map((w) =>
+              w.id === id ? { ...w, ...updates } : w
+            ),
+          },
+        },
+      };
+    });
+    debouncedSaveToHistory(() => get().saveToHistory());
+  },
+
+  removeWaypoint: (id) => {
+    set((state) => {
+      const network = state.model.transportNetwork || { waypoints: [], lanes: [], enabled: false };
+      return {
+        model: {
+          ...state.model,
+          transportNetwork: {
+            ...network,
+            waypoints: network.waypoints.filter((w) => w.id !== id),
+          },
+        },
+      };
+    });
+    get().saveToHistory();
+  },
+
+  addLane: (lane) => {
+    set((state) => {
+      const network = state.model.transportNetwork || { waypoints: [], lanes: [], enabled: false };
+      return {
+        model: {
+          ...state.model,
+          transportNetwork: {
+            ...network,
+            lanes: [...network.lanes, lane],
+          },
+        },
+      };
+    });
+    get().saveToHistory();
+  },
+
+  updateLane: (id, updates) => {
+    set((state) => {
+      const network = state.model.transportNetwork || { waypoints: [], lanes: [], enabled: false };
+      return {
+        model: {
+          ...state.model,
+          transportNetwork: {
+            ...network,
+            lanes: network.lanes.map((l) =>
+              l.id === id ? { ...l, ...updates } : l
+            ),
+          },
+        },
+      };
+    });
+    debouncedSaveToHistory(() => get().saveToHistory());
+  },
+
+  removeLane: (id) => {
+    set((state) => {
+      const network = state.model.transportNetwork || { waypoints: [], lanes: [], enabled: false };
+      return {
+        model: {
+          ...state.model,
+          transportNetwork: {
+            ...network,
+            lanes: network.lanes.filter((l) => l.id !== id),
+          },
+        },
+      };
+    });
+    get().saveToHistory();
+  },
+
+  setTransportNetworkEnabled: (enabled) => {
+    set((state) => {
+      const network = state.model.transportNetwork || { waypoints: [], lanes: [], enabled: false };
+      return {
+        model: {
+          ...state.model,
+          transportNetwork: {
+            ...network,
+            enabled,
+          },
+        },
+      };
+    });
     get().saveToHistory();
   },
 
@@ -668,9 +927,14 @@ export const useModelStore = create<ModelState>((set, get) => ({
   saveToHistory: () => {
     const { model, history, historyIndex } = get();
     const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(JSON.parse(JSON.stringify(model)));
+    // Use structuredClone when available (faster, handles more types),
+    // fall back to JSON round-trip for older environments.
+    const snapshot = typeof structuredClone === 'function'
+      ? structuredClone(model)
+      : JSON.parse(JSON.stringify(model));
+    newHistory.push(snapshot);
 
-    // Limit history size
+    // Limit history to 50 entries to prevent unbounded memory growth
     if (newHistory.length > 50) {
       newHistory.shift();
     }

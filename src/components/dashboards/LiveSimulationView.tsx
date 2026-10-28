@@ -1,4 +1,5 @@
 import { useMemo, useCallback, useRef, useEffect, useState, lazy, Suspense } from 'react';
+import { productColor } from '../../utils/productColors';
 import ReactFlow, {
   Background,
   MiniMap,
@@ -10,7 +11,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useModelStore } from '../../stores/modelStore';
-import { useLiveSimulationStore } from '../../stores/liveSimulationStore';
+import { useLiveSimulationStore, REPLAY_SPEEDS } from '../../stores/liveSimulationStore';
 import { useAppStore } from '../../stores/appStore';
 import { LiveStationNode } from '../factory-builder/nodes/LiveStationNode';
 import { LiveBufferNode } from '../factory-builder/nodes/LiveBufferNode';
@@ -23,7 +24,6 @@ const Factory3DView = lazy(() =>
   import('../factory-builder/3d/Factory3DView').then(m => ({ default: m.Factory3DView }))
 );
 
-const REPLAY_SPEEDS = [0.5, 1, 2, 5, 10, 25, 50, 100, 500];
 
 function InlineReplayControls() {
   const isReplaying = useLiveSimulationStore((s) => s.isReplaying);
@@ -31,6 +31,7 @@ function InlineReplayControls() {
   const replaySpeed = useLiveSimulationStore((s) => s.replaySpeed);
   const replayTime = useLiveSimulationStore((s) => s.replayTime);
   const replayDuration = useLiveSimulationStore((s) => s.replayDuration);
+  const stationLastStateChange = useLiveSimulationStore((s) => s.stationLastStateChange);
 
   if (!isReplaying) return null;
 
@@ -56,6 +57,7 @@ function InlineReplayControls() {
           onClick={() => useLiveSimulationStore.getState().setReplayPaused(!replayPaused)}
           className="w-7 h-7 flex items-center justify-center rounded-md bg-indigo-500 text-white hover:bg-indigo-400 transition-colors"
           title={replayPaused ? 'Play' : 'Pause'}
+          aria-label={replayPaused ? 'Play' : 'Pause'}
         >
           {replayPaused ? (
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
@@ -88,6 +90,7 @@ function InlineReplayControls() {
           }}
           className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors"
           title="Restart from beginning"
+          aria-label="Restart from beginning"
         >
           <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6V6zm3.5 6l8.5 6V6l-8.5 6z" /></svg>
         </button>
@@ -97,6 +100,7 @@ function InlineReplayControls() {
           onClick={() => useLiveSimulationStore.getState().stopReplay()}
           className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 text-red-400 hover:bg-red-900/50 hover:text-red-300 transition-colors"
           title="Stop & exit replay"
+          aria-label="Stop & exit replay"
         >
           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6V6z" /></svg>
         </button>
@@ -105,20 +109,17 @@ function InlineReplayControls() {
         <div className="w-px h-5 bg-slate-600" />
 
         {/* Speed selector */}
-        <div className="flex items-center space-x-0.5">
-          {REPLAY_SPEEDS.map((speed) => (
-            <button
-              key={speed}
-              onClick={() => useLiveSimulationStore.getState().setReplaySpeed(speed)}
-              className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded transition-colors ${
-                replaySpeed === speed
-                  ? 'bg-indigo-500 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
-              }`}
-            >
-              {speed < 1 ? speed.toString() : speed}x
-            </button>
-          ))}
+        <div className="flex items-center space-x-1.5">
+          <input
+            type="range"
+            min={0}
+            max={REPLAY_SPEEDS.length - 1}
+            value={REPLAY_SPEEDS.indexOf(replaySpeed) !== -1 ? REPLAY_SPEEDS.indexOf(replaySpeed) : 0}
+            onChange={(e) => useLiveSimulationStore.getState().setReplaySpeed(REPLAY_SPEEDS[parseInt(e.target.value)])}
+            className="w-24 h-1 appearance-none bg-slate-700 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-indigo-500 [&::-webkit-slider-thumb]:hover:bg-indigo-400 [&::-webkit-slider-thumb]:transition-colors"
+            title={`Replay speed: ${replaySpeed}x`}
+          />
+          <span className="text-[10px] font-mono font-bold text-indigo-400 w-8 text-right">{replaySpeed}x</span>
         </div>
 
         {/* Divider */}
@@ -130,14 +131,29 @@ function InlineReplayControls() {
         </span>
         {remaining > 1 && !replayPaused && (
           <span className="text-[10px] text-slate-500 whitespace-nowrap">
-            (~{formatTime(Math.floor(remaining))} left)
+            (~{formatTime(Math.floor(remaining))} to run end)
           </span>
         )}
       </div>
       {/* Bottom row: scrubber bar */}
-      <div className="mt-1.5 w-full h-1.5 bg-slate-700 rounded-full overflow-hidden cursor-pointer relative">
+      <div className="mt-1.5 w-full h-1.5 bg-slate-700 rounded-full overflow-visible cursor-pointer relative">
+        {/* Event markers for notable state changes */}
+        {Object.entries(stationLastStateChange).map(([name, info]) => {
+          if (!['failed', 'starved', 'blocked'].includes(info.state)) return null;
+          if (replayDuration <= 0) return null;
+          const pct = (info.time / replayDuration) * 100;
+          const color = info.state === 'failed' ? '#F31260' : info.state === 'blocked' ? '#f97316' : '#eab308';
+          return (
+            <div
+              key={`${name}-${info.state}`}
+              className="absolute"
+              style={{ left: `${pct}%`, top: -4, width: 5, height: 5, borderRadius: '50%', backgroundColor: color, transform: 'translateX(-50%)' }}
+              title={`${name}: ${info.state} at ${formatTime(info.time)}`}
+            />
+          );
+        })}
         <div
-          className="h-full bg-indigo-500 transition-all duration-100"
+          className="h-full bg-indigo-500 transition-all duration-100 rounded-full"
           style={{ width: `${progressPct}%` }}
         />
       </div>
@@ -160,24 +176,22 @@ const liveNodeTypes: NodeTypes = {
   palletize: LiveStationNode,
   depalletize: LiveStationNode,
   matchbuffer: LiveBufferNode,
+  agv: LiveGenericNode,
+  roboticcell: LiveStationNode,
+  humanoid: LiveGenericNode,
 };
 
 // Product type colors (must match LiveAnimationOverlay)
-const PRODUCT_COLORS = [
-  '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
-  '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1',
-];
-
 // #3 — State legend colors (always shown)
 const STATE_LEGEND: { label: string; key: string; color: string }[] = [
-  { label: 'Processing', key: 'processing', color: '#22c55e' },
-  { label: 'Starved', key: 'starved', color: '#f59e0b' },
-  { label: 'Blocked', key: 'blocked', color: '#ef4444' },
+  { label: 'Processing', key: 'processing', color: '#17C964' },
+  { label: 'Starved', key: 'starved', color: '#F5A524' },
+  { label: 'Blocked', key: 'blocked', color: '#F31260' },
   { label: 'Idle', key: 'idle', color: '#9ca3af' },
   { label: 'Off-shift', key: 'off_shift', color: '#64748b' },
   { label: 'Setup', key: 'setup', color: '#f97316' },
   { label: 'Failed', key: 'failed', color: '#b91c1c' },
-  { label: 'Batching', key: 'batch_wait', color: '#3b82f6' },
+  { label: 'Batching', key: 'batch_wait', color: '#2563EB' },
 ];
 
 // Strip distribution type: "CNC Mill (Weibull)" → "CNC Mill"
@@ -187,7 +201,7 @@ function shortName(name: string): string {
 
 // Solid zone colors for nav buttons
 const ZONE_BTN_COLORS = [
-  '#3b82f6', '#f97316', '#22c55e', '#a855f7', '#14b8a6', '#f43f5e',
+  '#2563EB', '#f97316', '#17C964', '#a855f7', '#14b8a6', '#f43f5e',
 ];
 
 interface LiveSimulationViewProps {
@@ -199,6 +213,8 @@ interface LiveSimulationViewProps {
 
 function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height: heightOverride }: LiveSimulationViewProps) {
   const { model } = useModelStore();
+  // Station panels mean nothing for a pure warehouse / distribution centre
+  const hasStations = model.stations.length > 0;
   const warmupPeriod = useSimulationStore((s) => s.defaultOptions.warmupPeriod) ?? 0;
   const stationStates = useLiveSimulationStore((s) => s.stationStates);
   const bufferLevels = useLiveSimulationStore((s) => s.bufferLevels);
@@ -238,18 +254,14 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
   }, [isFullscreen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track product color assignments
-  const productColorMap = useRef<Map<string, string>>(new Map());
-  const productColorIdx = useRef(0);
 
-  const getProductColor = useCallback((pt: string) => {
-    if (!productColorMap.current.has(pt)) {
-      productColorMap.current.set(pt, PRODUCT_COLORS[productColorIdx.current++ % PRODUCT_COLORS.length]);
-    }
-    return productColorMap.current.get(pt)!;
-  }, []);
+  // Same palette and order as the 3D totes (utils/productColors)
+  const modelProducts = useModelStore((st) => st.model.products);
+  const getProductColor = useCallback((pt: string) => productColor(pt, modelProducts), [modelProducts]);
 
-  // State filter — dim non-matching stations
-  const [stateFilter, setStateFilter] = useState<string | null>(null);
+  // State filter — dim non-matching stations (shared via store for 3D view)
+  const stateFilter = useLiveSimulationStore((s) => s.stateFilter);
+  const setStateFilter = useLiveSimulationStore((s) => s.setStateFilter);
 
   // Count station states for summary
   const stateCounts = useMemo(() => {
@@ -587,6 +599,7 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
   // Throughput rate — excludes warmup period for stable reading
   // During warmup, pipelines are filling so exits are artificially inflated
   const effectiveTime = warmupPeriod > 0 ? Math.max(0, currentTime - warmupPeriod) : currentTime;
+  // 0 means "not computable yet" (shown as —), not "nothing produced"
   const throughputRate = effectiveTime > 60 // wait at least 1 min of effective sim time
     ? (totalSinkExited / effectiveTime) * 3600
     : 0;
@@ -646,6 +659,11 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [zoneNavExpanded, setZoneNavExpanded] = useState(false);
 
+  // Collapsible KPI panel state
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
+  // Collapsible left panel state (state filters + products)
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
+
   // P6 — Hour tick marks for progress bar
   const hourTicks = useMemo(() => {
     if (simDuration <= 0) return [];
@@ -679,7 +697,7 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
   return (
     <div
       ref={containerRef}
-      className="relative rounded-xl border border-slate-700 bg-slate-900 overflow-hidden shadow-xl"
+      className="sim-hud-light relative border overflow-hidden"
       style={{ height: heightOverride ?? (isFullscreen ? '100vh' : 560) }}
     >
       {/* Inline replay controls overlay */}
@@ -696,11 +714,15 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
         </div>
       )}
 
-      {viewMode === '3d' ? (
+      {/* 3D view — kept mounted (hidden via CSS) to prevent Three.js disposal bugs */}
+      <div style={{ display: viewMode === '3d' ? 'contents' : 'none' }}>
         <Suspense fallback={<div className="flex items-center justify-center h-full text-slate-400">Loading 3D view...</div>}>
           <Factory3DView />
         </Suspense>
-      ) : (
+      </div>
+
+      {/* 2D view */}
+      <div style={{ display: viewMode === '2d' ? 'contents' : 'none' }}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -724,16 +746,16 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
           <LiveAnimationOverlay />
           <MiniMap
             nodeColor={(node) => {
-              if (node.type === 'source') return '#22c55e';
-              if (node.type === 'sink') return '#ef4444';
+              if (node.type === 'source') return '#17C964';
+              if (node.type === 'sink') return '#F31260';
               if (node.type === 'buffer' || node.type === 'matchbuffer') {
                 const bl = (node.data as any);
-                if (bl?.liveCapacity > 0 && bl?.liveLevel >= bl?.liveCapacity) return '#ef4444';
-                return '#f59e0b';
+                if (bl?.liveCapacity > 0 && bl?.liveLevel >= bl?.liveCapacity) return '#F31260';
+                return '#F5A524';
               }
               const state = (node.data as any)?.liveState;
-              if (state === 'processing') return '#22c55e';
-              if (state === 'blocked') return '#ef4444';
+              if (state === 'processing') return '#17C964';
+              if (state === 'blocked') return '#F31260';
               if (state === 'failed') return '#b91c1c';
               if (state === 'starved') return '#eab308';
               if (state === 'setup') return '#f97316';
@@ -746,10 +768,10 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
             zoomable={false}
           />
         </ReactFlow>
-      )}
+      </div>
 
-      {/* P6 — Progress bar with hour markers */}
-      <div className="absolute top-0 left-0 right-0 h-5 bg-slate-800">
+      {/* P6 — Progress timeline with hour markers */}
+      <div className="absolute top-0 left-0 right-0 h-5 bg-slate-800 border-b border-slate-700/60 shadow-md z-30">
         {/* Warm-up zone overlay */}
         {warmupPeriod > 0 && simDuration > 0 && (
           <div
@@ -772,7 +794,7 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
           className="h-full transition-all duration-300"
           style={{
             width: `${progress * 100}%`,
-            background: 'linear-gradient(90deg, #3b82f6, #22c55e)',
+            background: 'linear-gradient(90deg, #2563EB, #17C964)',
             boxShadow: '0 0 8px rgba(59,130,246,0.5)',
           }}
         />
@@ -813,73 +835,129 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
         </div>
       </div>
 
-      {/* State filter + legend (single bar, top-left) */}
-      <div className="absolute top-7 left-3 bg-slate-800/90 backdrop-blur-sm rounded-lg border border-slate-600 shadow-lg px-2 py-1 z-10">
-        <div className="flex items-center space-x-1">
-          <button
-            onClick={() => setStateFilter(null)}
-            className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-colors ${
-              !stateFilter ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'
-            }`}
-          >
-            All
-          </button>
-          {STATE_LEGEND.map((item) => {
-            const count = stateCounts[item.key] || 0;
-            return (
-              <button
-                key={item.key}
-                onClick={() => setStateFilter(stateFilter === item.key ? null : item.key)}
-                className={`px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors flex items-center space-x-1 ${
-                  stateFilter === item.key
-                    ? 'text-white ring-1 ring-white/50'
-                    : count === 0
-                      ? 'text-slate-600 hover:text-slate-400 hover:bg-slate-700'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-700'
-                }`}
-                style={stateFilter === item.key ? { backgroundColor: item.color + '40' } : count === 0 ? { opacity: 0.5 } : {}}
-              >
-                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                <span>{item.label}</span>
-                <span className="text-[11px] font-bold text-slate-300">{count}</span>
-              </button>
-            );
-          })}
-        </div>
+      {/* Collapsible left panel — Station States + Products */}
+      <div
+        className="absolute z-20 bg-slate-900/95 backdrop-blur-md rounded-xl border border-slate-600/50 shadow-2xl"
+        style={{
+          top: isReplaying ? 56 : 28,
+          left: 8,
+          width: leftPanelCollapsed ? 28 : 180,
+          transition: 'width 0.25s ease, padding 0.25s ease',
+          overflow: 'hidden',
+          display: hasStations ? undefined : 'none',
+        }}
+      >
+        {/* Collapse/expand toggle on right edge */}
+        <button
+          onClick={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
+          className="absolute top-1/2 -translate-y-1/2 w-5 h-8 flex items-center justify-center rounded-l bg-slate-700/80 hover:bg-slate-600 text-slate-300 hover:text-white transition-colors z-30 border border-r-0 border-slate-500"
+          style={{ right: -1 }}
+          title={leftPanelCollapsed ? 'Expand panel' : 'Collapse panel'}
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+            {leftPanelCollapsed ? <path d="M9 5l7 7-7 7" /> : <path d="M15 19l-7-7 7-7" />}
+          </svg>
+        </button>
+
+        {leftPanelCollapsed ? (
+          <div className="flex flex-col items-center gap-2 py-3 px-1">
+            <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+          </div>
+        ) : (
+          <div className="px-3 py-3">
+            {/* Section: Station States */}
+            <div className="mb-3">
+              <div className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-2">Station States</div>
+              <div className="flex flex-wrap gap-1">
+                <button
+                  onClick={() => setStateFilter(null)}
+                  className={`px-2 py-1 rounded-md text-[9px] font-bold transition-colors ${
+                    !stateFilter ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-700/60'
+                  }`}
+                >
+                  All
+                </button>
+                {STATE_LEGEND.map((item) => {
+                  const count = stateCounts[item.key] || 0;
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => setStateFilter(stateFilter === item.key ? null : item.key)}
+                      className={`px-2 py-1 rounded-md text-[9px] font-medium transition-colors flex items-center gap-1 ${
+                        stateFilter === item.key
+                          ? 'text-white ring-1 ring-white/40'
+                          : count === 0
+                            ? 'text-slate-600 hover:text-slate-400 hover:bg-slate-700/40'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-700/60'
+                      }`}
+                      style={stateFilter === item.key ? { backgroundColor: item.color + '35' } : count === 0 ? { opacity: 0.45 } : {}}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                      <span>{item.label}</span>
+                      <span className="text-[10px] font-bold text-slate-300 font-mono">{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-slate-700/50 mb-3" />
+
+            {/* Section: Products */}
+            {productLegend.length > 0 && (
+              <div>
+                <div className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-2">Products</div>
+                <div className="flex flex-col gap-1.5">
+                  {productLegend.map((item) => (
+                    <div key={item.name} className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" style={{ backgroundColor: item.color, boxShadow: `0 0 6px ${item.color}50` }} />
+                      <span className="text-[10px] text-slate-300 font-medium truncate">{item.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Product type legend (top-right, compact) */}
-      {productLegend.length > 0 && (
-        <div className="absolute top-7 right-3 bg-slate-800/90 backdrop-blur-sm rounded-lg border border-slate-600 shadow-lg px-2.5 py-1.5 z-10">
-          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Products</div>
-          <div className="flex flex-col space-y-0.5">
-            {productLegend.map((item) => (
-              <div key={item.name} className="flex items-center space-x-1.5">
-                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" style={{ backgroundColor: item.color, boxShadow: `0 0 6px ${item.color}40` }} />
-                <span className="text-[10px] text-slate-300 font-medium truncate max-w-[100px]">{item.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* GAP #6 — Floating KPI Panel (top-right, below product legend) — always rendered */}
+      {/* GAP #6 — Floating KPI Panel (top-right, aligned with tab bar) — always rendered */}
       <div
         className="absolute z-20 bg-slate-900 rounded-xl border border-slate-600 shadow-2xl"
         style={{
-          top: productLegend.length > 0 ? productLegend.length * 18 + 60 : 28,
+          top: 28,
           right: 12,
-          width: 170,
-          padding: '8px 10px',
+          width: panelCollapsed ? 24 : 170,
+          padding: panelCollapsed ? '8px 4px' : '8px 10px',
+          transition: 'width 0.2s ease, padding 0.2s ease',
+          overflow: 'hidden',
+          display: hasStations ? undefined : 'none',
         }}
       >
+        {/* Collapse/expand toggle */}
+        <button
+          onClick={() => setPanelCollapsed(!panelCollapsed)}
+          className="absolute top-1/2 -translate-y-1/2 w-5 h-8 flex items-center justify-center rounded-r bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition-colors z-30 border border-l-0 border-slate-500"
+          style={{ left: -1 }}
+          title={panelCollapsed ? 'Expand panel' : 'Collapse panel'}
+          aria-label={panelCollapsed ? 'Expand panel' : 'Collapse panel'}
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+            {panelCollapsed ? <path d="M9 5l7 7-7 7" /> : <path d="M15 19l-7-7 7-7" />}
+          </svg>
+        </button>
+        {panelCollapsed ? (
+          <div className="w-full h-full" />
+        ) : (
+        <>
           {/* Avg Utilization circular gauge */}
           <div className="flex items-center space-x-2 mb-2">
             <div style={{ width: 44, height: 44, position: 'relative', flexShrink: 0 }}>
               <svg width={44} height={44} viewBox="0 0 44 44">
                 <circle cx={22} cy={22} r={18} fill="none" stroke="#334155" strokeWidth={3} />
                 <circle cx={22} cy={22} r={18} fill="none"
-                  stroke={approxUtilization > 0.7 ? '#22c55e' : approxUtilization > 0.5 ? '#eab308' : '#ef4444'}
+                  stroke={approxUtilization > 0.7 ? '#17C964' : approxUtilization > 0.5 ? '#eab308' : '#F31260'}
                   strokeWidth={3}
                   strokeDasharray={`${approxUtilization * 113.1} 113.1`}
                   strokeLinecap="round"
@@ -900,7 +978,7 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
           {/* Throughput rate — always shown */}
           <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-700/50">
             <span className="text-[10px] text-slate-400 font-bold uppercase">Throughput</span>
-            <span className="text-[16px] font-black text-emerald-400 font-mono">{currentTime > 0 ? (throughputRate > 0 ? throughputRate.toFixed(0) : '0') : '--'}<span className="text-[10px] text-emerald-500">/hr</span></span>
+            <span className="text-[16px] font-black text-emerald-400 font-mono">{throughputRate > 0 ? throughputRate.toFixed(0) : '—'}<span className="text-[10px] text-emerald-500">/hr</span></span>
           </div>
 
           {/* Top utilized station — always shown */}
@@ -954,7 +1032,7 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
           <button
             className={`w-full text-[9px] font-bold rounded py-1 mb-1.5 transition-colors uppercase tracking-wider ${
               topBnId
-                ? 'text-slate-400 hover:text-white bg-slate-800 hover:bg-red-900/50'
+                ? 'text-white bg-red-900/60 hover:bg-red-900/80 ring-1 ring-red-500/50 shadow-[0_0_8px_rgba(239,68,68,0.3)] animate-pulse'
                 : 'text-amber-500/80 bg-slate-800/50 cursor-not-allowed'
             }`}
             onClick={() => {
@@ -1007,6 +1085,8 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
               </div>
             )}
           </div>
+        </>
+        )}
         </div>
 
       {/* P0 + P9 — Fullscreen toggle + Pop-out buttons */}
@@ -1150,8 +1230,9 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
         <div
           className="absolute left-0 right-0 bg-slate-800/90 backdrop-blur-sm border-t border-slate-700/40 flex items-center px-2 z-10"
           style={{ bottom: 44, height: 20 }}
+          title="Buffer fill levels — Green: <50%, Yellow: 50-80%, Orange: 80-95%, Red: >95%"
         >
-          <span className="text-[8px] text-slate-500 font-bold uppercase mr-1 flex-shrink-0">Buf</span>
+          <span className="text-[8px] text-slate-500 font-bold uppercase mr-1 flex-shrink-0">Buffers</span>
           {criticalCount > 0 && (
             <span className="text-[8px] font-bold text-red-400 bg-red-900/50 rounded px-1 mr-1.5 flex-shrink-0">{criticalCount}</span>
           )}
@@ -1160,7 +1241,7 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
               const live = bufferLevels[b.name];
               if (!live) return null;
               const pct = live.capacity > 0 ? (live.level / live.capacity) * 100 : 0;
-              const barColor = pct >= 95 ? '#ef4444' : pct >= 80 ? '#f97316' : pct >= 50 ? '#eab308' : pct > 0 ? '#22c55e' : '#475569';
+              const barColor = pct >= 95 ? '#F31260' : pct >= 80 ? '#f97316' : pct >= 50 ? '#eab308' : pct > 0 ? '#17C964' : '#475569';
               const bufId = b.id;
               return (
                 <button
@@ -1248,7 +1329,7 @@ function Metric({ label, value, accent, warn }: { label: string; value: number; 
 // P5 — Mini semicircular utilization gauge
 function MiniGauge({ value }: { value: number }) {
   const pct = Math.min(1, Math.max(0, value));
-  const color = pct > 0.7 ? '#22c55e' : pct > 0.5 ? '#eab308' : '#ef4444';
+  const color = pct > 0.7 ? '#17C964' : pct > 0.5 ? '#eab308' : '#F31260';
   // SVG semicircle arc (bottom half hidden)
   const r = 14;
   const cx = 20;
