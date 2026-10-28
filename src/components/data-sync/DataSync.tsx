@@ -377,7 +377,7 @@ export function DataSync() {
                       const next = new Set(notifiedTypes);
                       next.add(type.type);
                       setNotifiedTypes(next);
-                      try { localStorage.setItem('factorysim-notify-interest', JSON.stringify([...next])); } catch {}
+                      try { localStorage.setItem('factorysim-notify-interest', JSON.stringify([...next])); } catch { /* storage unavailable */ }
                       addToast({ type: 'success', message: `We'll notify you when ${type.name} is available` });
                     }}
                   >

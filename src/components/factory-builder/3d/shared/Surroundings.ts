@@ -379,7 +379,7 @@ function mergeStatic(root: THREE.Group): THREE.Group {
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh || Array.isArray(mesh.material)) return;
-    let g = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
+    const g = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
     for (const name of Object.keys(g.attributes)) if (name !== 'position' && name !== 'normal') g.deleteAttribute(name);
     if (!g.attributes.normal) g.computeVertexNormals();
     g.applyMatrix4(mesh.matrixWorld);

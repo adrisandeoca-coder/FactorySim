@@ -182,10 +182,9 @@ export class WearWeatheringManager {
 
       // Only modify if material is already cloned (has been through applyWear)
       // or clone it now
-      let mat: THREE.MeshStandardMaterial;
       if (child.material.userData._dustApplied) return;
 
-      mat = child.material.clone() as THREE.MeshStandardMaterial;
+      const mat = child.material.clone() as THREE.MeshStandardMaterial;
       mat.color.lerp(this.dustColor, dustIntensity);
       mat.roughness = Math.min(1, mat.roughness + dustIntensity * 0.15);
       mat.userData._dustApplied = true;

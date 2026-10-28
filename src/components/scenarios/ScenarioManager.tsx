@@ -1490,7 +1490,7 @@ export function ScenarioManager() {
       {comparisonMode && comparisonScenarios.length < 2 && selectedScenarioIds.length >= 2 && (
         <Card>
           <div className="text-center py-8 text-gray-500">
-            <p>Some selected scenarios don't have results yet.</p>
+            <p>Some selected scenarios don&apos;t have results yet.</p>
             <p className="text-sm">Run simulations on selected scenarios before comparing.</p>
           </div>
         </Card>
@@ -1568,7 +1568,7 @@ export function ScenarioManager() {
               <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded text-center">
                 No overrides. The scenario will use current model parameters.
                 <br />
-                <span className="text-xs">Click "+ Add Override" to modify parameters for this scenario.</span>
+                <span className="text-xs">Click &ldquo;+ Add Override&rdquo; to modify parameters for this scenario.</span>
               </p>
             ) : (
               <div className="space-y-3 max-h-64 overflow-y-auto">

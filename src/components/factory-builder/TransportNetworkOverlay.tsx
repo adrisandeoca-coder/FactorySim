@@ -23,10 +23,8 @@ export function TransportNetworkOverlay() {
   const [laneStart, setLaneStart] = useState<string | null>(null);
   const [showOverlay, setShowOverlay] = useState(true);
 
-  if (!network?.enabled) return null;
-
-  const waypoints = network.waypoints || [];
-  const lanes = network.lanes || [];
+  const waypoints = network?.waypoints || [];
+  const lanes = network?.lanes || [];
 
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
@@ -81,6 +79,8 @@ export function TransportNetworkOverlay() {
 
   const getWaypointPos = (id: string) =>
     waypoints.find((w) => w.id === id)?.position;
+
+  if (!network?.enabled) return null;
 
   return (
     <>

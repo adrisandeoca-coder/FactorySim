@@ -528,7 +528,7 @@ export function ScenarioViewer() {
               <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 10 }}>Drop an Excel file here</div>
               <div style={{ fontSize: 13, color: '#9aa3af', marginBottom: 14 }}>
                 or use the buttons on the right. The file should have a <b>Scenario</b> sheet
-                and a <b>Layout</b> sheet — download the starter template if you don't have one yet.
+                and a <b>Layout</b> sheet — download the starter template if you don&apos;t have one yet.
               </div>
               <button
                 onClick={onLoadDemo}
@@ -771,7 +771,7 @@ export function ScenarioViewer() {
             </div>
             {bookmarks.length === 0 ? (
               <div style={{ fontSize: 11, color: '#7a838f' }}>
-                Pan, zoom, then click "Save view" to bookmark this angle. Bookmarks persist across reloads.
+                Pan, zoom, then click &ldquo;Save view&rdquo; to bookmark this angle. Bookmarks persist across reloads.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

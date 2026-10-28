@@ -206,7 +206,7 @@ export class VehicleAnimationManager {
           }
           break;
 
-        case 'traveling':
+        case 'traveling': {
           if (v.path.length === 0) {
             v.state = 'idle';
             break;
@@ -257,6 +257,7 @@ export class VehicleAnimationManager {
             }
           });
           break;
+        }
 
         case 'unloading':
           v.stateTimer -= dt;

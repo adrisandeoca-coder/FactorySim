@@ -261,7 +261,7 @@ export function ModelLibraryPanel({
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {filteredModels.length === 0 ? (
             <div className="text-center py-12 text-gray-400 text-sm">
-              No models found for "{search}"
+              No models found for &ldquo;{search}&rdquo;
             </div>
           ) : (
             <div className="grid grid-cols-4 gap-3">

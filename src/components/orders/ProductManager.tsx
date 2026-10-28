@@ -267,7 +267,7 @@ export function ProductManager() {
                   </p>
                 ) : formData.routing.length === 0 ? (
                   <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded text-center">
-                    No routing steps defined. Click "+ Add Step" to build the routing.
+                    No routing steps defined. Click &ldquo;+ Add Step&rdquo; to build the routing.
                   </p>
                 ) : (
                   <div className="space-y-2">

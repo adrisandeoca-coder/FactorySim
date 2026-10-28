@@ -138,13 +138,13 @@ function ProductRoutings() {
 
 function StationDetails() {
   const { model } = useModelStore();
-  if (model.stations.length === 0) return null;
 
   // sort by bottleneck potential: longest mean cycle time first
   const sorted = useMemo(() =>
     [...model.stations].sort((a, b) => distMean(b.cycleTime) - distMean(a.cycleTime)),
     [model.stations]
   );
+  if (model.stations.length === 0) return null;
 
   return (
     <div className="bg-white rounded-lg border border-slate-200 p-4">
@@ -208,7 +208,6 @@ function BufferSummary() {
 
 function BottleneckAnalysis() {
   const { model } = useModelStore();
-  if (model.stations.length < 2) return null;
 
   const insights = useMemo(() => {
     const results: Array<{ icon: string; text: string; severity: 'info' | 'warn' }> = [];
@@ -269,6 +268,7 @@ function BottleneckAnalysis() {
 
     return results;
   }, [model]);
+  if (model.stations.length < 2) return null;
 
   if (insights.length === 0) return null;
 

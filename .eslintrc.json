@@ -32,14 +32,43 @@
   "rules": {
     "react/react-in-jsx-scope": "off",
     "react/prop-types": "off",
-    "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_"
+      }
+    ],
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/explicit-function-return-type": "off",
-    "no-console": ["warn", { "allow": ["warn", "error"] }]
+    "no-console": [
+      "warn",
+      {
+        "allow": [
+          "warn",
+          "error"
+        ]
+      }
+    ],
+    "react-hooks/set-state-in-effect": "warn",
+    "react-hooks/immutability": "warn",
+    "react-hooks/refs": "warn",
+    "react-hooks/purity": "warn",
+    "react-hooks/preserve-manual-memoization": "warn"
   },
   "ignorePatterns": [
     "dist/",
     "node_modules/",
     "release/"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "src/components/factory-builder/3d/NodeModels.tsx",
+        "src/components/factory-builder/3d/SimulationAnimation3D.tsx"
+      ],
+      "rules": {
+        "react/no-unknown-property": "off"
+      }
+    }
   ]
 }

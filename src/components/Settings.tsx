@@ -81,7 +81,7 @@ export function Settings() {
   });
   const isNewVersion = seenVersion !== CURRENT_VERSION;
   const markVersionSeen = () => {
-    try { localStorage.setItem('factorysim_seen_version', CURRENT_VERSION); } catch {}
+    try { localStorage.setItem('factorysim_seen_version', CURRENT_VERSION); } catch { /* storage unavailable */ }
   };
 
   return (

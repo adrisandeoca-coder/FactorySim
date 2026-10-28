@@ -13,12 +13,14 @@ const ROUTE_LABELS: Record<string, string> = {
   settings: 'Settings',
 };
 
+const SHOW_IN_CONTENT = false;
+
 export function Breadcrumbs() {
   const location = useLocation();
   const segments = location.pathname.split('/').filter(Boolean);
 
   // Breadcrumb is now shown in the Header topbar — no duplicate needed in content area
-  if (true) return null;
+  if (!SHOW_IN_CONTENT) return null;
 
   if (segments.length === 0) return null;
 
