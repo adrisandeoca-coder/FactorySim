@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState, useEffect, lazy, Suspense } from 'react';
 import ReactFlow, {
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
   useNodesState,
@@ -11,13 +12,25 @@ import ReactFlow, {
   NodeTypes,
   Panel,
   ReactFlowInstance,
+  MarkerType,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
+import { useNavigate } from 'react-router-dom';
+import {
+  Globe as GlobeIcon, LayoutTemplate, LayoutGrid, Network, Box, SquareDashed, Route, Flame, Undo2, Redo2, Search,
+  Camera, Wand2, Shapes, ArrowDownToLine, Cog, Layers, MoveRight, ScanSearch, Combine, UserRound, PackageCheck,
+} from 'lucide-react';
+import { RibbonContent, RibbonGroup, RibbonButton, RibbonSmallButton, RibbonStack, DockPanel } from '../layout/Ribbon';
+import { ModelOutline } from './ModelOutline';
 import { useModelStore } from '../../stores/modelStore';
 import { useAppStore } from '../../stores/appStore';
+import { useScenarioBridgeStore } from '../../stores/scenarioBridgeStore';
+import { modelToScenario } from '../../services/modelToScenario';
+import { autoAssignLibraryModels, describeAssignment } from '../../services/modelAutoAssign';
 import { captureScreenshot, captureToBase64 } from '../../services/screenshotService';
 import { registerElement, setCachedImage } from '../../services/elementRegistry';
+import { useModelValidation } from '../../hooks/useModelValidation';
 import { Button } from '../common/Button';
 
 // Lazy-load the 3D view to avoid loading Three.js when not needed
@@ -39,11 +52,45 @@ import { DisassemblyNode } from './nodes/DisassemblyNode';
 import { PalletizeNode } from './nodes/PalletizeNode';
 import { DepalletizeNode } from './nodes/DepalletizeNode';
 import { MatchBufferNode } from './nodes/MatchBufferNode';
+import { AGVNode } from './nodes/AGVNode';
+import { RoboticCellNode } from './nodes/RoboticCellNode';
+import { HumanoidNode } from './nodes/HumanoidNode';
+import { WarehouseNode } from './nodes/WarehouseNode';
+import { LoadingDockNode } from './nodes/LoadingDockNode';
+import { CraneNode } from './nodes/CraneNode';
+import { ForkliftNode } from './nodes/ForkliftNode';
+import { ColdStorageNode } from './nodes/ColdStorageNode';
+import { PressNode } from './nodes/PressNode';
+import { LaserCutterNode } from './nodes/LaserCutterNode';
+import { WeldingCellNode } from './nodes/WeldingCellNode';
+import { PaintBoothNode } from './nodes/PaintBoothNode';
+import { PackagerNode } from './nodes/PackagerNode';
+import { WasherNode } from './nodes/WasherNode';
+import { CNCMachineNode } from './nodes/CNCMachineNode';
+import { OvenNode } from './nodes/OvenNode';
+import { InjectionMolderNode } from './nodes/InjectionMolderNode';
+import { SortingStationNode } from './nodes/SortingStationNode';
+import { AccumulatorNode } from './nodes/AccumulatorNode';
+import { TurntableNode } from './nodes/TurntableNode';
+import { ElevatorNode } from './nodes/ElevatorNode';
+import { OverheadConveyorNode } from './nodes/OverheadConveyorNode';
+import { SorterNode } from './nodes/SorterNode';
+import { ShuttleNode } from './nodes/ShuttleNode';
+import { RollerConveyorNode } from './nodes/RollerConveyorNode';
+import { TrackGuidedVehicleNode } from './nodes/TrackGuidedVehicleNode';
+import { CrossoverNode } from './nodes/CrossoverNode';
+import { PickStationNode } from './nodes/PickStationNode';
+import { WeighingNode } from './nodes/WeighingNode';
+import { LabelerNode } from './nodes/LabelerNode';
 import { ZoneBackgroundNode } from './nodes/ZoneBackgroundNode';
 import { PropertyPanel } from './PropertyPanel';
 import { TemplateSelector } from './TemplateSelector';
 import { SimulationAnimationOverlay } from './SimulationAnimationOverlay';
+import { TransportNetworkOverlay } from './TransportNetworkOverlay';
+import { FloorPlanOverlay } from './FloorPlanOverlay';
+import { FloorPlanToolbar } from './FloorPlanToolbar';
 import { useSimulationStore } from '../../stores/simulationStore';
+import { useLiveSimulationStore } from '../../stores/liveSimulationStore';
 import type { Station, Buffer, ExtraNodeData } from '../../types';
 
 const nodeTypes: NodeTypes = {
@@ -61,6 +108,36 @@ const nodeTypes: NodeTypes = {
   palletize: PalletizeNode,
   depalletize: DepalletizeNode,
   matchbuffer: MatchBufferNode,
+  agv: AGVNode,
+  roboticcell: RoboticCellNode,
+  humanoid: HumanoidNode,
+  warehouse: WarehouseNode,
+  loadingdock: LoadingDockNode,
+  crane: CraneNode,
+  forklift: ForkliftNode,
+  coldstorage: ColdStorageNode,
+  press: PressNode,
+  lasercutter: LaserCutterNode,
+  weldingcell: WeldingCellNode,
+  paintbooth: PaintBoothNode,
+  packager: PackagerNode,
+  washer: WasherNode,
+  cncmachine: CNCMachineNode,
+  oven: OvenNode,
+  injectionmolder: InjectionMolderNode,
+  sortingstation: SortingStationNode,
+  accumulator: AccumulatorNode,
+  turntable: TurntableNode,
+  elevator: ElevatorNode,
+  overheadconveyor: OverheadConveyorNode,
+  sorter: SorterNode,
+  shuttle: ShuttleNode,
+  rollerconveyor: RollerConveyorNode,
+  trackguidedvehicle: TrackGuidedVehicleNode,
+  crossover: CrossoverNode,
+  pickstation: PickStationNode,
+  weighing: WeighingNode,
+  labeler: LabelerNode,
   zoneBackground: ZoneBackgroundNode,
 };
 
@@ -68,46 +145,164 @@ const NODE_PALETTE_GROUPS = [
   {
     label: 'Flow',
     items: [
-      { type: 'source', label: 'Source', shortCode: 'So', color: 'bg-green-500', icon: '↓', tooltip: 'Source - Generates parts entering the line' },
-      { type: 'sink', label: 'Sink', shortCode: 'Si', color: 'bg-red-500', icon: '⬇', tooltip: 'Sink - Collects finished products' },
+      { type: 'source', label: 'Source', shortCode: 'So', color: 'bg-gray-100', accent: '#17C964', icon: '↓', tooltip: 'Source - Generates parts entering the line' },
+      { type: 'sink', label: 'Sink', shortCode: 'Si', color: 'bg-gray-100', accent: '#F31260', icon: '⬇', tooltip: 'Sink - Collects finished products' },
     ],
   },
   {
     label: 'Processing',
     items: [
-      { type: 'station', label: 'Station', shortCode: 'St', color: 'bg-blue-500', icon: '⚙', tooltip: 'Station - Processing step with configurable cycle time' },
-      { type: 'assembly', label: 'Assembly', shortCode: 'As', color: 'bg-indigo-500', icon: '+', tooltip: 'Assembly - Combines multiple parts into one' },
-      { type: 'disassembly', label: 'Disassembly', shortCode: 'Di', color: 'bg-orange-500', icon: '−', tooltip: 'Disassembly - Splits one part into multiple' },
-      { type: 'inspection', label: 'Inspection', shortCode: 'In', color: 'bg-cyan-500', icon: '✓', tooltip: 'Inspection - Quality check with pass/fail rate' },
+      { type: 'station', label: 'Station', shortCode: 'St', color: 'bg-gray-100', accent: '#2563EB', icon: '⚙', tooltip: 'Station - Processing step with configurable cycle time' },
+      { type: 'assembly', label: 'Assembly', shortCode: 'As', color: 'bg-gray-100', accent: '#6366f1', icon: '+', tooltip: 'Assembly - Combines multiple parts into one' },
+      { type: 'disassembly', label: 'Disassembly', shortCode: 'Di', color: 'bg-gray-100', accent: '#f97316', icon: '−', tooltip: 'Disassembly - Splits one part into multiple' },
+      { type: 'inspection', label: 'Inspection', shortCode: 'In', color: 'bg-gray-100', accent: '#06b6d4', icon: '✓', tooltip: 'Inspection - Quality check with pass/fail rate' },
     ],
   },
   {
     label: 'Storage',
     items: [
-      { type: 'buffer', label: 'Buffer', shortCode: 'Bu', color: 'bg-amber-500', icon: '▭', tooltip: 'Buffer - Queue between stations' },
-      { type: 'matchbuffer', label: 'Match Buffer', shortCode: 'MB', color: 'bg-purple-500', icon: '⇔', tooltip: 'Match Buffer - Holds parts until matching set available' },
-      { type: 'conveyor', label: 'Conveyor', shortCode: 'Cv', color: 'bg-amber-400', icon: '→', tooltip: 'Conveyor - Transport with travel time' },
+      { type: 'buffer', label: 'Buffer', shortCode: 'Bu', color: 'bg-gray-100', accent: '#F5A524', icon: '▭', tooltip: 'Buffer - Queue between stations' },
+      { type: 'matchbuffer', label: 'Match Buffer', shortCode: 'MB', color: 'bg-gray-100', accent: '#a855f7', icon: '⇔', tooltip: 'Match Buffer - Holds parts until matching set available' },
+      { type: 'conveyor', label: 'Conveyor', shortCode: 'Cv', color: 'bg-gray-100', accent: '#F5A524', icon: '→', tooltip: 'Conveyor - Transport with travel time' },
     ],
   },
   {
     label: 'Routing',
     items: [
-      { type: 'splitter', label: 'Splitter', shortCode: 'Sp', color: 'bg-teal-500', icon: '⋔', tooltip: 'Splitter - Routes parts to multiple outputs' },
-      { type: 'merge', label: 'Merge', shortCode: 'Me', color: 'bg-emerald-500', icon: '⋒', tooltip: 'Merge - Combines multiple input streams' },
-      { type: 'palletize', label: 'Palletize', shortCode: 'Pa', color: 'bg-amber-600', icon: '▦', tooltip: 'Palletize - Groups parts into batches' },
-      { type: 'depalletize', label: 'Depalletize', shortCode: 'Dp', color: 'bg-yellow-600', icon: '▤', tooltip: 'Depalletize - Splits batches into individual parts' },
+      { type: 'splitter', label: 'Splitter', shortCode: 'Sp', color: 'bg-gray-100', accent: '#14b8a6', icon: '⋔', tooltip: 'Splitter - Routes parts to multiple outputs' },
+      { type: 'merge', label: 'Merge', shortCode: 'Me', color: 'bg-gray-100', accent: '#10b981', icon: '⋒', tooltip: 'Merge - Combines multiple input streams' },
+      { type: 'palletize', label: 'Palletize', shortCode: 'Pa', color: 'bg-gray-100', accent: '#d97706', icon: '▦', tooltip: 'Palletize - Groups parts into batches' },
+      { type: 'depalletize', label: 'Depalletize', shortCode: 'Dp', color: 'bg-gray-100', accent: '#ca8a04', icon: '▤', tooltip: 'Depalletize - Splits batches into individual parts' },
     ],
   },
   {
     label: 'Resources',
     items: [
-      { type: 'operator', label: 'Operator', shortCode: 'Op', color: 'bg-violet-500', icon: '👤', tooltip: 'Operator - Shared human resource for stations' },
+      { type: 'operator', label: 'Operator', shortCode: 'Op', color: 'bg-gray-100', accent: '#8b5cf6', icon: '👤', tooltip: 'Operator - Shared human resource for stations' },
+      { type: 'humanoid', label: 'Humanoid', shortCode: 'Hu', color: 'bg-gray-100', accent: '#0ea5e9', icon: '🤖', tooltip: 'Humanoid - Bipedal robot worker (behaves like operator)' },
+      { type: 'agv', label: 'AGV', shortCode: 'Ag', color: 'bg-gray-100', accent: '#06b6d4', icon: '🚗', tooltip: 'AGV - Autonomous guided vehicle for transport (behaves like forklift)' },
+    ],
+  },
+  {
+    label: 'Automation',
+    items: [
+      { type: 'roboticcell', label: 'Robotic Cell', shortCode: 'Rc', color: 'bg-gray-100', accent: '#ea580c', icon: '🦾', tooltip: 'Robotic Cell - Industrial robot arm in safety cage (behaves like station)' },
+    ],
+  },
+  {
+    label: 'Logistics',
+    items: [
+      { type: 'warehouse', label: 'Warehouse', shortCode: 'Wh', color: 'bg-gray-100', accent: '#f59e0b', icon: '🏭', tooltip: 'Warehouse - Multi-level storage with put/pick operations' },
+      { type: 'loadingdock', label: 'Loading Dock', shortCode: 'Ld', color: 'bg-gray-100', accent: '#64748b', icon: '🚛', tooltip: 'Loading Dock - Truck loading/unloading bay' },
+      { type: 'crane', label: 'Crane', shortCode: 'Cr', color: 'bg-gray-100', accent: '#eab308', icon: '🏗️', tooltip: 'Crane - Overhead gantry or bridge crane' },
+      { type: 'forklift', label: 'Forklift', shortCode: 'Fk', color: 'bg-gray-100', accent: '#f97316', icon: '🚜', tooltip: 'Forklift - Material handling lift truck' },
+      { type: 'coldstorage', label: 'Cold Storage', shortCode: 'Cs', color: 'bg-gray-100', accent: '#0ea5e9', icon: '❄️', tooltip: 'Cold Storage - Temperature-controlled storage' },
+    ],
+  },
+  {
+    label: 'Specialized',
+    items: [
+      { type: 'press', label: 'Press', shortCode: 'Pr', color: 'bg-gray-100', accent: '#ef4444', icon: '⬇', tooltip: 'Press - Hydraulic stamping/forming press' },
+      { type: 'lasercutter', label: 'Laser Cutter', shortCode: 'Lc', color: 'bg-gray-100', accent: '#8b5cf6', icon: '⚡', tooltip: 'Laser Cutter - CNC laser cutting machine' },
+      { type: 'weldingcell', label: 'Welding Cell', shortCode: 'Wc', color: 'bg-gray-100', accent: '#d97706', icon: '🔥', tooltip: 'Welding Cell - Robotic welding station' },
+      { type: 'paintbooth', label: 'Paint Booth', shortCode: 'Pb', color: 'bg-gray-100', accent: '#ec4899', icon: '🎨', tooltip: 'Paint Booth - Spray painting with cure cycle' },
+      { type: 'packager', label: 'Packager', shortCode: 'Pk', color: 'bg-gray-100', accent: '#84cc16', icon: '📦', tooltip: 'Packager - End-of-line packaging' },
+      { type: 'washer', label: 'Washer', shortCode: 'Wa', color: 'bg-gray-100', accent: '#06b6d4', icon: '💧', tooltip: 'Washer - Parts washing/cleaning station' },
+      { type: 'cncmachine', label: 'CNC Machine', shortCode: 'Cn', color: 'bg-gray-100', accent: '#10b981', icon: '⚙', tooltip: 'CNC Machine - Lathe, mill, or grinder with tool changes' },
+      { type: 'oven', label: 'Oven', shortCode: 'Ov', color: 'bg-gray-100', accent: '#ea580c', icon: '🔥', tooltip: 'Oven - Batch heat treatment with ramp/hold/cool cycle' },
+      { type: 'injectionmolder', label: 'Inj. Molder', shortCode: 'Im', color: 'bg-gray-100', accent: '#9333ea', icon: '⬤', tooltip: 'Injection Molder - Multi-cavity plastic molding' },
+      { type: 'sortingstation', label: 'Sorter', shortCode: 'Sr', color: 'bg-gray-100', accent: '#14b8a6', icon: '↕', tooltip: 'Sorting Station - Multi-output product sorting' },
+      { type: 'accumulator', label: 'Accumulator', shortCode: 'Ac', color: 'bg-gray-100', accent: '#6366f1', icon: '▥', tooltip: 'Accumulator - Collects and releases in bursts' },
+    ],
+  },
+  {
+    label: 'Material Handling',
+    items: [
+      { type: 'turntable', label: 'Turntable', shortCode: 'Tt', color: 'bg-gray-100', accent: '#14b8a6', icon: '↻', tooltip: 'Turntable - Rotary transfer between conveyors' },
+      { type: 'elevator', label: 'Elevator', shortCode: 'El', color: 'bg-gray-100', accent: '#6366f1', icon: '⇕', tooltip: 'Elevator - Vertical transport between floors' },
+      { type: 'overheadconveyor', label: 'Overhead', shortCode: 'Oc', color: 'bg-gray-100', accent: '#06b6d4', icon: '⌒', tooltip: 'Overhead Conveyor - Carrier-based overhead transport' },
+      { type: 'sorter', label: 'Sorter', shortCode: 'So', color: 'bg-gray-100', accent: '#10b981', icon: '⇣', tooltip: 'Sorter - Multi-output sorting with error rate' },
+      { type: 'shuttle', label: 'Shuttle', shortCode: 'Sh', color: 'bg-gray-100', accent: '#8b5cf6', icon: '⇔', tooltip: 'Shuttle - Lane-based shuttle transport' },
+      { type: 'rollerconveyor', label: 'Roller Conv.', shortCode: 'Rc', color: 'bg-gray-100', accent: '#f59e0b', icon: '═', tooltip: 'Roller Conveyor - Simple roller transport' },
+      { type: 'trackguidedvehicle', label: 'TGV', shortCode: 'Tg', color: 'bg-gray-100', accent: '#64748b', icon: '⊞', tooltip: 'Track Guided Vehicle - Fixed-rail fleet transport' },
+      { type: 'crossover', label: 'Crossover', shortCode: 'Cx', color: 'bg-gray-100', accent: '#ec4899', icon: '✕', tooltip: 'Crossover - Lane transfer switch' },
+    ],
+  },
+  {
+    label: 'Quality & Finishing',
+    items: [
+      { type: 'pickstation', label: 'Pick Station', shortCode: 'Pk', color: 'bg-gray-100', accent: '#f97316', icon: '✋', tooltip: 'Pick Station - Manual pick-to-light with error rate' },
+      { type: 'weighing', label: 'Weighing', shortCode: 'Wg', color: 'bg-gray-100', accent: '#3b82f6', icon: '⚖', tooltip: 'Weighing - Weight measurement with reject rate' },
+      { type: 'labeler', label: 'Labeler', shortCode: 'Lb', color: 'bg-gray-100', accent: '#84cc16', icon: '🏷', tooltip: 'Labeler - Label application with error rate' },
     ],
   },
 ];
 
 // Flat palette for backward compatibility
 const NODE_PALETTE = NODE_PALETTE_GROUPS.flatMap(g => g.items);
+
+// ── Essential elements (shown as large ribbon buttons in both modes) ─────────
+const SIMPLE_PALETTE: Array<{ type: string; label: string; hint: string; icon: React.ReactNode }> = [
+  { type: 'source', label: 'Source', hint: 'Where parts enter the line', icon: <ArrowDownToLine size={26} color="#059669" /> },
+  { type: 'station', label: 'Station', hint: 'A machine or work step with a cycle time', icon: <Cog size={26} color="#2563EB" /> },
+  { type: 'buffer', label: 'Buffer', hint: 'Queue / storage space between stations', icon: <Layers size={26} color="#D97706" /> },
+  { type: 'conveyor', label: 'Conveyor', hint: 'Moves parts with a travel time', icon: <MoveRight size={26} color="#B45309" /> },
+  { type: 'inspection', label: 'Inspection', hint: 'Quality check with a reject rate', icon: <ScanSearch size={26} color="#0891B2" /> },
+  { type: 'assembly', label: 'Assembly', hint: 'Joins several parts into one', icon: <Combine size={26} color="#4F46E5" /> },
+  { type: 'operator', label: 'Operator', hint: 'A worker shared by stations', icon: <UserRound size={26} color="#7C3AED" /> },
+  { type: 'sink', label: 'Sink', hint: 'Where finished parts leave the line', icon: <PackageCheck size={26} color="#DC2626" /> },
+];
+
+// ── "More elements" ribbon button: every element type, grouped (expert mode) ──
+function MoreElementsButton({ onAdd }: { onAdd: (type: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: 'relative' }}>
+      <RibbonButton
+        icon={<Shapes size={26} color="#475569" />}
+        label="More"
+        dropdown
+        active={open}
+        onClick={() => setOpen((v) => !v)}
+        title="All 47 element types"
+      />
+      {open && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 60 }} onClick={() => setOpen(false)} />
+          <div
+            role="menu"
+            style={{
+              position: 'absolute', top: '100%', left: 0, zIndex: 61, marginTop: 2,
+              background: '#fff', border: '1px solid var(--chrome-border)', boxShadow: '0 8px 24px rgba(15,23,42,.18)',
+              padding: 10, display: 'grid', gridTemplateColumns: 'repeat(5, 150px)', gap: '10px 14px',
+            }}
+          >
+            {NODE_PALETTE_GROUPS.map((group) => (
+              <div key={group.label}>
+                <div className="text-label" style={{ marginBottom: 4 }}>{group.label}</div>
+                {group.items.map((item) => (
+                  <button
+                    key={item.type}
+                    role="menuitem"
+                    type="button"
+                    title={item.tooltip}
+                    onClick={() => { onAdd(item.type); setOpen(false); }}
+                    className="file-menu-item"
+                    style={{ padding: '3px 4px', gap: 7, fontSize: 12 }}
+                  >
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: (item as any).accent || '#94a3b8', flexShrink: 0 }} />
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 
 export function FactoryBuilder() {
   const {
@@ -131,10 +326,47 @@ export function FactoryBuilder() {
     history,
     historyIndex,
     applyAutoLayout,
+    setTransportNetworkEnabled,
   } = useModelStore();
 
   const { addToast } = useAppStore();
+  const simpleMode = useAppStore((st) => st.simpleMode);
+  // Hoisted: these were called inline in JSX, which breaks hook order once the box is conditional
+  const maxOperators = useLiveSimulationStore((st) => st.maxOperators);
+  const maxForklifts = useLiveSimulationStore((st) => st.maxForklifts);
+  const navigate = useNavigate();
+  const setBridgeScenario = useScenarioBridgeStore((s) => s.setPending);
   const { isRunning: isSimulating, lastResult } = useSimulationStore();
+
+  const openInScenarioWorld = useCallback(() => {
+    const scenario = modelToScenario(model, { type: 'factory' });
+    setBridgeScenario(scenario);
+    navigate('/world');
+    addToast({
+      type: 'success',
+      message: `Opened ${scenario.entities.length} entities in 3D World`,
+    });
+  }, [model, setBridgeScenario, navigate, addToast]);
+
+  const onAutoAssignModels = useCallback(() => {
+    // Force reassignment for every entity (overwrites prior auto-picks; user
+    // picks via the property panel are still taken into account first because
+    // autoAssignLibraryModels respects existing libraryModelId unless force=true).
+    const updated = autoAssignLibraryModels({ ...model,
+      stations: model.stations.map(s => ({ ...s, libraryModelId: undefined })),
+      buffers: model.buffers.map(b => ({ ...b, libraryModelId: undefined })),
+      extraNodes: model.extraNodes.map(e => ({ ...e, libraryModelId: undefined })),
+    });
+    useModelStore.getState().setModel(updated);
+    const stats = describeAssignment(updated);
+    addToast({
+      type: 'success',
+      message: `Auto-assigned 3D models to ${stats.totalAssigned}/${stats.total} entities (${Object.keys(stats.modelDistribution).length} unique).`,
+    });
+  }, [model, addToast]);
+  const validationIssues = useModelValidation(model);
+  const errorCount = validationIssues.filter(i => i.severity === 'error').length;
+  const warningCount = validationIssues.filter(i => i.severity === 'warning').length;
 
   const [showTemplates, setShowTemplates] = useState(false);
   const [showAddNode, setShowAddNode] = useState(false);
@@ -143,9 +375,16 @@ export function FactoryBuilder() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [showZones, setShowZones] = useState(false);
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d');
+  const [heatmapMode, setHeatmapMode] = useState<'off' | 'utilization' | 'blocked' | 'starved'>('off');
   const searchRef = useRef<HTMLDivElement>(null);
   const factoryRef = useRef<HTMLDivElement>(null);
   const rfInstance = useRef<ReactFlowInstance | null>(null);
+
+  // Track whether component is still mounted to guard async callbacks
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    return () => { isMountedRef.current = false; };
+  }, []);
 
   // Register element in registry for cross-tab screenshot access.
   // On unmount, capture a fresh screenshot to cache BEFORE clearing the element,
@@ -166,9 +405,12 @@ export function FactoryBuilder() {
   // Cache a base64 screenshot of the canvas when model changes (debounced 300ms)
   useEffect(() => {
     const timer = setTimeout(() => {
+      if (!isMountedRef.current) return;
       if (factoryRef.current) {
         captureToBase64(factoryRef.current)
-          .then((base64) => setCachedImage('factory-canvas', base64))
+          .then((base64) => {
+            if (isMountedRef.current) setCachedImage('factory-canvas', base64);
+          })
           .catch(() => {}); // non-critical
       }
     }, 300);
@@ -226,6 +468,8 @@ export function FactoryBuilder() {
     source: conn.source,
     target: conn.target,
     animated: true,
+    type: 'smoothstep',
+    markerEnd: { type: MarkerType.ArrowClosed, color: '#64748b' },
     style: { stroke: '#64748b', strokeWidth: 2 },
   }));
 
@@ -234,12 +478,28 @@ export function FactoryBuilder() {
 
   // Sync nodes with model store
   React.useEffect(() => {
+    // Build heatmap data from last result
+    const heatmapData: Record<string, { value: number; color: string }> = {};
+    if (heatmapMode !== 'off' && lastResult?.kpis?.utilization?.byStation) {
+      const util = lastResult.kpis.utilization.byStation;
+      for (const [sid, s] of Object.entries(util)) {
+        const su = s as any;
+        const val = heatmapMode === 'utilization' ? (su.busy || 0)
+          : heatmapMode === 'blocked' ? (su.blocked || 0)
+          : (su.starved || 0);
+        // Color: green (low) → yellow → red (high)
+        const r = Math.round(255 * Math.min(1, val * 2));
+        const g = Math.round(255 * Math.min(1, (1 - val) * 2));
+        heatmapData[sid] = { value: val, color: `rgb(${r}, ${g}, 0)` };
+      }
+    }
+
     const modelNodes: Node[] = [
       ...model.stations.map((station) => ({
         id: station.id,
         type: 'station',
         position: station.position,
-        data: station,
+        data: { ...station, _heatmap: heatmapData[station.id] },
         selected: station.id === selectedNodeId,
       })),
       ...model.buffers.map((buffer) => ({
@@ -261,7 +521,7 @@ export function FactoryBuilder() {
     // Compute zone background nodes when zones are visible
     const zoneNodes: Node[] = [];
     if (showZones) {
-      const ZONE_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
+      const ZONE_COLORS = ['#2563EB', '#8b5cf6', '#06b6d4', '#F5A524', '#10b981', '#F31260', '#ec4899'];
       const zoneMap = new Map<string, { ids: string[]; positions: { x: number; y: number }[] }>();
       for (const n of modelNodes) {
         const name: string = n.data?.name || n.data?.label || '';
@@ -301,23 +561,25 @@ export function FactoryBuilder() {
     }
 
     setNodes([...zoneNodes, ...modelNodes]);
-  }, [model.stations, model.buffers, model.extraNodes, selectedNodeId, showZones, setNodes]);
+  }, [model.stations, model.buffers, model.extraNodes, selectedNodeId, showZones, setNodes, heatmapMode, lastResult]);
 
   React.useEffect(() => {
     const newEdges: Edge[] = model.connections.map((conn) => {
       const isUpstream = selectedNodeId && conn.target === selectedNodeId;
       const isDownstream = selectedNodeId && conn.source === selectedNodeId;
       const highlighted = isUpstream || isDownstream;
+      const baseColor = isUpstream ? '#10b981' : isDownstream ? '#3b82f6' : selectedNodeId ? '#94a3b8' : '#64748b';
       return {
         id: conn.id,
         source: conn.source,
         target: conn.target,
         type: 'smoothstep',
         animated: true,
+        markerEnd: { type: MarkerType.ArrowClosed, color: baseColor },
         style: {
-          stroke: isUpstream ? '#22c55e' : isDownstream ? '#3b82f6' : selectedNodeId ? '#334155' : '#64748b',
-          strokeWidth: highlighted ? 3 : selectedNodeId ? 1 : 2,
-          opacity: selectedNodeId && !highlighted ? 0.3 : 1,
+          stroke: baseColor,
+          strokeWidth: highlighted ? 2.5 : selectedNodeId ? 1.5 : 2,
+          opacity: selectedNodeId && !highlighted ? 0.25 : 1,
         },
       };
     });
@@ -465,171 +727,188 @@ export function FactoryBuilder() {
     <>
     <div className="h-full flex flex-col" ref={factoryRef}>
       {/* Toolbar */}
-      <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setShowTemplates(true)}
-          >
-            Load Template
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
+      {/* Commands live in the app ribbon (engineering-desktop style) */}
+      <RibbonContent>
+        <RibbonGroup label="Model">
+          <RibbonButton icon={<LayoutTemplate size={26} color="#1F5FAD" />} label="Load template" onClick={() => setShowTemplates(true)} />
+          <RibbonButton
+            icon={<LayoutGrid size={26} color="#475569" />}
+            label="Auto layout"
+            title="Arrange elements left to right by flow"
             onClick={() => {
               applyAutoLayout();
               setTimeout(() => {
                 rfInstance.current?.fitView({ padding: 0.15, maxZoom: 1.0 });
               }, 200);
             }}
-            title="Auto Layout"
-          >
-            <LayoutIcon className="w-4 h-4 mr-1" />
-            Auto Layout
-          </Button>
-          <div className="h-6 w-px bg-gray-200 mx-2" />
+          />
+        </RibbonGroup>
 
-          {/* Node Palette — grouped with dividers */}
-          <div className="flex items-center">
-            {NODE_PALETTE_GROUPS.map((group, gi) => (
-              <div key={group.label} className="flex items-center">
-                {gi > 0 && <div className="h-8 w-px bg-gray-200 mx-1" />}
-                {group.items.map((item) => (
-                  <button
-                    key={item.type}
-                    onClick={() => {
-                      setAddNodeType(item.type);
-                      setShowAddNode(true);
-                    }}
-                    className="px-1.5 py-1 rounded hover:bg-gray-100 transition-colors flex flex-col items-center"
-                    title={item.tooltip}
-                  >
-                    <div className={`w-7 h-7 ${item.color} rounded-md flex items-center justify-center text-white text-xs font-bold shadow-sm`}>
-                      {item.shortCode}
+        <RibbonGroup label="Add element">
+          {SIMPLE_PALETTE.map((item) => (
+            <RibbonButton
+              key={item.type}
+              icon={item.icon}
+              label={item.label}
+              title={`Add ${item.label} — ${item.hint}`}
+              onClick={() => { setAddNodeType(item.type); setShowAddNode(true); }}
+            />
+          ))}
+          {!simpleMode && (
+            <MoreElementsButton
+              onAdd={(type) => { setAddNodeType(type); setShowAddNode(true); }}
+            />
+          )}
+        </RibbonGroup>
+
+        <RibbonGroup label="View">
+          <RibbonButton icon={<Network size={26} color="#2563EB" />} label="2D layout" active={viewMode === '2d'} onClick={() => setViewMode('2d')} title="2D flow layout" />
+          <RibbonButton icon={<Box size={26} color={isSimulating ? '#059669' : '#475569'} />} label="3D view" active={viewMode === '3d'} onClick={() => setViewMode('3d')} title="3D view (works during simulation)" />
+          {(!simpleMode || lastResult) && (
+            <RibbonStack>
+              {!simpleMode && (
+                <RibbonSmallButton icon={<SquareDashed size={14} />} label="Zones" active={showZones} onClick={() => setShowZones(!showZones)} title="Toggle zone outlines" />
+              )}
+              {!simpleMode && (
+                <RibbonSmallButton icon={<Route size={14} />} label="Transport" active={!!model.transportNetwork?.enabled} onClick={() => setTransportNetworkEnabled(!model.transportNetwork?.enabled)} title="Toggle transport network (AGV/forklift paths)" />
+              )}
+              {lastResult && (
+                <label className="ribbon-field" title="Colour stations by simulation results">
+                  <Flame size={14} color="#EA580C" />
+                  <select value={heatmapMode} onChange={(e) => setHeatmapMode(e.target.value as any)}>
+                    <option value="off">Heatmap: off</option>
+                    <option value="utilization">Utilization</option>
+                    <option value="blocked">Blocked</option>
+                    <option value="starved">Starved</option>
+                  </select>
+                </label>
+              )}
+            </RibbonStack>
+          )}
+        </RibbonGroup>
+
+        <RibbonGroup label="Edit">
+          <RibbonStack>
+            <RibbonSmallButton icon={<Undo2 size={14} />} label="Undo" onClick={undo} disabled={historyIndex <= 0} title="Undo (Ctrl+Z)" />
+            <RibbonSmallButton icon={<Redo2 size={14} />} label="Redo" onClick={redo} disabled={historyIndex >= history.length - 1} title="Redo (Ctrl+Y)" />
+            <div className="relative" ref={searchRef}>
+              <RibbonSmallButton
+                icon={<Search size={14} />}
+                label="Find"
+                active={searchOpen}
+                onClick={() => { setSearchOpen(!searchOpen); setTimeout(() => searchRef.current?.querySelector('input')?.focus(), 50); }}
+                title="Find element (Ctrl+F)"
+              />
+              {searchOpen && (
+                <div className="absolute left-0 top-full mt-1 w-64 bg-white shadow-lg border border-gray-300 z-50">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Find element by name…"
+                    className="w-full px-2 py-1.5 text-sm border-b border-gray-200 outline-none"
+                    autoFocus
+                  />
+                  {searchQuery.trim() && (
+                    <div className="max-h-48 overflow-y-auto">
+                      {searchResults.length === 0 ? (
+                        <div className="px-3 py-2 text-xs text-gray-400">No matches</div>
+                      ) : (
+                        searchResults.map(r => (
+                          <button
+                            key={r.id}
+                            onClick={() => focusNode(r.id)}
+                            className="w-full text-left px-2 py-1 text-sm hover:bg-blue-50 flex items-center gap-2"
+                          >
+                            <span className="text-[10px] uppercase text-gray-400 w-12 shrink-0">{r.type}</span>
+                            <span className="truncate">{r.name}</span>
+                          </button>
+                        ))
+                      )}
                     </div>
-                    <span className="text-[9px] text-gray-600 mt-0.5 leading-tight truncate max-w-[56px] font-medium">
-                      {item.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </RibbonStack>
+        </RibbonGroup>
 
-        <div className="flex items-center space-x-2">
-          {/* 2D / 3D view toggle */}
-          <div className={`flex items-center rounded-md p-0.5 transition-all ${isSimulating ? 'bg-green-100 ring-2 ring-green-400/50' : 'bg-gray-100'}`}>
-            <button
-              onClick={() => setViewMode('2d')}
-              className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${viewMode === '2d' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-              title="2D View"
-            >
-              2D
-            </button>
-            <button
-              onClick={() => setViewMode('3d')}
-              className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${viewMode === '3d' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-              title="3D View (works during simulation)"
-            >
-              3D
-            </button>
-          </div>
-          <button
-            onClick={() => setShowZones(!showZones)}
-            className={`px-2 py-1 text-xs rounded transition-colors ${showZones ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}
-            title="Toggle zone outlines"
-          >
-            Zones
-          </button>
-          <div className="h-6 w-px bg-gray-200 mx-1" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={undo}
-            disabled={historyIndex <= 0}
-            title="Undo (Ctrl+Z)"
-          >
-            <UndoIcon className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={redo}
-            disabled={historyIndex >= history.length - 1}
-            title="Redo (Ctrl+Y)"
-          >
-            <RedoIcon className="w-4 h-4" />
-          </Button>
-          <div className="h-6 w-px bg-gray-200 mx-2" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleScreenshot}
-            title="Screenshot"
-          >
-            <CameraIcon className="w-4 h-4" />
-          </Button>
-          <div className="h-6 w-px bg-gray-200 mx-2" />
+        <RibbonGroup label="Output">
+          <RibbonButton icon={<Camera size={26} color="#475569" />} label="Screenshot" onClick={handleScreenshot} title="Save the layout as PNG" />
+        </RibbonGroup>
 
-          {/* Node Search */}
-          <div className="relative" ref={searchRef}>
-            <button
-              onClick={() => { setSearchOpen(!searchOpen); setTimeout(() => searchRef.current?.querySelector('input')?.focus(), 50); }}
-              className="p-1.5 rounded hover:bg-gray-100 transition-colors"
-              title="Search nodes (Ctrl+F)"
-            >
-              <SearchIcon className="w-4 h-4 text-gray-500" />
-            </button>
-            {searchOpen && (
-              <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search nodes..."
-                  className="w-full px-3 py-2 text-sm border-b border-gray-100 rounded-t-lg outline-none focus:ring-1 focus:ring-blue-400"
-                  autoFocus
-                />
-                {searchQuery.trim() && (
-                  <div className="max-h-48 overflow-y-auto">
-                    {searchResults.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-gray-400">No matches</div>
-                    ) : (
-                      searchResults.map(r => (
-                        <button
-                          key={r.id}
-                          onClick={() => focusNode(r.id)}
-                          className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 flex items-center gap-2"
-                        >
-                          <span className="text-[10px] uppercase text-gray-400 w-12 shrink-0">{r.type}</span>
-                          <span className="truncate">{r.name}</span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+        {!simpleMode && (
+          <RibbonGroup label="3D">
+            <RibbonButton
+              icon={<Wand2 size={26} color="#7C3AED" />}
+              label="Auto 3D models"
+              onClick={onAutoAssignModels}
+              title="Auto-assign 3D library models to every station/buffer based on name + type"
+              disabled={model.stations.length + model.buffers.length + model.extraNodes.length === 0}
+            />
+            <RibbonButton
+              icon={<GlobeIcon size={26} color="#0891B2" />}
+              label="Open in 3D World"
+              onClick={openInScenarioWorld}
+              title="Open the current model in the 3D World viewer with rigged robots and live animation"
+              disabled={model.stations.length + model.buffers.length + model.extraNodes.length === 0}
+            />
+          </RibbonGroup>
+        )}
 
-          <div className="h-6 w-px bg-gray-200 mx-2" />
-          <span className="text-sm text-gray-500">
-            {nodes.length} elements, {edges.length} connections
+        {!simpleMode && (
+          <RibbonGroup label="Animation">
+            <RibbonStack>
+              <label className="ribbon-field" title="Maximum animated operators in the live view">
+                <span>Operators</span>
+                <input type="number" min={1} max={50} value={maxOperators} style={{ width: 48 }}
+                  onChange={(e) => useLiveSimulationStore.getState().setMaxOperators(parseInt(e.target.value) || 1)} />
+              </label>
+              <label className="ribbon-field" title="Maximum animated forklifts in the live view">
+                <span>Forklifts</span>
+                <input type="number" min={1} max={20} value={maxForklifts} style={{ width: 48 }}
+                  onChange={(e) => useLiveSimulationStore.getState().setMaxForklifts(parseInt(e.target.value) || 1)} />
+              </label>
+            </RibbonStack>
+          </RibbonGroup>
+        )}
+      </RibbonContent>
+
+      {/* Inline validation warnings */}
+      {(errorCount > 0 || warningCount > 0) && (
+        <div className={`px-4 py-1.5 text-xs flex items-center space-x-3 border-b ${errorCount > 0 ? 'bg-red-50 border-red-200 text-red-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+          <span className="font-medium">
+            {errorCount > 0 && `${errorCount} error${errorCount > 1 ? 's' : ''}`}
+            {errorCount > 0 && warningCount > 0 && ', '}
+            {warningCount > 0 && `${warningCount} warning${warningCount > 1 ? 's' : ''}`}
           </span>
+          <span className="text-gray-400">|</span>
+          <span>{validationIssues.filter(i => i.severity !== 'info').slice(0, 3).map(i => i.message).join(' · ')}</span>
         </div>
-      </div>
+      )}
 
-      {/* Canvas */}
-      <div className="flex-1 flex min-h-0">
+      {/* Workspace: outline (left) · graphics (centre) · properties (right) */}
+      <div className="flex-1 flex min-h-0" style={{ gap: 0 }}>
+        <DockPanel title="Outline" style={{ width: 230, flexShrink: 0, borderTop: 'none', borderLeft: 'none', borderBottom: 'none' }}>
+          <ModelOutline
+            onSelect={(id) => {
+              setSelectedNode(id);
+              rfInstance.current?.fitView({ nodes: [{ id }] as any, padding: 2, maxZoom: 1, duration: 300 });
+            }}
+          />
+        </DockPanel>
+        <div className="flex-1 flex flex-col min-w-0">
+        <div className="graphics-title">
+          <span><b style={{ fontWeight: 600 }}>{viewMode === '3d' ? '3D view' : 'Layout'}</b>{' — '}{model.name || 'Untitled model'}</span>
+          <span style={{ color: '#64748B' }}>{nodes.length} elements · {edges.length} connections</span>
+        </div>
         <div className="flex-1 relative">
           {viewMode === '3d' ? (
             <Suspense fallback={
-              <div className="w-full h-full flex items-center justify-center bg-slate-100">
+              <div className="w-full h-full flex items-center justify-center" style={{ background: '#1c2333' }}>
                 <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                  <p className="text-sm text-gray-500">Loading 3D View...</p>
+                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-blue-500 border-t-transparent mx-auto mb-4" style={{ boxShadow: '0 0 12px rgba(59,130,246,0.5)' }}></div>
+                  <p style={{ color: '#94a3b8', fontSize: 13, letterSpacing: '0.05em' }}>Initialising 3D Factory…</p>
                 </div>
               </div>
             }>
@@ -655,36 +934,72 @@ export function FactoryBuilder() {
             snapGrid={[20, 20]}
             deleteKeyCode="Delete"
           >
-            <Background color="#e2e8f0" gap={20} />
+            <Background variant={BackgroundVariant.Dots} color="#cbd5e1" gap={20} size={1.5} />
             <Controls />
             <MiniMap
               nodeColor={(node) => {
                 const colors: Record<string, string> = {
-                  station: '#3b82f6',
-                  buffer: '#f59e0b',
-                  source: '#22c55e',
-                  sink: '#ef4444',
-                  conveyor: '#f59e0b',
-                  operator: '#8b5cf6',
-                  inspection: '#06b6d4',
-                  assembly: '#6366f1',
-                  splitter: '#14b8a6',
-                  merge: '#10b981',
-                  disassembly: '#f97316',
-                  palletize: '#d97706',
-                  depalletize: '#ca8a04',
-                  matchbuffer: '#a855f7',
+                  station: '#93c5fd',    // blue-300
+                  buffer: '#fcd34d',     // amber-300
+                  source: '#86efac',     // green-300
+                  sink: '#fca5a5',       // red-300
+                  conveyor: '#fcd34d',   // amber-300
+                  operator: '#c4b5fd',   // violet-300
+                  inspection: '#67e8f9', // cyan-300
+                  assembly: '#a5b4fc',   // indigo-300
+                  splitter: '#5eead4',   // teal-300
+                  merge: '#6ee7b7',      // emerald-300
+                  disassembly: '#fdba74', // orange-300
+                  palletize: '#fbbf24',  // amber-400
+                  depalletize: '#fde047', // yellow-300
+                  matchbuffer: '#d8b4fe', // purple-300
                 };
                 return colors[node.type || 'station'] || '#64748b';
               }}
-              style={{ height: 150, width: 220 }}
-              maskColor="rgba(0,0,0,0.6)"
+              style={{ height: 120, width: 200 }}
+              maskColor="rgba(241,245,249,0.7)"
+              maskStrokeColor="#2563EB"
+              maskStrokeWidth={2}
+              pannable
+              zoomable
             />
             <Panel position="bottom-center">
-              <div className="bg-white px-3 py-1.5 rounded-lg shadow text-xs text-gray-500">
-                {isSimulating ? 'Simulation running...' : 'Drag to connect elements. Press Delete to remove. Click palette to add.'}
+              <div className="rf-hint-panel" style={{
+                background: 'rgba(15,23,42,0.8)',
+                backdropFilter: 'blur(6px)',
+                color: 'rgba(255,255,255,0.7)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 20,
+                padding: '5px 14px',
+                fontSize: 11,
+                letterSpacing: '0.01em',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+              }}>
+                {isSimulating ? (
+                  <>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 6px #4ade80', display: 'inline-block', animation: 'replay-blink 1.5s ease-in-out infinite' }} />
+                    Simulation running — canvas is live
+                  </>
+                ) : (
+                  <>
+                    <span style={{ opacity: 0.5 }}>Drag handle to connect</span>
+                    <span style={{ opacity: 0.25 }}>·</span>
+                    <span style={{ opacity: 0.5 }}>Del to remove</span>
+                    <span style={{ opacity: 0.25 }}>·</span>
+                    <span style={{ opacity: 0.5 }}>Ctrl+F to search</span>
+                  </>
+                )}
               </div>
             </Panel>
+            <Panel position="top-right">
+              <div className="flex flex-col gap-2">
+                <FloorPlanToolbar />
+              </div>
+            </Panel>
+            <FloorPlanOverlay />
+            <TransportNetworkOverlay />
             <SimulationAnimationOverlay
               isSimulating={isSimulating}
               events={lastResult?.events?.map(e => ({
@@ -696,6 +1011,7 @@ export function FactoryBuilder() {
             />
           </ReactFlow>
           )}
+        </div>
         </div>
 
         {/* Property Panel */}
@@ -889,7 +1205,17 @@ function AddNodeModal({
     <Modal isOpen={isOpen} onClose={onClose} title={`Add ${nodeInfo?.label || nodeType}`}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="flex items-center space-x-3 pb-2 border-b">
-          <div className={`w-10 h-10 ${nodeInfo?.color || 'bg-gray-500'} rounded flex items-center justify-center text-white text-lg`}>
+          <div style={{
+            width: 40,
+            height: 40,
+            borderRadius: 10,
+            background: (nodeInfo as any)?.accent || '#64748b',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 18,
+            boxShadow: `0 2px 8px ${(nodeInfo as any)?.accent || '#64748b'}55`,
+          }}>
             {nodeInfo?.icon}
           </div>
           <div className="text-sm text-gray-600">
@@ -935,44 +1261,7 @@ function AddNodeModal({
 }
 
 // Icons
-function UndoIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-    </svg>
-  );
-}
 
-function RedoIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
-    </svg>
-  );
-}
 
-function LayoutIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 7h4M7 10v4m10-4v4m-7 3h4" />
-    </svg>
-  );
-}
 
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-  );
-}
 
-function CameraIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  );
-}

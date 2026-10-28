@@ -1,6 +1,5 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps, useStore } from 'reactflow';
-import { FlaskConical } from 'lucide-react';
 import type { Station } from '../../../types';
 
 interface StationNodeData extends Station {}
@@ -24,21 +23,47 @@ function getCycleTimeDisplay(ct?: { type?: string; parameters?: Record<string, n
   }
 }
 
+/* Inline SVG — CNC machine cabinet icon */
+function MachineIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" width="14" height="14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="14" height="13" rx="1.5" />
+      <rect x="5" y="6" width="10" height="5" rx="1" />
+      <circle cx="6.5" cy="15" r="0.7" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="15" r="0.7" fill="currentColor" stroke="none" />
+      <circle cx="13.5" cy="15" r="0.7" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export const StationNode = memo(({ data, selected }: NodeProps<StationNodeData>) => {
   const { value: cycleTime, approx, distAbbrev } = getCycleTimeDisplay(data.cycleTime);
   const isCompact = useStore((s) => (s as any).transform[2] < 0.5);
   const hasScrap = (data.scrapRate ?? 0) > 0;
+  const heatmap = (data as any)._heatmap as { value: number; color: string } | undefined;
+  const hasMtbf = !!data.mtbf;
 
+  /* ── Compact (zoomed out) mode ── */
   if (isCompact) {
     return (
       <div
-        className={`rounded-lg border-2 ${selected ? 'border-blue-500 shadow-lg' : 'border-green-400'} bg-green-50 overflow-hidden`}
-        style={{ minWidth: '120px' }}
+        className={`factory-node station ${selected ? 'selected' : ''}`}
+        style={{ minWidth: 100, padding: 0 }}
       >
         <Handle type="target" position={Position.Left} />
-        <div className="bg-green-500 px-2 py-1.5 flex items-center">
-          <div className="font-bold text-[16px] text-white truncate leading-tight flex-1">{data.name}</div>
-          {hasScrap && <div className="w-2 h-2 rounded-full bg-red-400 ml-1 flex-shrink-0" title={`Scrap: ${((data.scrapRate ?? 0) * 100).toFixed(1)}%`} />}
+        <div style={{
+          background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+          padding: '5px 8px',
+          borderRadius: '8px 8px 0 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 5,
+        }}>
+          <span style={{ color: '#bfdbfe', width: 14, height: 14, display: 'flex' }}><MachineIcon /></span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {data.name}
+          </span>
+          {hasScrap && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fca5a5', flexShrink: 0 }} />}
         </div>
         <Handle type="source" position={Position.Right} />
       </div>
@@ -48,33 +73,92 @@ export const StationNode = memo(({ data, selected }: NodeProps<StationNodeData>)
   return (
     <div
       className={`factory-node station ${selected ? 'selected' : ''}`}
-      style={{ minWidth: '180px' }}
+      style={{
+        minWidth: 172,
+        padding: 0,
+        ...(heatmap ? {
+          boxShadow: `0 0 0 2px ${heatmap.color}, 0 4px 16px ${heatmap.color}44`,
+          borderLeftColor: heatmap.color,
+        } : {}),
+      }}
     >
       <Handle type="target" position={Position.Left} />
 
-      <div className="flex items-center space-x-2.5">
-        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-          <FlaskConical className="w-4 h-4 text-green-600" strokeWidth={1.75} />
+      {/* Heatmap utilization badge */}
+      {heatmap && (
+        <div
+          className="absolute -top-2.5 -right-2.5 w-9 h-9 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-lg z-10"
+          style={{ background: heatmap.color, boxShadow: `0 0 8px ${heatmap.color}` }}
+        >
+          {(heatmap.value * 100).toFixed(0)}%
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-semibold text-[13px] text-gray-900 truncate leading-tight">{data.name}</div>
-          <div className="text-[11px] text-gray-500 mt-0.5 font-mono tabular-nums">
-            CT: {approx ? '~' : ''}{cycleTime}s{distAbbrev ? ` (${distAbbrev})` : ''}
+      )}
+
+      {/* Header */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '8px 10px 7px',
+        background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+        borderBottom: '1px solid #dbeafe',
+      }}>
+        <div style={{
+          width: 28,
+          height: 28,
+          borderRadius: 7,
+          background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          boxShadow: '0 1px 4px rgba(37,99,235,0.4)',
+          color: '#fff',
+        }}>
+          <MachineIcon />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#1e3a5f', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>
+            {data.name}
+          </div>
+          <div style={{ fontSize: 10, color: '#6b7280', marginTop: 1, fontVariantNumeric: 'tabular-nums' }}>
+            {distAbbrev ? `${distAbbrev} · ` : ''}{approx ? '~' : ''}{cycleTime}s cycle
           </div>
         </div>
       </div>
 
-      {/* Additional details */}
-      <div className="mt-1.5 pt-1.5 border-t border-gray-100 grid grid-cols-2 gap-1 text-[11px] text-gray-500 font-mono tabular-nums">
-        {data.mtbf && (
-          <div title="Mean Time Between Failures">
-            MTBF: {data.mtbf}h
-          </div>
+      {/* Body */}
+      <div style={{ padding: '6px 10px 7px', display: 'flex', gap: 10 }}>
+        {/* Cycle time pill */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#9ca3af' }}>CT</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#1e40af', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+            {approx ? '~' : ''}{cycleTime}<span style={{ fontSize: 9, fontWeight: 500, color: '#6b7280', marginLeft: 1 }}>s</span>
+          </span>
+        </div>
+
+        {hasMtbf && (
+          <>
+            <div style={{ width: 1, background: '#f1f5f9', alignSelf: 'stretch' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#9ca3af' }}>MTBF</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#d97706', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+                {data.mtbf}h
+              </span>
+            </div>
+          </>
         )}
-        {data.scrapRate !== undefined && data.scrapRate > 0 && (
-          <div title="Scrap Rate">
-            Scrap: {(data.scrapRate * 100).toFixed(1)}%
-          </div>
+
+        {hasScrap && (
+          <>
+            <div style={{ width: 1, background: '#f1f5f9', alignSelf: 'stretch' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#9ca3af' }}>Scrap</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#ef4444', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+                {((data.scrapRate ?? 0) * 100).toFixed(1)}%
+              </span>
+            </div>
+          </>
         )}
       </div>
 

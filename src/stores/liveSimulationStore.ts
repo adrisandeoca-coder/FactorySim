@@ -57,6 +57,19 @@ export interface LiveSimulationState {
     };
   }>;
 
+  // 3D animation limits (user-configurable)
+  maxOperators: number;
+  maxForklifts: number;
+  setMaxOperators: (n: number) => void;
+  setMaxForklifts: (n: number) => void;
+
+  // AGV transport tracking
+  agvStates: Record<string, { inTransit: number; trips: number; waiting: number }>;
+
+  // State filter — dim non-matching stations (shared between 2D & 3D views)
+  stateFilter: string | null;
+  setStateFilter: (filter: string | null) => void;
+
   // 3D camera fly-to signal (increments on each click)
   flyToBottleneck3DSignal: number;
   triggerFlyToBottleneck3D: () => void;
@@ -127,6 +140,10 @@ const initialState = {
   stationStateTimes: {} as Record<string, Record<string, number>>,
   stationLastStateChange: {} as Record<string, { state: string; time: number }>,
   edgeFlowCounts: {} as Record<string, number>,
+  agvStates: {} as Record<string, { inTransit: number; trips: number; waiting: number }>,
+  maxOperators: 20,
+  maxForklifts: 8,
+  stateFilter: null as string | null,
   flyToBottleneck3DSignal: 0,
   capturedFrames: [] as Array<{ progress: number; base64: string; metadata?: { simTime: number; diagnostics: Record<string, unknown>; trigger?: string } }>,
   isReplaying: false,
@@ -171,7 +188,7 @@ export const useLiveSimulationStore = create<LiveSimulationState>((set) => ({
       let stationUtilizations = state.stationUtilizations;
 
       const addProductType = (pt: string) => {
-        if (!productTypes.includes(pt)) {
+        if (!productTypes.includes(pt) && productTypes.length < 200) {
           productTypes = [...productTypes, pt];
         }
       };
@@ -196,7 +213,7 @@ export const useLiveSimulationStore = create<LiveSimulationState>((set) => ({
               if (totalTime > 0) {
                 stationUtilizations = {
                   ...stationUtilizations,
-                  [station]: ((updatedTimes['processing'] || 0) + (updatedTimes['setup'] || 0) + (updatedTimes['failed'] || 0)) / totalTime,
+                  [station]: (updatedTimes['processing'] || 0) / totalTime,
                 };
               }
             }
@@ -268,6 +285,22 @@ export const useLiveSimulationStore = create<LiveSimulationState>((set) => ({
         }
       }
 
+      // AGV tracking
+      let agvStates = state.agvStates;
+      if (event.type === 'agv_transit_start') {
+        const agvId = event.entity_id;
+        const prev = agvStates[agvId] || { inTransit: 0, trips: 0, waiting: 0 };
+        agvStates = { ...agvStates, [agvId]: { ...prev, inTransit: prev.inTransit + 1 } };
+      } else if (event.type === 'agv_transit_complete') {
+        const agvId = event.entity_id;
+        const prev = agvStates[agvId] || { inTransit: 0, trips: 0, waiting: 0 };
+        agvStates = { ...agvStates, [agvId]: { ...prev, inTransit: Math.max(0, prev.inTransit - 1), trips: prev.trips + 1 } };
+      } else if (event.type === 'agv_wait') {
+        const agvId = event.entity_id;
+        const prev = agvStates[agvId] || { inTransit: 0, trips: 0, waiting: 0 };
+        agvStates = { ...agvStates, [agvId]: { ...prev, waiting: prev.waiting + 1 } };
+      }
+
       const newEvents = [...state.recentEvents, event];
       return {
         recentEvents: newEvents.length > MAX_RECENT_EVENTS
@@ -279,6 +312,7 @@ export const useLiveSimulationStore = create<LiveSimulationState>((set) => ({
         stationProcessedCounts,
         sourceGeneratedCounts,
         sinkExitedCounts,
+        agvStates,
         productTypes,
         stationStateTimes,
         stationLastStateChange,
@@ -301,7 +335,7 @@ export const useLiveSimulationStore = create<LiveSimulationState>((set) => ({
       let stationUtilizations = state.stationUtilizations;
 
       const addProductType = (pt: string) => {
-        if (!productTypes.includes(pt)) {
+        if (!productTypes.includes(pt) && productTypes.length < 200) {
           productTypes = [...productTypes, pt];
         }
       };
@@ -325,7 +359,7 @@ export const useLiveSimulationStore = create<LiveSimulationState>((set) => ({
                 if (totalTime > 0) {
                   stationUtilizations = {
                     ...stationUtilizations,
-                    [station]: ((updatedTimes['processing'] || 0) + (updatedTimes['setup'] || 0) + (updatedTimes['failed'] || 0)) / totalTime,
+                    [station]: (updatedTimes['processing'] || 0) / totalTime,
                   };
                 }
               }
@@ -401,12 +435,28 @@ export const useLiveSimulationStore = create<LiveSimulationState>((set) => ({
 
   startReplay: (duration) =>
     set({
+      // Replay counts from zero. Previously the counters from the live run
+      // carried over, so e.g. "Done" and throughput/hr were inflated
+      // (408 parts already counted + the replayed ones).
+      completedProducts: 0,
+      activeProducts: 0,
+      stationProcessedCounts: {},
+      sourceGeneratedCounts: {},
+      sinkExitedCounts: {},
+      edgeFlowCounts: {},
+      stationStateTimes: {},
+      stationLastStateChange: {},
+      stationUtilizations: {},
+      recentEvents: [],
+      currentTime: 0,
       isReplaying: true,
       replayPaused: false,
       replayProgress: 0,
       replayTime: 0,
       replayDuration: duration,
-      replaySpeed: 1,
+      // Play the whole run in about a minute (was 1x = real time, so an
+      // 8-hour run took 8 hours to watch). The user can still change it.
+      replaySpeed: defaultReplaySpeed(duration),
     }),
 
   stopReplay: () =>
@@ -417,6 +467,7 @@ export const useLiveSimulationStore = create<LiveSimulationState>((set) => ({
       replayTime: 0,
       stationStates: {},
       bufferLevels: {},
+      stateFilter: null,
     }),
 
   addCapturedFrame: (progress, base64, metadata) =>
@@ -444,7 +495,7 @@ export const useLiveSimulationStore = create<LiveSimulationState>((set) => ({
       let lastTime = state.currentTime;
 
       const addProductType = (pt: string) => {
-        if (!productTypes.includes(pt)) {
+        if (!productTypes.includes(pt) && productTypes.length < 200) {
           productTypes = [...productTypes, pt];
         }
       };
@@ -471,7 +522,7 @@ export const useLiveSimulationStore = create<LiveSimulationState>((set) => ({
                 if (totalTime > 0) {
                   stationUtilizations = {
                     ...stationUtilizations,
-                    [station]: ((updatedTimes['processing'] || 0) + (updatedTimes['setup'] || 0) + (updatedTimes['failed'] || 0)) / totalTime,
+                    [station]: (updatedTimes['processing'] || 0) / totalTime,
                   };
                 }
               }
@@ -574,5 +625,19 @@ export const useLiveSimulationStore = create<LiveSimulationState>((set) => ({
 
   triggerFlyToBottleneck3D: () => set((s) => ({ flyToBottleneck3DSignal: s.flyToBottleneck3DSignal + 1 })),
 
+  setStateFilter: (filter) => set({ stateFilter: filter }),
+
+  setMaxOperators: (n) => set({ maxOperators: Math.max(1, Math.min(50, n)) }),
+  setMaxForklifts: (n) => set({ maxForklifts: Math.max(1, Math.min(20, n)) }),
+
   reset: () => set(initialState),
 }));
+
+/** Replay speed steps offered in the player (simulated seconds per real second). */
+export const REPLAY_SPEEDS = [0.5, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
+
+/** Smallest speed step that replays `duration` simulated seconds in ~60 s. */
+export function defaultReplaySpeed(duration: number): number {
+  const target = duration / 60;
+  return REPLAY_SPEEDS.find((s) => s >= target) ?? REPLAY_SPEEDS[REPLAY_SPEEDS.length - 1];
+}

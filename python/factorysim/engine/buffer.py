@@ -29,6 +29,8 @@ class BufferConfig:
     capacity: int
     queue_rule: str = "FIFO"
     position: Dict[str, float] = field(default_factory=lambda: {"x": 0, "y": 0})
+    kanban_enabled: bool = False
+    kanban_cards: int = 0
 
 
 class Buffer:
@@ -65,6 +67,15 @@ class Buffer:
         self.total_waiting_time = 0.0
         self.max_level = 0
         self.wip_history: List[Dict[str, Any]] = []
+
+        # Kanban pull system
+        self.kanban_enabled = config.kanban_enabled
+        self.kanban_cards = config.kanban_cards
+        self._kanban_resource: Optional[simpy.Resource] = None
+        self.kanban_blocked_time = 0.0
+        self.kanban_blocked_count = 0
+        if self.kanban_enabled and self.kanban_cards > 0:
+            self._kanban_resource = simpy.Resource(env, capacity=self.kanban_cards)
 
         # Blocking/starving tracking
         self.total_blocking_time = 0.0
@@ -159,6 +170,12 @@ class Buffer:
 
         product = self._items.pop(0)
 
+        # Release kanban card when product exits a kanban-controlled buffer
+        kanban_req = getattr(product, '_kanban_req', None)
+        if kanban_req is not None and self._kanban_resource is not None:
+            self.release_kanban(kanban_req)
+            product._kanban_req = None
+
         # Track waiting time
         if product.buffer_entry_time is not None:
             waiting_time = self.env.now - product.buffer_entry_time
@@ -182,6 +199,24 @@ class Buffer:
         })
 
         return product
+
+    def acquire_kanban(self):
+        """Acquire a kanban card (SimPy generator). Blocks if no cards available."""
+        if not self._kanban_resource:
+            return
+        start = self.env.now
+        req = self._kanban_resource.request()
+        yield req
+        wait = self.env.now - start
+        if wait > 0:
+            self.kanban_blocked_time += wait
+            self.kanban_blocked_count += 1
+        return req
+
+    def release_kanban(self, req) -> None:
+        """Release a kanban card back to the pool."""
+        if self._kanban_resource and req is not None:
+            self._kanban_resource.release(req)
 
     def peek(self) -> Optional["Product"]:
         """Look at the next item without removing it."""
@@ -271,6 +306,10 @@ class Buffer:
             "total_starving_time": self.total_starving_time,
             "block_count": self.block_count,
             "starve_count": self.starve_count,
+            "kanban_enabled": self.kanban_enabled,
+            "kanban_cards": self.kanban_cards,
+            "kanban_blocked_time": self.kanban_blocked_time,
+            "kanban_blocked_count": self.kanban_blocked_count,
         }
 
     def to_dict(self) -> Dict[str, Any]:
@@ -292,5 +331,7 @@ class Buffer:
             capacity=data["capacity"],
             queue_rule=data.get("queue_rule", data.get("queueRule", "FIFO")),
             position=data.get("position", {"x": 0, "y": 0}),
+            kanban_enabled=data.get("kanban_enabled", data.get("kanbanEnabled", False)),
+            kanban_cards=data.get("kanban_cards", data.get("kanbanCards", 0)),
         )
         return cls(env, config, sim)

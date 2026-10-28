@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardHeader } from '../common/Card';
 import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
@@ -7,9 +7,10 @@ import { useModelStore } from '../../stores/modelStore';
 import { downloadDemoExcelTemplate } from '../../services/demoExcelGenerator';
 import { downloadModelExcel } from '../../services/modelExcelExporter';
 import { importWorkbook, type ImportResult } from '../../services/excelImporter';
-import { captureToBase64 } from '../../services/screenshotService';
+import { useElementScreenshot } from '../../hooks/useElementScreenshot';
+import { MQTTConnector } from './MQTTConnector';
+import { OPCUAConnector } from './OPCUAConnector';
 import { Upload, FileText, Server, Wifi, Cpu, Link2, RefreshCw, Download, Settings } from 'lucide-react';
-import { registerElement, setCachedImage } from '../../services/elementRegistry';
 
 type ImportMode = 'replace' | 'merge';
 
@@ -39,20 +40,7 @@ interface Connector {
 export function DataSync() {
   const { addToast } = useAppStore();
   const modelStore = useModelStore();
-  const dataSyncRef = useRef<HTMLDivElement>(null);
-
-  // Register data sync tab for cross-tab screenshot capture
-  useEffect(() => {
-    registerElement('data-sync-tab', dataSyncRef.current);
-    return () => {
-      if (dataSyncRef.current) {
-        captureToBase64(dataSyncRef.current)
-          .then((base64) => setCachedImage('data-sync-tab', base64))
-          .catch(() => {});
-      }
-      registerElement('data-sync-tab', null);
-    };
-  }, []);
+  const dataSyncRef = useElementScreenshot('data-sync-tab');
 
   const [connectors, setConnectors] = useState<Connector[]>([
     {
@@ -71,6 +59,8 @@ export function DataSync() {
   const [importMode, setImportMode] = useState<ImportMode>('replace');
   const [importPreview, setImportPreview] = useState<ImportResult | null>(null);
   const [importing, setImporting] = useState(false);
+  const [showMQTT, setShowMQTT] = useState(false);
+  const [showOPCUA, setShowOPCUA] = useState(false);
   const [notifiedTypes, setNotifiedTypes] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('factorysim-notify-interest');
@@ -345,7 +335,7 @@ export function DataSync() {
         />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {connectorTypes.map((type) => {
-            const isAvailable = type.type === 'csv';
+            const isAvailable = type.type === 'csv' || type.type === 'mqtt' || type.type === 'opcua';
             return (
               <div
                 key={type.type}
@@ -354,7 +344,15 @@ export function DataSync() {
                     ? 'hover:border-blue-500 hover:bg-blue-50 cursor-pointer'
                     : 'opacity-75'
                 }`}
-                onClick={isAvailable ? () => setShowAddConnector(true) : undefined}
+                onClick={isAvailable ? () => {
+                  if (type.type === 'mqtt') {
+                    setShowMQTT(!showMQTT);
+                  } else if (type.type === 'opcua') {
+                    setShowOPCUA(!showOPCUA);
+                  } else {
+                    setShowAddConnector(true);
+                  }
+                } : undefined}
               >
                 <div className="flex items-start justify-between">
                   <type.icon className={`w-8 h-8 ${isAvailable ? 'text-blue-600' : 'text-gray-400'} mb-2`} />
@@ -391,6 +389,12 @@ export function DataSync() {
           })}
         </div>
       </Card>
+
+      {/* MQTT Connector */}
+      {showMQTT && <MQTTConnector />}
+
+      {/* OPC-UA Connector */}
+      {showOPCUA && <OPCUAConnector />}
 
       {/* Import Modal */}
       <Modal

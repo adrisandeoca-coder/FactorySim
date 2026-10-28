@@ -1,6 +1,8 @@
-import type { FactoryModel, SweepConfig, SweepParameterDef, SweepPointResult, SweepResult, KPIData } from '../types';
+import type { FactoryModel, SweepConfig, SweepParameterDef, SweepPointResult, SweepResult, KPIData, ScenarioParameterOverride, SweepMode } from '../types';
 import { applyOverrides } from './scenarioModelBuilder';
-import type { ScenarioParameterOverride } from '../types';
+import { createLogger } from './logger';
+
+const log = createLogger('SweepService');
 
 let cancelFlag = false;
 
@@ -58,6 +60,85 @@ export function generateGrid(
 }
 
 /**
+ * Generate Latin Hypercube Sampling points.
+ * Creates n equally-spaced strata per parameter and randomly samples one point per stratum.
+ */
+export function generateLHSSamples(
+  parameters: SweepParameterDef[],
+  sampleCount: number
+): Record<string, number>[] {
+  const n = sampleCount;
+  const k = parameters.length;
+
+  // Create permuted index arrays for each parameter (Fisher-Yates shuffle)
+  const permutations: number[][] = [];
+  for (let i = 0; i < k; i++) {
+    const perm = Array.from({ length: n }, (_, j) => j);
+    for (let j = n - 1; j > 0; j--) {
+      const r = Math.floor(Math.random() * (j + 1));
+      [perm[j], perm[r]] = [perm[r], perm[j]];
+    }
+    permutations.push(perm);
+  }
+
+  const samples: Record<string, number>[] = [];
+  for (let i = 0; i < n; i++) {
+    const sample: Record<string, number> = {};
+    for (let j = 0; j < k; j++) {
+      const param = parameters[j];
+      const stratum = permutations[j][i];
+      // Random point within the stratum
+      const u = (stratum + Math.random()) / n;
+      sample[`${param.entityId}.${param.parameter}`] =
+        param.min + u * (param.max - param.min);
+    }
+    samples.push(sample);
+  }
+
+  return samples;
+}
+
+/**
+ * Generate Monte Carlo (pure random) sampling points.
+ */
+export function generateMonteCarloSamples(
+  parameters: SweepParameterDef[],
+  sampleCount: number
+): Record<string, number>[] {
+  const samples: Record<string, number>[] = [];
+  for (let i = 0; i < sampleCount; i++) {
+    const sample: Record<string, number> = {};
+    for (const param of parameters) {
+      const key = `${param.entityId}.${param.parameter}`;
+      sample[key] = param.min + Math.random() * (param.max - param.min);
+    }
+    samples.push(sample);
+  }
+  return samples;
+}
+
+/**
+ * Generate experiment points for any sweep mode.
+ */
+export function generateSweepPoints(
+  params: SweepParameterDef[],
+  mode: SweepMode,
+  sampleCount: number
+): Record<string, number>[] {
+  switch (mode) {
+    case 'oat':
+    case 'full':
+      return generateGrid(params, mode === 'full' ? 'full' : 'oat');
+    case 'lhs':
+      return generateLHSSamples(params, sampleCount);
+    case 'montecarlo':
+      return generateMonteCarloSamples(params, sampleCount);
+    default:
+      return generateGrid(params, 'oat');
+  }
+}
+
+/**
  * Build ScenarioParameterOverride[] from a grid point.
  */
 function buildOverrides(
@@ -83,7 +164,7 @@ export async function runSweep(
   onProgress: (current: number, total: number) => void
 ): Promise<SweepResult> {
   cancelFlag = false;
-  const grid = generateGrid(config.parameters, config.mode);
+  const grid = generateSweepPoints(config.parameters, config.mode, config.sampleCount);
   const startedAt = new Date().toISOString();
   const pointResults: SweepPointResult[] = [];
 
@@ -107,7 +188,7 @@ export async function runSweep(
         runId: result.runId,
       });
     } catch (err) {
-      console.error(`Sweep run ${i + 1} failed:`, err);
+      log.error(`Sweep run ${i + 1} failed`, err);
     }
   }
 

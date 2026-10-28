@@ -32,7 +32,7 @@ const stateConfig: Record<string, {
   processing: {
     bg: 'bg-emerald-50', text: 'text-emerald-700',
     label: 'Processing', iconBg: 'bg-emerald-500', stripColor: 'bg-emerald-500',
-    borderColor: '#22c55e', // green-500 — matches legend
+    borderColor: '#17C964', // green-500 — matches legend
   },
   idle: {
     bg: 'bg-gray-50', text: 'text-gray-400',
@@ -42,12 +42,12 @@ const stateConfig: Record<string, {
   blocked: {
     bg: 'bg-red-50', text: 'text-red-600',
     label: 'Blocked', iconBg: 'bg-red-500', stripColor: 'bg-red-500',
-    borderColor: '#ef4444', // red-500 — matches legend
+    borderColor: '#F31260', // red-500 — matches legend
   },
   starved: {
     bg: 'bg-amber-50', text: 'text-amber-600',
     label: 'Starved', iconBg: 'bg-amber-500', stripColor: 'bg-amber-400',
-    borderColor: '#f59e0b', // amber-500 — matches legend
+    borderColor: '#F5A524', // amber-500 — matches legend
     borderStyle: 'dashed',
   },
   failed: {
@@ -69,7 +69,7 @@ const stateConfig: Record<string, {
   batch_wait: {
     bg: 'bg-blue-50', text: 'text-blue-600',
     label: 'Batching', iconBg: 'bg-blue-500', stripColor: 'bg-blue-400',
-    borderColor: '#3b82f6', // blue-500
+    borderColor: '#2563EB', // blue-500
   },
 };
 
@@ -86,7 +86,7 @@ if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
   style.id = styleId;
   style.textContent = `
     @keyframes flash-red {
-      0%, 100% { border-color: #dc2626; }
+      0%, 100% { border-color: #F31260; }
       50% { border-color: #991b1b; }
     }
     @keyframes state-flash {
@@ -106,9 +106,9 @@ if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
 
 // Utilization ring color — only matters at extremes
 function utilColor(util: number): string {
-  if (util > 0.95) return '#dc2626';
+  if (util > 0.95) return '#F31260';
   if (util > 0.80) return '#ea580c';
-  if (util > 0.50) return '#d97706';
+  if (util > 0.50) return '#F5A524';
   return '#16a34a';
 }
 
@@ -154,7 +154,7 @@ export const LiveStationNode = memo(({ data }: NodeProps<LiveStationNodeData>) =
           style={{
             width: 28, height: 28, borderRadius: '50%',
             backgroundColor: cfg.borderColor,
-            border: isBottleneck ? '3px solid #dc2626' : '2px solid rgba(255,255,255,0.3)',
+            border: isBottleneck ? '3px solid #F31260' : '2px solid rgba(255,255,255,0.3)',
             boxShadow: isBottleneck ? '0 0 10px rgba(220,38,38,0.6)' : undefined,
           }}
         />
@@ -178,7 +178,7 @@ export const LiveStationNode = memo(({ data }: NodeProps<LiveStationNodeData>) =
         className={`relative rounded-lg border-2 overflow-hidden ${cfg.bg} ${cfg.dimmed ? 'opacity-55' : ''}`}
         style={{
           minWidth: 120,
-          borderColor: isBottleneck && state !== 'failed' ? '#dc2626' : cfg.borderColor,
+          borderColor: isBottleneck && state !== 'failed' ? '#F31260' : cfg.borderColor,
           borderWidth: isBottleneck ? 3 : 2,
           ...(cfg.borderStyle === 'dashed' ? { borderStyle: 'dashed' as const } : {}),
         }}
@@ -195,7 +195,7 @@ export const LiveStationNode = memo(({ data }: NodeProps<LiveStationNodeData>) =
           <div style={{
             position: 'absolute', top: -5, right: -5,
             width: 16, height: 16, borderRadius: '50%',
-            backgroundColor: '#dc2626', border: '2px solid #fff',
+            backgroundColor: '#F31260', border: '2px solid #fff',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 10,
           }}>
@@ -225,7 +225,7 @@ export const LiveStationNode = memo(({ data }: NodeProps<LiveStationNodeData>) =
         cfg.dimmed ? 'opacity-55' : ''
       }`}
       style={{
-        borderColor: isBottleneck && state !== 'failed' ? '#dc2626' : cfg.borderColor,
+        borderColor: isBottleneck && state !== 'failed' ? '#F31260' : cfg.borderColor,
         borderWidth: isBottleneck && state !== 'failed' ? 3 : 2,
         ...(cfg.borderStyle === 'dashed' ? { borderStyle: 'dashed' as const } : {}),
         ...(state === 'failed' ? { boxShadow: '0 0 14px 3px rgba(220,38,38,0.5)' } : {}),
@@ -419,7 +419,7 @@ export const LiveStationNode = memo(({ data }: NodeProps<LiveStationNodeData>) =
         <div style={{
           position: 'absolute', top: -7, right: -7,
           width: 20, height: 20, borderRadius: '50%',
-          backgroundColor: '#dc2626', border: '2px solid #fff',
+          backgroundColor: '#F31260', border: '2px solid #fff',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           zIndex: 10,
         }}>

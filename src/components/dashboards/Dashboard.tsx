@@ -15,17 +15,39 @@ import { QualityScrapChart } from './QualityScrapChart';
 import { WipTrendChart } from './WipTrendChart';
 import { WidgetConfigurator } from './WidgetConfigurator';
 import { GanttScheduleView } from './GanttScheduleView';
+import { SankeyChart } from './SankeyChart';
+import { CycleTimePareto } from './CycleTimePareto';
+import { ThroughputWaterfall } from './ThroughputWaterfall';
+import { BufferSparklines } from './BufferSparklines';
+import { CostSummary } from './CostSummary';
+import { EnergyChart } from './EnergyChart';
+import { MaintenanceChart } from './MaintenanceChart';
+import { ValueStreamMap } from './ValueStreamMap';
+import { exportTimelapse } from '../../services/timelapseExporter';
+import { downloadPDFReport } from '../../services/pdfReportExporter';
+import { downloadPPTXReport } from '../../services/pptxReportExporter';
 import { useSimulationStore, formatPercentage, formatDuration } from '../../stores/simulationStore';
+import { ResultsSummary } from './ResultsSummary';
+import { WarehouseResults } from './WarehouseResults';
+import { RibbonContent, RibbonGroup, RibbonButton, RibbonSmallButton, RibbonStack } from '../layout/Ribbon';
+import { Play, Square, RotateCcw, History, Camera, FileDown, SlidersHorizontal } from 'lucide-react';
 import { useModelStore } from '../../stores/modelStore';
 import { useAppStore } from '../../stores/appStore';
 import { useLiveSimulationStore } from '../../stores/liveSimulationStore';
 import { LiveSimulationView } from './LiveSimulationView';
+import { SimulationBriefView } from './SimulationBriefView';
 import { ReplayController } from './ReplayController';
-import { captureScreenshot, captureToBase64, downloadEventLog, downloadEventLogCSV, downloadKPICSV } from '../../services/screenshotService';
+import { captureScreenshot, captureToBase64, whenIdle, downloadEventLog, downloadEventLogCSV, downloadKPICSV } from '../../services/screenshotService';
 import { registerElement, getElement, getCachedImage, setCachedImage, clearCachedImage } from '../../services/elementRegistry';
 import { saveRunArtifacts } from '../../services/artifactService';
+import { saveModelVersion } from '../common/ModelVersionHistory';
+import { downloadReport } from '../../services/reportExporter';
 import { captureAllTabScreenshots } from '../../services/tabScreenshotCapture';
 import { buildStateTimeline, getTimelineDuration } from '../../services/replayTimelineBuilder';
+import { getCachedResult, cacheResult } from '../../services/resultCache';
+import { createLogger } from '../../services/logger';
+
+const log = createLogger('Dashboard');
 import { ReplayPlayer } from './ReplayPlayer';
 import type { DashboardWidgetConfig, KPIData, SimulationResult } from '../../types';
 
@@ -43,6 +65,7 @@ const WIDGET_LABELS: Record<string, string> = {
   'wip-trend-chart': 'WIP Trend',
   'quality-chart': 'Quality Chart',
   'gantt-schedule': 'Schedule Gantt',
+  'experiment-results': 'Experiments',
 };
 
 function WarningBanners({ warnings }: { warnings: Array<{ severity: string; message: string; type?: string }> }) {
@@ -52,21 +75,26 @@ function WarningBanners({ warnings }: { warnings: Array<{ severity: string; mess
   const hidden = warnings.length - MAX_VISIBLE;
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col" style={{ gap: 5 }}>
       {shown.map((w, i) => (
-        <div key={i} className={`flex items-start gap-2 px-4 py-3 rounded-lg border ${
-          w.severity === 'error' ? 'bg-red-50 border-red-200 text-red-800'
-            : w.severity === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-800'
-            : 'bg-blue-50 border-blue-200 text-blue-800'
+        <div key={i} className={`alert-banner ${
+          w.severity === 'error' ? 'alert-critical'
+            : w.severity === 'warning' ? 'alert-warning'
+            : 'alert-info'
         }`}>
-          <span className="text-lg mt-0.5">{w.severity === 'error' ? '\u26A0' : w.severity === 'warning' ? '\u26A0' : '\u2139'}</span>
-          <span className="text-sm">{w.message}</span>
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="flex-shrink-0" style={{ marginTop: 2, color: w.severity === 'error' ? 'var(--red)' : w.severity === 'warning' ? 'var(--amber)' : 'var(--blue)' }}>
+            <path d="M7 2L12.5 12H1.5L7 2z"/>
+            <path d="M7 6v3"/>
+            <circle cx="7" cy="10.5" r=".75" fill="currentColor" stroke="none"/>
+          </svg>
+          <div style={{ flex: 1 }} dangerouslySetInnerHTML={{ __html: w.message }} />
         </div>
       ))}
       {hidden > 0 && !expanded && (
         <button
           onClick={() => setExpanded(true)}
-          className="text-sm text-gray-500 hover:text-gray-700 font-medium px-4 py-1"
+          className="text-sm font-medium px-4 py-1"
+          style={{ color: 'var(--t3)' }}
         >
           + {hidden} more warning{hidden !== 1 ? 's' : ''}...
         </button>
@@ -74,7 +102,8 @@ function WarningBanners({ warnings }: { warnings: Array<{ severity: string; mess
       {expanded && warnings.length > MAX_VISIBLE && (
         <button
           onClick={() => setExpanded(false)}
-          className="text-sm text-gray-500 hover:text-gray-700 font-medium px-4 py-1"
+          className="text-sm font-medium px-4 py-1"
+          style={{ color: 'var(--t3)' }}
         >
           Show fewer warnings
         </button>
@@ -87,7 +116,7 @@ export function Dashboard() {
   const navigate = useNavigate();
   const { model } = useModelStore();
   const { setSelectedNode } = useModelStore();
-  const { lastResult, isRunning, defaultOptions, setResult, clearResults, startSimulation, stopSimulation } = useSimulationStore();
+  const { lastResult, isRunning, defaultOptions, setResult, setError, clearResults, startSimulation, stopSimulation } = useSimulationStore();
   const { addToast, setSimulating, setSimulationProgress, simulationProgress, dashboardWidgets } = useAppStore();
 
   const navigateToStation = useCallback((stationId: string) => {
@@ -98,6 +127,7 @@ export function Dashboard() {
   const [startDayOfWeek, setStartDayOfWeek] = useState(0);
   const [startHour, setStartHour] = useState(0);
   const [showConfigurator, setShowConfigurator] = useState(false);
+  const simpleMode = useAppStore((st) => st.simpleMode);
   const [layoutMode, setLayoutMode] = useState<'3d-focus' | 'balanced' | 'dashboard-focus'>('balanced');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -143,6 +173,7 @@ export function Dashboard() {
   // next sequential run can't corrupt the saved data.  The timer is NOT
   // cleaned up on re-render — each result gets its own independent save.
   const artifactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const earlyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!lastResult || !dashboardRef.current) return;
 
@@ -175,20 +206,26 @@ export function Dashboard() {
       ? screenshotData.image
       : undefined;
 
-    // Pre-capture at 500ms as early fallback (charts may be partially rendered)
-    let earlyCaptureBase64: string | undefined;
-    setTimeout(async () => {
-      if (dashboardRef.current) {
-        try {
-          earlyCaptureBase64 = await captureToBase64(dashboardRef.current);
-        } catch { /* non-critical */ }
-      }
-    }, 500);
+    // Clear any pending timer from a previous run before starting a new one
+    if (artifactTimerRef.current) {
+      clearTimeout(artifactTimerRef.current);
+      artifactTimerRef.current = null;
+    }
+    if (earlyTimerRef.current) {
+      clearTimeout(earlyTimerRef.current);
+      earlyTimerRef.current = null;
+    }
 
-    // Main capture at 2000ms, with retry + early fallback
+    // Artifact screenshots are background work: wait for an idle moment and
+    // skip the expensive page captures while a replay is playing (they froze
+    // the replay). The early 500 ms capture was dropped — it doubled the cost.
+    const earlyCaptureBase64: string | undefined = undefined;
+    const replaying = () => useLiveSimulationStore.getState().isReplaying;
+
     artifactTimerRef.current = setTimeout(async () => {
       let dashScreenshot: string | undefined;
-      if (dashboardRef.current) {
+      await whenIdle();
+      if (dashboardRef.current && !replaying()) {
         // Try live capture up to 2 times with backoff
         const retryDelays = [0, 1500];
         for (const delay of retryDelays) {
@@ -201,7 +238,7 @@ export function Dashboard() {
               dashScreenshot = base64;
               break;
             }
-          } catch { /* retry */ }
+          } catch (e) { log.warn('Dashboard screenshot capture failed, retrying...', e); }
         }
       }
       // Fall back to early capture if live captures all failed
@@ -210,7 +247,10 @@ export function Dashboard() {
       }
 
       // Pre-capture tab screenshots offscreen (scenarios, orders, code, data, settings)
-      try { await captureAllTabScreenshots(); } catch { /* non-critical */ }
+      if (!replaying()) {
+        await whenIdle();
+        try { await captureAllTabScreenshots(); } catch { /* non-critical */ }
+      }
 
       try {
         const savedPath = await saveRunArtifacts({
@@ -228,24 +268,38 @@ export function Dashboard() {
       } catch { /* non-critical */ }
     }, 2000);
 
-    // Do NOT return cleanup — let the timer complete even if lastResult
-    // changes from the next run.  Each result gets its own save.
+    // No per-render cleanup — timers are cleared at the TOP of the next
+    // invocation and on unmount below.  Each result gets its own save.
   }, [lastResult]);
 
-  // Clean up timer on unmount
+  // Clean up all timers on unmount
   useEffect(() => {
     return () => {
       if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+      if (artifactTimerRef.current) clearTimeout(artifactTimerRef.current);
+      if (earlyTimerRef.current) clearTimeout(earlyTimerRef.current);
     };
   }, []);
 
+  // Production charts (OEE, throughput, bottlenecks…) only mean something with stations
+  const hasStations = model.stations.length > 0;
+  // A model can be a pure warehouse / distribution centre with no stations
+  const hasSimulatableElements = model.stations.length > 0 ||
+    model.extraNodes.some((e) => e.type === 'warehouse' || e.type === 'coldstorage');
+
   const handleRunSimulation = async () => {
-    if (model.stations.length === 0) {
-      addToast({ type: 'warning', message: 'Add stations to your model before running simulation' });
+    if (!hasSimulatableElements) {
+      addToast({ type: 'warning', message: 'Add stations or a warehouse to your model before running simulation' });
       return;
     }
 
     abortRef.current = false;
+
+    // Save model version before simulation run (for version history)
+    try {
+      saveModelVersion(model.id || 'current', model.name || 'Untitled', JSON.stringify(model), 'pre-simulation');
+    } catch { /* non-critical */ }
+
     // Clear stale dashboard screenshot so previous-run image can't leak into artifacts.
     // Note: factory-canvas is NOT cleared — the model hasn't changed, and clearing it
     // causes early runs to lose their model screenshot before the cache is repopulated.
@@ -285,19 +339,43 @@ export function Dashboard() {
     startSimulation();
     addToast({ type: 'info', message: 'Starting simulation...' });
 
+    // Check result cache before running
+    const simOptions: Record<string, unknown> = {
+      duration,
+      warmupPeriod: defaultOptions.warmupPeriod || 0,
+      seed: defaultOptions.seed,
+      replications: defaultOptions.replications || 1,
+    };
+    const cached = getCachedResult(model, simOptions as any);
+    if (cached) {
+      setResult(cached);
+      addToast({ type: 'info', message: 'Using cached result' });
+      if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+      setSimulating(false);
+      stopSimulation();
+      return;
+    }
+
     // Start elapsed time counter
     const startTime = Date.now();
     elapsedTimerRef.current = setInterval(() => {
       setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000));
     }, 1000);
 
+    let cleanupProgress: (() => void) | undefined;
+    let cleanupEvents: (() => void) | undefined;
     try {
       if (!window.factorySim?.simulation?.runSimulation) {
-        throw new Error('Simulation engine not available');
+        throw new Error(
+          'Simulation engine not available. ' +
+          (!window.factorySim ? 'Electron bridge not loaded — are you running outside the desktop app?' :
+           !window.factorySim.simulation ? 'Python simulation bridge not initialized — the engine may have failed to start.' :
+           'runSimulation method not found on bridge.')
+        );
       }
 
       // Set up progress listener for live UI updates
-      const cleanupProgress = window.factorySim.app?.onSimulationProgress?.((progress) => {
+      cleanupProgress = window.factorySim.app?.onSimulationProgress?.((progress) => {
         setSimulationProgress(progress.progress);
         if (progress.diagnostics) {
           useLiveSimulationStore.getState().updateFromDiagnostics(progress.diagnostics, progress.currentTime);
@@ -305,7 +383,7 @@ export function Dashboard() {
       });
 
       // Set up event stream listener for live animation
-      const cleanupEvents = window.factorySim.app?.onSimulationEvent?.((event) => {
+      cleanupEvents = window.factorySim.app?.onSimulationEvent?.((event) => {
         useLiveSimulationStore.getState().addStreamedEvent(event as any);
       });
 
@@ -318,9 +396,6 @@ export function Dashboard() {
         startHour: startHour,
         streamEvents: true,
       }) as SimulationResult;
-
-      cleanupProgress?.();
-      cleanupEvents?.();
 
       // Extract diagnostic snapshots from result (collected by Python engine
       // at 10/20/40/60/80/100% progress thresholds + adaptive first_activity —
@@ -343,7 +418,7 @@ export function Dashboard() {
         };
       };
       const diagSnapshots: DiagSnapshot[] = (result as any).diagSnapshots || [];
-      console.log(`[FrameCapture] Result contains ${diagSnapshots.length} snapshots`);
+      log.info(`Result contains ${diagSnapshots.length} snapshots for frame capture`);
 
       // Replay each snapshot through the store, render, then capture frame
       const waitForRender = () => new Promise<void>(resolve =>
@@ -370,10 +445,12 @@ export function Dashboard() {
       }
 
       setResult(result);
+      cacheResult(model, simOptions as any, result);
       addToast({ type: 'success', message: 'Simulation completed!' });
 
-      // Auto-start replay after simulation completes
-      if (result.events && result.events.length > 0) {
+      // Auto-start replay after simulation completes (expert mode only — in
+      // Simple mode results come first; the Replay button stays available)
+      if (!useAppStore.getState().simpleMode && result.events && result.events.length > 0) {
         // Build buffer capacity map from model
         const bufCaps: Record<string, number> = {};
         for (const b of model.buffers || []) {
@@ -394,9 +471,12 @@ export function Dashboard() {
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       if (msg !== 'Simulation stopped') {
+        setError(msg);
         addToast({ type: 'error', message: `Simulation error: ${msg}` });
       }
     } finally {
+      cleanupProgress?.();
+      cleanupEvents?.();
       if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
       setSimulating(false);
       stopSimulation();
@@ -479,11 +559,11 @@ export function Dashboard() {
   const isSimRunning = isRunning || useAppStore.getState().isSimulating;
   const isAnimationFullscreen = useAppStore((s) => s.isAnimationFullscreen);
 
-  // P0 — In fullscreen mode, render only the live simulation view
+  // P0 — In fullscreen mode, render only the simulation brief view
   if (isAnimationFullscreen && isSimRunning) {
     return (
       <div ref={dashboardRef}>
-        <LiveSimulationView
+        <SimulationBriefView
           progress={simulationProgress}
           elapsedSeconds={elapsedSeconds}
           simDuration={duration}
@@ -494,156 +574,65 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6" ref={dashboardRef}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-500">Monitor your factory performance</p>
-        </div>
-
-        <div className="flex items-center space-x-4">
-          {/* Screenshot */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleScreenshot}
-            icon={<CameraIcon className="w-4 h-4" />}
-            title="Capture dashboard as PNG"
-          >
-            Screenshot
-          </Button>
-
-          {/* Replay */}
-          {lastResult && !isSimRunning && !isReplaying && (
-            <ReplayController />
-          )}
-
-          {/* Download Logs */}
-          {lastResult && (
-            <div className="relative">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowLogMenu(!showLogMenu)}
-                icon={<DownloadIcon className="w-4 h-4" />}
-                title="Download simulation event log"
-              >
-                Logs
-              </Button>
-              {showLogMenu && (
-                <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                  <button
-                    onClick={() => handleDownloadLog('json')}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded-t-lg"
-                  >
-                    Download as JSON
-                  </button>
-                  <button
-                    onClick={() => handleDownloadLog('csv')}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded-b-lg"
-                  >
-                    Download as CSV
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Export KPIs */}
-          {kpis && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => downloadKPICSV(kpis, model.stations)}
-              icon={<ExportIcon className="w-4 h-4" />}
-              title="Export KPI data as CSV"
-            >
-              Export
-            </Button>
-          )}
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowConfigurator(true)}
-            icon={<CustomizeIcon className="w-4 h-4" />}
-            title="Choose which widgets to display"
-          >
-            Customize
-          </Button>
-
-          <div className="flex items-center space-x-2" title="Set simulation duration">
-            <label className="text-sm text-gray-600">Duration:</label>
-            <select
-              value={duration}
-              onChange={(e) => setDuration(Number(e.target.value))}
-              className="input w-32"
-              disabled={isSimRunning}
-            >
-              <option value={3600}>1 hour</option>
-              <option value={14400}>4 hours</option>
-              <option value={28800}>8 hours</option>
-              <option value={86400}>24 hours</option>
-              <option value={604800}>1 week</option>
-            </select>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <label className="text-sm text-gray-600">Start:</label>
-            <select
-              value={startDayOfWeek}
-              onChange={(e) => setStartDayOfWeek(Number(e.target.value))}
-              className="input w-24"
-              disabled={isSimRunning}
-            >
-              <option value={0}>Mon</option>
-              <option value={1}>Tue</option>
-              <option value={2}>Wed</option>
-              <option value={3}>Thu</option>
-              <option value={4}>Fri</option>
-              <option value={5}>Sat</option>
-              <option value={6}>Sun</option>
-            </select>
-            <select
-              value={startHour}
-              onChange={(e) => setStartHour(Number(e.target.value))}
-              className="input w-24"
-              disabled={isSimRunning}
-            >
-              {Array.from({ length: 24 }, (_, i) => (
-                <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>
-              ))}
-            </select>
-          </div>
-
+      {/* Commands live in the app ribbon (engineering-desktop style) */}
+      <RibbonContent>
+        <RibbonGroup label="Simulation">
           {isSimRunning ? (
-            <Button
-              variant="secondary"
-              onClick={handleStopSimulation}
-              icon={<StopIcon className="w-4 h-4" />}
-            >
-              Stop
-            </Button>
+            <RibbonButton icon={<Square size={26} color="#DC2626" fill="#DC2626" />} label="Stop" onClick={handleStopSimulation} title="Stop the running simulation" />
           ) : (
-            <Button
-              onClick={handleRunSimulation}
-              icon={<PlayIcon className="w-4 h-4" />}
-            >
-              Run Simulation
-            </Button>
+            <RibbonButton icon={<Play size={26} color="#059669" fill="#059669" />} label="Run simulation" onClick={handleRunSimulation} title="Run the simulation with the settings shown" />
           )}
+        </RibbonGroup>
 
-          {/* Run history button — opens run history picker */}
-          <div className="relative">
-            <Button
-              variant="secondary"
-              onClick={() => { setShowRunHistory(!showRunHistory); setRunHistory([]); }}
-              title="View previous simulation runs"
-            >
-              Run History
-            </Button>
+        <RibbonGroup label="Settings">
+          <RibbonStack>
+            <label className="ribbon-field" title="Simulated duration">
+              <span>Run length</span>
+              <select value={duration} onChange={(e) => setDuration(Number(e.target.value))} disabled={isSimRunning}>
+                <option value={3600}>1 hour</option>
+                <option value={14400}>4 hours</option>
+                <option value={28800}>8 hours (1 shift)</option>
+                <option value={86400}>24 hours</option>
+                <option value={604800}>1 week</option>
+              </select>
+            </label>
+            <label className="ribbon-field" title="Simulated start day — affects shift calendars">
+              <span>Start day</span>
+              <select value={startDayOfWeek} onChange={(e) => setStartDayOfWeek(Number(e.target.value))} disabled={isSimRunning}>
+                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((d, i) => (
+                  <option key={d} value={i}>{d}</option>
+                ))}
+              </select>
+            </label>
+            <label className="ribbon-field" title="Simulated start hour — affects shift calendars">
+              <span>Start time</span>
+              <select value={startHour} onChange={(e) => setStartHour(Number(e.target.value))} disabled={isSimRunning}>
+                {Array.from({ length: 24 }, (_, i) => (
+                  <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>
+                ))}
+              </select>
+            </label>
+          </RibbonStack>
+        </RibbonGroup>
+
+        <RibbonGroup label="Results">
+          <RibbonStack>
+            {isReplaying ? (
+              <RibbonSmallButton icon={<Square size={12} />} label="Stop replay" onClick={() => useLiveSimulationStore.getState().stopReplay()} title="Stop the replay and show the results" />
+            ) : lastResult && !isSimRunning ? <ReplayController /> : (
+              <RibbonSmallButton icon={<RotateCcw size={14} />} label="Replay" disabled title={isSimRunning ? 'Available when the run finishes' : 'Run a simulation first'} />
+            )}
+            <div className="relative">
+              <RibbonSmallButton
+                icon={<History size={14} />}
+                label="Run history"
+                dropdown
+                active={showRunHistory}
+                onClick={() => { setShowRunHistory(!showRunHistory); setRunHistory([]); }}
+                title="View previous simulation runs"
+              />
             {showRunHistory && (
-              <div className="absolute top-full mt-1 right-0 z-50 bg-white border border-slate-200 rounded-lg shadow-xl w-80 max-h-64 overflow-y-auto">
+              <div className="absolute top-full mt-1 left-0 z-50 bg-white border border-slate-300 shadow-xl w-80 max-h-64 overflow-y-auto">
                 <div className="p-2 border-b border-slate-200">
                   <span className="text-xs font-bold text-slate-500 uppercase">Recent Runs</span>
                 </div>
@@ -665,56 +654,143 @@ export function Dashboard() {
                 )}
               </div>
             )}
-          </div>
-        </div>
-      </div>
+            </div>
+          {/* Timelapse export */}
+          {(() => {
+            const frames = useLiveSimulationStore.getState().capturedFrames;
+            return frames.length > 0 && !isSimRunning && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => exportTimelapse(frames, { filename: `${model.name || 'factory'}-timelapse` })}
+                icon={<FilmIcon className="w-4 h-4" />}
+                title="Export animation as WebM video"
+              >
+                Timelapse
+              </Button>
+            );
+          })()}
+
+          </RibbonStack>
+        </RibbonGroup>
+
+        <RibbonGroup label="Export">
+          {/* Export — one menu for reports and data (was five separate buttons) */}
+          {kpis && (
+            <div className="relative">
+              <RibbonButton
+                icon={<FileDown size={26} color="#1F5FAD" />}
+                label="Export"
+                dropdown
+                active={showLogMenu}
+                onClick={() => setShowLogMenu(!showLogMenu)}
+                title="Export reports and data"
+              />
+              {showLogMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowLogMenu(false)} />
+                  <div className="absolute left-0 mt-1 w-60 bg-white border border-gray-300 shadow-lg z-50 py-1">
+                    {lastResult && (<>
+                      <div className="px-3 pt-2 pb-1 text-label">Report</div>
+                      {([
+                        ['PDF report', 'Executive summary via print dialog', () => downloadPDFReport(lastResult, model)],
+                        ['PowerPoint', 'Slides with KPIs and charts', () => downloadPPTXReport(lastResult, model)],
+                        ['HTML report', 'Standalone page with charts', () => downloadReport(lastResult, model.name || 'Factory', model)],
+                      ] as const).map(([label, hint, fn]) => (
+                        <button key={label} onClick={() => { fn(); setShowLogMenu(false); }} className="w-full text-left px-3 py-1.5 hover:bg-gray-50">
+                          <div className="text-sm text-gray-800">{label}</div>
+                          <div className="text-xs text-gray-500">{hint}</div>
+                        </button>
+                      ))}
+                    </>)}
+                    <div className="px-3 pt-2 pb-1 text-label border-t border-gray-100 mt-1">Data</div>
+                    <button onClick={() => { downloadKPICSV(kpis, model.stations); setShowLogMenu(false); }} className="w-full text-left px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50">KPIs (CSV)</button>
+                    {lastResult && (<>
+                      <button onClick={() => { handleDownloadLog('csv'); setShowLogMenu(false); }} className="w-full text-left px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50">Event log (CSV)</button>
+                      <button onClick={() => { handleDownloadLog('json'); setShowLogMenu(false); }} className="w-full text-left px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50">Event log (JSON)</button>
+                    </>)}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          <RibbonButton icon={<Camera size={26} color="#475569" />} label="Screenshot" onClick={handleScreenshot} title="Capture the dashboard as PNG" />
+        </RibbonGroup>
+
+        <RibbonGroup label="View">
+          <RibbonButton icon={<SlidersHorizontal size={26} color="#475569" />} label="Customize" onClick={() => setShowConfigurator(true)} title="Choose which panels to show" />
+        </RibbonGroup>
+      </RibbonContent>
 
       {/* Section Tab Bar */}
-      {kpis && !isSimRunning && (
-        <div className="sticky top-0 z-30 bg-white border-b border-gray-200 -mx-6 px-6 py-1 flex items-center gap-0.5 overflow-x-auto">
-          <button
-            onClick={() => setActiveSection('all')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-t-lg whitespace-nowrap transition-colors border-b-2 ${
-              activeSection === 'all' ? 'text-blue-600 border-blue-600 bg-blue-50' : 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            All
-          </button>
-          {statWidgets.length > 0 && (
+      {kpis && !isSimRunning && hasStations && (
+        <div
+          className="sticky top-0 z-30 flex items-center overflow-x-auto"
+          style={{
+            height: 38,
+            background: 'var(--surface)',
+            borderBottom: '1px solid var(--border)',
+            margin: '0 -12px',
+            padding: '0 12px',
+            gap: 4,
+          }}
+        >
+          {[
+            { id: 'all', label: 'All' },
+            ...(statWidgets.length > 0 ? [{ id: 'overview', label: 'Overview' }] : []),
+            ...otherWidgets.map(w => ({ id: w.id, label: WIDGET_LABELS[w.type] || w.type })),
+          ].map(tab => (
             <button
-              onClick={() => setActiveSection('overview')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-t-lg whitespace-nowrap transition-colors border-b-2 ${
-                activeSection === 'overview' ? 'text-blue-600 border-blue-600 bg-blue-50' : 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50'
-              }`}
+              key={tab.id}
+              onClick={() => setActiveSection(tab.id)}
+              style={{
+                padding: '4px 11px',
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 500,
+                whiteSpace: 'nowrap' as const,
+                transition: 'all 0.15s',
+                cursor: 'pointer',
+                border: activeSection === tab.id ? '1px solid var(--border)' : '1px solid transparent',
+                background: activeSection === tab.id ? 'var(--page-bg)' : 'transparent',
+                color: activeSection === tab.id ? 'var(--t1)' : 'var(--t3)',
+              }}
             >
-              Overview
-            </button>
-          )}
-          {otherWidgets.map(w => (
-            <button key={w.id}
-              onClick={() => setActiveSection(w.id)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-t-lg whitespace-nowrap transition-colors border-b-2 ${
-                activeSection === w.id ? 'text-blue-600 border-blue-600 bg-blue-50' : 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              {WIDGET_LABELS[w.type] || w.type}
+              {tab.label}
             </button>
           ))}
         </div>
       )}
 
-      {/* Layout mode selector — visible during sim or replay */}
-      {(isSimRunning || isReplaying) && (
-        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5 w-fit">
+      {/* Layout mode selector — visible during replay */}
+      {(!isSimRunning && isReplaying) && (
+        <div
+          className="flex items-center"
+          style={{
+            height: 38,
+            background: 'var(--surface)',
+            borderBottom: '1px solid var(--border)',
+            margin: '0 -12px',
+            padding: '0 12px',
+            gap: 4,
+          }}
+        >
           {(['3d-focus', 'balanced', 'dashboard-focus'] as const).map(mode => (
             <button
               key={mode}
               onClick={() => setLayoutMode(mode)}
-              className={`px-3 py-1 text-[10px] font-semibold rounded-md transition-colors ${
-                layoutMode === mode
-                  ? 'bg-white text-gray-800 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
+              style={{
+                padding: '4px 11px',
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 500,
+                transition: 'all 0.15s',
+                cursor: 'pointer',
+                border: layoutMode === mode ? '1px solid var(--border)' : '1px solid transparent',
+                background: layoutMode === mode ? 'var(--page-bg)' : 'transparent',
+                color: layoutMode === mode ? 'var(--t1)' : 'var(--t3)',
+              }}
             >
               {mode === '3d-focus' ? '3D Focus' : mode === 'balanced' ? 'Balanced' : 'Dashboard'}
             </button>
@@ -723,71 +799,13 @@ export function Dashboard() {
       )}
 
       {/* Live Simulation View — layout depends on mode */}
-      {isSimRunning && layoutMode === '3d-focus' && (
-        <LiveSimulationView
+      {isSimRunning && (
+        <SimulationBriefView
           progress={simulationProgress}
           elapsedSeconds={elapsedSeconds}
           simDuration={duration}
           height="calc(100vh - 180px)"
         />
-      )}
-      {isSimRunning && layoutMode === 'balanced' && (
-        <div className="flex gap-4" style={{ height: 'calc(100vh - 220px)' }}>
-          <div className="flex-[7] min-w-0">
-            <LiveSimulationView
-              progress={simulationProgress}
-              elapsedSeconds={elapsedSeconds}
-              simDuration={duration}
-              height="100%"
-            />
-          </div>
-          <div className="flex-[3] min-w-[280px] max-w-[400px] overflow-y-auto space-y-3">
-            <div className="flex items-center gap-2 px-1 pb-1 border-b border-gray-100">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-              </span>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600">Projected Results</span>
-            </div>
-            {kpis && statWidgets.length > 0 && (
-              <div className="grid grid-cols-1 gap-3">
-                {statWidgets.map((w) => renderWidget(w, displayKpis, model, navigateToStation, lastResult, { startDayOfWeek, startHour }))}
-              </div>
-            )}
-            {kpis?.warnings && kpis.warnings.length > 0 && (
-              <WarningBanners warnings={kpis.warnings} />
-            )}
-          </div>
-        </div>
-      )}
-      {isSimRunning && layoutMode === 'dashboard-focus' && (
-        <div className="flex gap-4" style={{ height: 'calc(100vh - 220px)' }}>
-          <div className="flex-[3] min-w-[200px] max-w-[320px]">
-            <LiveSimulationView
-              progress={simulationProgress}
-              elapsedSeconds={elapsedSeconds}
-              simDuration={duration}
-              height="100%"
-            />
-          </div>
-          <div className="flex-[7] min-w-0 overflow-y-auto space-y-4">
-            <div className="flex items-center gap-2 px-1 pb-1 border-b border-gray-100">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-              </span>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600">Projected Results</span>
-            </div>
-            {kpis && statWidgets.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {statWidgets.map((w) => renderWidget(w, displayKpis, model, navigateToStation, lastResult, { startDayOfWeek, startHour }))}
-              </div>
-            )}
-            {kpis?.warnings && kpis.warnings.length > 0 && (
-              <WarningBanners warnings={kpis.warnings} />
-            )}
-          </div>
-        </div>
       )}
 
       {/* Replay View */}
@@ -818,10 +836,14 @@ export function Dashboard() {
                 <CheckCircleIcon className="w-3 h-3 text-emerald-500" />
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600">Final Results</span>
               </div>
-              {kpis && statWidgets.length > 0 && (
+              {kpis && hasStations && statWidgets.length > 0 && (
                 <div className="grid grid-cols-1 gap-3">
                   {statWidgets.map((w) => renderWidget(w, displayKpis, model, navigateToStation, lastResult, { startDayOfWeek, startHour }))}
                 </div>
+              )}
+              {kpis?.warehouses && !hasStations && (
+                <WarehouseResults compact warehouses={kpis.warehouses}
+                  names={Object.fromEntries(model.extraNodes.map((e) => [e.id, ((e.data as { name?: string })?.name) || e.id]))} />
               )}
             </div>
           </div>
@@ -844,7 +866,11 @@ export function Dashboard() {
                 <CheckCircleIcon className="w-3 h-3 text-emerald-500" />
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600">Final Results</span>
               </div>
-              {kpis && statWidgets.length > 0 && (
+              {kpis?.warehouses && !hasStations && (
+                <WarehouseResults warehouses={kpis.warehouses}
+                  names={Object.fromEntries(model.extraNodes.map((e) => [e.id, ((e.data as { name?: string })?.name) || e.id]))} />
+              )}
+              {kpis && hasStations && statWidgets.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {statWidgets.map((w) => renderWidget(w, displayKpis, model, navigateToStation, lastResult, { startDayOfWeek, startHour }))}
                 </div>
@@ -855,13 +881,67 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* No results message */}
+      {/* No results — empty state with call-to-action */}
       {!kpis && !isSimRunning && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-          <PlayIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-600 font-medium">No simulation results yet</p>
-          <p className="text-sm text-gray-400 mt-1">Run a simulation to see KPIs and charts</p>
+        <div className="space-y-6">
+          {/* Guided empty state: tells a first-time user exactly what to do next */}
+          <div className="dock-panel" style={{ padding: '22px 24px 20px' }}>
+            {!hasSimulatableElements ? (
+              <>
+                <div className="text-label" style={{ marginBottom: 6 }}>Get started</div>
+                <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--t1)', margin: 0, letterSpacing: '-0.3px' }}>Build your production line, then run it here</h2>
+                <ol className="grid gap-3 mt-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', listStyle: 'none', padding: 0, margin: '20px 0 0' }}>
+                  {[
+                    ['Build', 'Place a source, your stations and buffers, and a sink. Or start from a ready-made template.'],
+                    ['Run', 'Choose the run length under Settings in the ribbon (e.g. one 8-hour shift) and press Run simulation.'],
+                    ['Improve', 'See output, the bottleneck and what to change. Save variants as scenarios and compare.'],
+                  ].map(([t, d], i) => (
+                    <li key={t} style={{ display: 'flex', gap: 12 }}>
+                      <span style={{ width: 24, height: 24, borderRadius: 12, background: i === 0 ? 'var(--blue)' : 'var(--gray-100)', color: i === 0 ? '#fff' : 'var(--t2)', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--t1)' }}>{t}</div>
+                        <div style={{ fontSize: 13, color: 'var(--t2)', marginTop: 2, lineHeight: 1.45 }}>{d}</div>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+                <div className="flex gap-2 mt-6">
+                  <Button onClick={() => navigate('/builder')}>Open the builder</Button>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-between gap-6 flex-wrap">
+                <div>
+                  <div className="text-label" style={{ marginBottom: 6 }}>Ready to run</div>
+                  <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--t1)', margin: 0, letterSpacing: '-0.3px' }}>{model.name || 'Untitled model'}</h2>
+                  <p style={{ fontSize: 13, color: 'var(--t2)', margin: '4px 0 0' }}>
+                    {model.stations.length} station{model.stations.length === 1 ? '' : 's'} · {model.buffers.length} buffer{model.buffers.length === 1 ? '' : 's'} · {model.products.length} product{model.products.length === 1 ? '' : 's'}
+                    {' — '}simulating {duration >= 86400 ? `${duration / 86400} day${duration === 86400 ? '' : 's'}` : `${duration / 3600} hour${duration === 3600 ? '' : 's'}`}. Change it under Settings in the ribbon.
+                  </p>
+                  {!simpleMode && (
+                    <p style={{ fontSize: 12, color: 'var(--t3)', margin: '6px 0 0' }}>Results include OEE, throughput, bottlenecks, WIP trends and a schedule Gantt.</p>
+                  )}
+                </div>
+                <Button size="lg" onClick={handleRunSimulation} icon={<PlayIcon className="w-4 h-4" />}>Run simulation</Button>
+              </div>
+            )}
+          </div>
+
+          {/* No skeletons here: nothing is loading until the user clicks Run. */}
         </div>
+      )}
+
+      {/* Plain-language summary of the run */}
+      {kpis && !isSimRunning && (activeSection === 'all' || activeSection === 'overview') && (
+        <ResultsSummary kpis={kpis} model={model} durationSeconds={duration} onStationClick={navigateToStation} />
+      )}
+
+      {/* Warehouse elements (racks, forklifts, orders, inventory) */}
+      {kpis && !isSimRunning && kpis.warehouses && (activeSection === 'all' || activeSection === 'overview') && (
+        <WarehouseResults
+          warehouses={kpis.warehouses}
+          names={Object.fromEntries(model.extraNodes.map((e) => [e.id, ((e.data as { name?: string })?.name) || e.id]))}
+        />
       )}
 
       {/* Simulation Warnings — collapsible when >3 */}
@@ -870,8 +950,8 @@ export function Dashboard() {
       )}
 
       {/* Stat Cards Row */}
-      {kpis && statWidgets.length > 0 && (activeSection === 'all' || activeSection === 'overview') && (
-        <div id="dash-overview" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 scroll-mt-12">
+      {kpis && hasStations && statWidgets.length > 0 && (activeSection === 'all' || activeSection === 'overview') && (
+        <div id="dash-overview" className="grid gap-4 scroll-mt-12" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
           {statWidgets.map((w) => renderWidget(w, displayKpis, model, navigateToStation, lastResult, { startDayOfWeek, startHour }))}
           {kpis.delivery && kpis.delivery.onTimeRate != null && kpis.delivery.onTimeRate < 1.0 && (
             <StatCard
@@ -879,14 +959,14 @@ export function Dashboard() {
               title="On-Time Delivery"
               value={formatPercentage(kpis.delivery.onTimeRate)}
               status={kpis.delivery.onTimeRate >= 0.95 ? 'good' : kpis.delivery.onTimeRate >= 0.80 ? 'warning' : 'bad'}
-              icon={<ClockIcon className="w-6 h-6 text-indigo-600" />}
+              icon={<ClockIcon className="w-6 h-6 text-[#2563EB]" />}
             />
           )}
         </div>
       )}
 
       {/* Other Widgets — filtered by active tab */}
-      {kpis && lgRows.map((row, i) => {
+      {kpis && hasStations && lgRows.map((row, i) => {
         // In tab mode, only show the matching widget(s)
         const visibleRow = activeSection === 'all'
           ? row
@@ -991,41 +1071,60 @@ function StationPerformanceTable({ kpis, model, onStationClick }: { kpis: KPIDat
               </tr>
             ) : (
               sorted.map((row: any) => (
-                <tr key={row.id} className={row.oee < 0.1 && row.oee > 0 ? 'bg-red-50' : row.oee < 0.3 && row.oee > 0 ? 'bg-amber-50' : ''}>
+                <tr key={row.id} style={row.oee < 0.1 && row.oee > 0 ? { background: 'var(--red-bg)' } : row.oee < 0.3 && row.oee > 0 ? { background: 'var(--amber-bg)' } : {}}>
                   <td className="font-medium" title={`${row.name} — Click to view in editor`}>
-                    <span
-                      className={onStationClick ? 'cursor-pointer text-blue-600 hover:underline' : ''}
-                      onClick={() => onStationClick?.(row.id)}
-                    >
-                      {shortName(row.name)}
-                    </span>
-                    {row.oee > 0 && row.oee < 0.1 && (
-                      <span className="ml-1.5 px-1 py-0.5 text-[9px] font-bold bg-red-100 text-red-700 rounded">LOW</span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{
+                        background: row.utilization > 0.9 ? 'var(--red)' : row.utilization > 0.7 ? 'var(--amber)' : 'var(--blue)',
+                      }} />
+                      <span
+                        className={onStationClick ? 'cursor-pointer hover:underline' : ''}
+                        style={{ color: onStationClick ? 'var(--blue)' : 'var(--t1)' }}
+                        onClick={() => onStationClick?.(row.id)}
+                      >
+                        {shortName(row.name)}
+                      </span>
+                      {row.oee > 0 && row.oee < 0.1 && (
+                        <span className="chip chip-red" style={{ fontSize: 9 }}>LOW</span>
+                      )}
+                      {row.utilization > 0.95 && (
+                        <span className="chip chip-red" style={{ fontSize: 9 }}>Bottleneck</span>
+                      )}
+                    </div>
                   </td>
                   <td>
                     <div className="flex items-center space-x-2">
-                      <span className="w-10 text-right">{formatPercentage(row.utilization)}</span>
-                      <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden max-w-[60px]">
-                        <div className="h-full bg-blue-400 rounded-full" style={{ width: `${Math.min(100, row.utilization * 100)}%` }} />
+                      <span className="w-10 text-right font-semibold tabular-nums" style={{
+                        color: row.utilization > 0.9 ? 'var(--red)' : row.utilization > 0.7 ? 'var(--amber)' : 'var(--t2)',
+                      }}>{formatPercentage(row.utilization)}</span>
+                      <div className="flex-1 h-1.5 rounded-full overflow-hidden max-w-[60px]" style={{ background: 'var(--page-bg)' }}>
+                        <div className="h-full rounded-full" style={{
+                          width: `${Math.min(100, row.utilization * 100)}%`,
+                          background: row.utilization > 0.9 ? 'var(--red)' : row.utilization > 0.7 ? 'var(--amber)' : 'var(--blue)',
+                        }} />
                       </div>
                     </div>
                   </td>
-                  <td>{formatPercentage(row.availability)}</td>
-                  <td title={row.performanceNote === 'constant_ct' ? 'P = 100% is expected for constant cycle times (no speed variation)' : undefined}>
+                  <td className="tabular-nums">{formatPercentage(row.availability)}</td>
+                  <td className="tabular-nums" title={row.performanceNote === 'constant_ct' ? 'P = 100% is expected for constant cycle times (no speed variation)' : undefined}>
                     {formatPercentage(row.performance)}
                     {row.performanceNote === 'constant_ct' && (
-                      <span className="ml-1 text-[9px] text-blue-500 cursor-help" title="P = 100% expected for constant cycle time">*</span>
+                      <span className="ml-1 text-[9px] cursor-help" style={{ color: 'var(--blue)' }} title="P = 100% expected for constant cycle time">*</span>
                     )}
                   </td>
-                  <td>{formatPercentage(row.quality)}</td>
+                  <td className="tabular-nums">{formatPercentage(row.quality)}</td>
                   <td>
                     <div className="flex items-center space-x-2">
-                      <span className={`font-semibold w-10 text-right ${row.oee >= 0.8 ? 'text-green-600' : row.oee >= 0.5 ? 'text-amber-600' : 'text-red-600'}`}>
+                      <span className="font-semibold w-10 text-right tabular-nums" style={{
+                        color: row.oee >= 0.8 ? 'var(--green)' : row.oee >= 0.5 ? 'var(--amber)' : 'var(--red)',
+                      }}>
                         {formatPercentage(row.oee)}
                       </span>
-                      <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden max-w-[60px]">
-                        <div className={`h-full rounded-full ${row.oee >= 0.8 ? 'bg-green-400' : row.oee >= 0.5 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${Math.min(100, row.oee * 100)}%` }} />
+                      <div className="flex-1 h-1.5 rounded-full overflow-hidden max-w-[60px]" style={{ background: 'var(--page-bg)' }}>
+                        <div className="h-full rounded-full" style={{
+                          width: `${Math.min(100, row.oee * 100)}%`,
+                          background: row.oee >= 0.8 ? 'var(--green)' : row.oee >= 0.5 ? 'var(--amber)' : 'var(--red)',
+                        }} />
                       </div>
                     </div>
                   </td>
@@ -1059,7 +1158,7 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
           status={kpis.oee.overall >= 0.85 ? 'good' : kpis.oee.overall >= 0.65 ? 'warning' : 'bad'}
           subtitle={batchSubtitle}
           subtitleStatus={batchSubtitle ? 'warning' : undefined}
-          icon={<GaugeIcon className="w-6 h-6 text-blue-600" />}
+          icon={<GaugeIcon className="w-6 h-6 text-[#2563EB]" />}
         />
       );
     }
@@ -1069,9 +1168,8 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
           key={config.id}
           title="Throughput"
           value={`${kpis.throughput.total} units`}
-          change={12}
-          changeLabel={kpis.throughput.inProgress ? `+${kpis.throughput.inProgress} in-flight` : 'vs baseline'}
-          icon={<TrendUpIcon className="w-6 h-6 text-green-600" />}
+          changeLabel={kpis.throughput.inProgress ? `+${kpis.throughput.inProgress} still in system` : undefined}
+          icon={<TrendUpIcon className="w-6 h-6 text-[#17C964]" />}
         />
       );
     case 'cycle-time-summary':
@@ -1080,17 +1178,18 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
           key={config.id}
           title="Avg Cycle Time"
           value={formatDuration(kpis.cycleTime.mean)}
-          icon={<ClockIcon className="w-6 h-6 text-purple-600" />}
+          icon={<ClockIcon className="w-6 h-6 text-[#2563EB]" />}
         />
       );
     case 'wip-summary':
       return (
         <StatCard
           key={config.id}
-          title="WIP Level"
+          title="WIP at End"
           value={`${kpis.wip.total} items`}
+          subtitle={kpis.wip.average != null ? `avg ${Number(kpis.wip.average).toFixed(1)} · peak ${kpis.wip.peak ?? '–'}` : undefined}
           status={kpis.wip.total < 50 ? 'good' : kpis.wip.total < 100 ? 'warning' : 'bad'}
-          icon={<BoxIcon className="w-6 h-6 text-orange-600" />}
+          icon={<BoxIcon className="w-6 h-6 text-[#F5A524]" />}
         />
       );
     case 'quality-summary': {
@@ -1103,7 +1202,7 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
           value={formatPercentage(qualPct)}
           status={qualPct >= 0.98 ? 'good' : qualPct >= 0.95 ? 'warning' : 'bad'}
           changeLabel={`${totalScrapped} scrapped`}
-          icon={<QualityIcon className="w-6 h-6 text-rose-600" />}
+          icon={<QualityIcon className="w-6 h-6 text-[#F31260]" />}
         />
       );
     }
@@ -1176,7 +1275,7 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
             const key = `fail-${Math.round(e.time / 300)}`; // dedupe within 5-min windows
             if (!seen.has(key)) {
               seen.add(key);
-              wipEvents.push({ time: e.time, label: 'Fail', color: '#ef4444' });
+              wipEvents.push({ time: e.time, label: 'Fail', color: '#F31260' });
             }
           }
         }
@@ -1199,6 +1298,62 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
             startDayOfWeek={ganttOptions?.startDayOfWeek}
             startHour={ganttOptions?.startHour}
           />
+        </Card>
+      );
+    case 'sankey-flow':
+      return (
+        <Card key={config.id}>
+          <CardHeader title="Material Flow" subtitle="Sankey diagram — link width proportional to throughput" />
+          <SankeyChart kpis={kpis} model={model} result={result ?? null} />
+        </Card>
+      );
+    case 'cycle-time-pareto':
+      return (
+        <Card key={config.id}>
+          <CardHeader title="Cycle Time Pareto" subtitle="Stations ranked by processing time contribution" />
+          <CycleTimePareto kpis={kpis} model={model} />
+        </Card>
+      );
+    case 'throughput-waterfall':
+      return (
+        <Card key={config.id}>
+          <CardHeader title="Throughput Waterfall" subtitle="OEE loss cascade: Theoretical Max → Actual Output" />
+          <ThroughputWaterfall kpis={kpis} model={model} />
+        </Card>
+      );
+    case 'buffer-sparklines':
+      return (
+        <Card key={config.id}>
+          <CardHeader title="Buffer Fill Levels" subtitle="Sparklines showing buffer utilization over time" />
+          <BufferSparklines kpis={kpis} model={model} result={result ?? null} />
+        </Card>
+      );
+    case 'cost-summary':
+      return (
+        <Card key={config.id}>
+          <CardHeader title="Cost Summary" subtitle="Operating, variable, and scrap cost breakdown" />
+          <CostSummary kpis={kpis} model={model} />
+        </Card>
+      );
+    case 'energy-chart':
+      return (
+        <Card key={config.id}>
+          <CardHeader title="Energy Consumption" subtitle="Energy usage (kWh), cost, and CO2 by station" />
+          <EnergyChart kpis={kpis} model={model} />
+        </Card>
+      );
+    case 'maintenance-chart':
+      return (
+        <Card key={config.id}>
+          <CardHeader title="Maintenance Overview" subtitle="Planned vs unplanned downtime by station" />
+          <MaintenanceChart kpis={kpis} model={model} />
+        </Card>
+      );
+    case 'value-stream-map':
+      return (
+        <Card key={config.id}>
+          <CardHeader title="Value Stream Map" subtitle="Process flow, cycle times, inventory, and lead time breakdown" />
+          <ValueStreamMap kpis={kpis} model={model} />
         </Card>
       );
     default:
@@ -1224,13 +1379,6 @@ function PlayIcon({ className }: { className?: string }) {
   );
 }
 
-function CustomizeIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-    </svg>
-  );
-}
 
 function GaugeIcon({ className }: { className?: string }) {
   return (
@@ -1272,37 +1420,15 @@ function QualityIcon({ className }: { className?: string }) {
   );
 }
 
-function CameraIcon({ className }: { className?: string }) {
+
+function FilmIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
     </svg>
   );
 }
 
-function DownloadIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-    </svg>
-  );
-}
 
-function StopIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
-    </svg>
-  );
-}
 
-function ExportIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-    </svg>
-  );
-}
 

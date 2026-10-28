@@ -3,6 +3,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as readline from 'readline';
 import { EventEmitter } from 'events';
+import { createLogger } from './logger';
+
+const log = createLogger('PythonBridge');
 
 interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -54,20 +57,30 @@ export class PythonBridge extends EventEmitter {
     this.startupPromise = new Promise((resolve, reject) => {
       const serverScript = path.join(this.pythonPath, 'factorysim', 'api', 'server.py');
 
-      // Try to find Python executable — prefer venv if it exists
+      // Find the Python executable, in this order:
+      //  1. Developer venv (python/venv) — dev checkouts only; never shipped.
+      //  2. Bundled runtime (python-runtime/ next to python/) — what installed
+      //     copies use. Self-contained embeddable Python with the engine's
+      //     packages, so end users need no Python install.
+      //  3. Python on PATH (last resort; needs simpy/numpy/scipy installed).
+      // Before 1.3.0 the installer shipped the developer's venv, which only
+      // works on a PC with the same Python at the same path.
       let pythonExecutable: string;
       const venvPythonWin = path.join(this.pythonPath, 'venv', 'Scripts', 'python.exe');
       const venvPythonUnix = path.join(this.pythonPath, 'venv', 'bin', 'python');
+      const bundledPythonWin = path.join(this.pythonPath, '..', 'python-runtime', 'python.exe');
 
       if (process.platform === 'win32' && fs.existsSync(venvPythonWin)) {
         pythonExecutable = venvPythonWin;
       } else if (process.platform !== 'win32' && fs.existsSync(venvPythonUnix)) {
         pythonExecutable = venvPythonUnix;
+      } else if (process.platform === 'win32' && fs.existsSync(bundledPythonWin)) {
+        pythonExecutable = path.resolve(bundledPythonWin);
       } else {
         pythonExecutable = process.platform === 'win32' ? 'python' : 'python3';
       }
 
-      console.log('Using Python executable:', pythonExecutable);
+      log.info('Using Python executable: ' + pythonExecutable);
 
       // Determine plugins directory from Electron's userData path
       let pluginsDir = '';
@@ -90,29 +103,33 @@ export class PythonBridge extends EventEmitter {
       });
 
       this.process.on('error', (error) => {
-        console.error('Python process error:', error);
+        log.error('Python process error', error);
         this.emit('error', error);
         reject(error);
       });
 
       this.process.on('exit', (code, signal) => {
-        console.log(`Python process exited with code ${code}, signal ${signal}`);
+        log.info(`Python process exited with code ${code}, signal ${signal}`);
         this.isReady = false;
         this.startupPromise = null;
         this.emit('exit', { code, signal });
 
-        // Auto-restart on unexpected exit
+        // Auto-restart on unexpected exit with exponential backoff
         if (!this.shuttingDown && this.restartCount < this.MAX_RESTARTS) {
-          console.log(`Unexpected Python exit — restarting (attempt ${this.restartCount + 1}/${this.MAX_RESTARTS})...`);
+          const delay = 1000 * Math.pow(2, this.restartCount); // 1s, 2s, 4s
+          log.warn(`Unexpected Python exit — restarting in ${delay}ms (attempt ${this.restartCount + 1}/${this.MAX_RESTARTS})`);
           setTimeout(() => {
             this.restart().catch((err) => {
-              console.error('Python auto-restart failed:', err);
+              log.error('Python auto-restart failed', err);
               this.emit('error', err);
             });
-          }, 1000);
+          }, delay);
         } else if (!this.shuttingDown) {
-          console.error(`Python process crashed ${this.MAX_RESTARTS} times — giving up`);
-          this.emit('error', new Error(`Python process crashed ${this.MAX_RESTARTS} consecutive times`));
+          log.error(`Python process crashed ${this.MAX_RESTARTS} times — giving up`);
+          this.emit('error', new Error(
+            `Simulation engine crashed ${this.MAX_RESTARTS} consecutive times and could not recover. ` +
+            `Try restarting the application. If the issue persists, check that Python dependencies are installed correctly.`
+          ));
         }
       });
 
@@ -120,7 +137,7 @@ export class PythonBridge extends EventEmitter {
       this.process.stderr?.on('data', (data: Buffer) => {
         const message = data.toString().trim();
         if (message) {
-          console.error('Python stderr:', message);
+          log.error('Python stderr: ' + message);
           this.emit('log', { level: 'error', message });
         }
       });
@@ -147,6 +164,7 @@ export class PythonBridge extends EventEmitter {
           const data = JSON.parse(line);
           if (data.type === 'ready') {
             clearTimeout(readyTimeout);
+            this.readline?.removeListener('line', checkReady);
             this.isReady = true;
             this.restartCount = 0;
             this.emit('ready');
@@ -191,7 +209,7 @@ export class PythonBridge extends EventEmitter {
         }
       }
     } catch (error) {
-      console.error('Failed to parse Python response:', line, error);
+      log.error('Failed to parse Python response: ' + line, error);
     }
   }
 
@@ -230,7 +248,7 @@ export class PythonBridge extends EventEmitter {
 
       const timeout = setTimeout(() => {
         this.pendingRequests.delete(id);
-        reject(new Error(`Request timeout for method: ${method}`));
+        reject(new Error(`Request timeout after ${this.REQUEST_TIMEOUT / 1000}s for method '${method}'. The simulation may be too complex or the engine may be unresponsive.`));
       }, this.REQUEST_TIMEOUT);
 
       this.pendingRequests.set(id, {
@@ -240,7 +258,28 @@ export class PythonBridge extends EventEmitter {
       });
 
       const requestStr = JSON.stringify(request) + '\n';
-      this.process?.stdin?.write(requestStr);
+      const stdin = this.process?.stdin;
+      if (!stdin || stdin.destroyed) {
+        clearTimeout(timeout);
+        this.pendingRequests.delete(id);
+        reject(new Error(`Failed to write request for method '${method}': process not available`));
+        return;
+      }
+      const ok = stdin.write(requestStr);
+      if (!ok) {
+        // Buffer full — wait for drain; attach error handler in case process dies before flush
+        stdin.once('drain', () => {
+          // Data will be flushed automatically by Node, nothing else needed
+        });
+        stdin.once('error', (err) => {
+          const pending = this.pendingRequests.get(id);
+          if (pending) {
+            clearTimeout(pending.timeout);
+            this.pendingRequests.delete(id);
+            pending.reject(new Error(`Failed to send request for method '${method}': ${err.message}`));
+          }
+        });
+      }
     });
   }
 
@@ -251,6 +290,14 @@ export class PythonBridge extends EventEmitter {
 
   async validateModel(model: object): Promise<unknown> {
     return this.call('validate_model', { model });
+  }
+
+  async runExperiment(model: object, simOptions: object, experimentConfig: object): Promise<unknown> {
+    return this.call('run_experiment', { model, sim_options: simOptions, experiment_config: experimentConfig });
+  }
+
+  async mlOptimize(model: object, simOptions: object, mlConfig: object): Promise<unknown> {
+    return this.call('ml_optimize', { model, sim_options: simOptions, ml_config: mlConfig });
   }
 
   async stopSimulation(runId: string): Promise<void> {

@@ -3,6 +3,9 @@ import * as path from 'path';
 import { PythonBridge } from './python-bridge';
 import { registerIpcHandlers } from './ipc-handlers';
 import { DatabaseManager } from './database';
+import { createLogger } from './logger';
+
+const log = createLogger('Main');
 
 let mainWindow: BrowserWindow | null = null;
 let popoutWindow: BrowserWindow | null = null;
@@ -254,7 +257,7 @@ app.whenReady().then(async () => {
   try {
     await initializeApp();
   } catch (err) {
-    console.error('App initialization failed:', err);
+    log.error('App initialization failed', err);
     dialog.showErrorBox(
       'Initialization Error',
       `FactorySim failed to start:\n\n${(err as Error).message}\n\nThe app will open but simulations may not work.`
@@ -286,10 +289,10 @@ app.on('before-quit', () => {
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught exception:', error);
+  log.error('Uncaught exception', error);
   dialog.showErrorBox('Error', `An unexpected error occurred: ${error.message}`);
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error('Unhandled rejection:', reason);
+  log.error('Unhandled rejection', reason);
 });

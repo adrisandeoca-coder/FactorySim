@@ -1,6 +1,23 @@
 import html2canvas from 'html2canvas';
 
 /**
+ * WebGL canvases (the 3D view) are skipped: they render without
+ * preserveDrawingBuffer, so html2canvas gets a blank image anyway, and the
+ * read-back forces a GPU stall that froze the app (and on weak GPUs lost the
+ * WebGL context) when a capture ran during replay.
+ */
+const skipCanvas = (el: Element) => el.tagName === 'CANVAS';
+
+/** Resolve when the browser is idle (or after `timeout` ms at the latest). */
+export function whenIdle(timeout = 4000): Promise<void> {
+  return new Promise((resolve) => {
+    const ric = (window as any).requestIdleCallback as undefined | ((cb: () => void, o?: { timeout: number }) => number);
+    if (ric) ric(() => resolve(), { timeout });
+    else setTimeout(resolve, 200);
+  });
+}
+
+/**
  * Capture a DOM element as a PNG image and trigger download.
  */
 export async function captureScreenshot(
@@ -9,9 +26,10 @@ export async function captureScreenshot(
 ): Promise<void> {
   const canvas = await html2canvas(element, {
     backgroundColor: '#ffffff',
-    scale: 2, // retina quality
+    scale: 2, // retina quality — user-requested download
     useCORS: true,
     logging: false,
+    ignoreElements: skipCanvas,
   });
 
   const link = document.createElement('a');
@@ -27,12 +45,15 @@ export async function captureScreenshot(
 export async function captureToBase64(
   element: HTMLElement,
   backgroundColor: string | null = '#ffffff',
+  scale = 1,
 ): Promise<string> {
+  // Background captures (run artifacts, frames) at 1× — 2× quadrupled the work
   const canvas = await html2canvas(element, {
     backgroundColor,
-    scale: 2,
+    scale,
     useCORS: true,
     logging: false,
+    ignoreElements: skipCanvas,
   });
   return canvas.toDataURL('image/png');
 }

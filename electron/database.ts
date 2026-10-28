@@ -6,6 +6,8 @@ import * as fs from 'fs';
 export class DatabaseManager {
   private db: SqlJsDatabase | null = null;
   private dbPath: string;
+  private saveQueued = false;
+  private saving = false;
 
   constructor(dbPath: string) {
     this.dbPath = dbPath;
@@ -48,9 +50,23 @@ export class DatabaseManager {
 
   private save(): void {
     if (!this.db) return;
-    const data = this.db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(this.dbPath, buffer);
+    // Prevent concurrent writes — if a save is in progress, queue the next one
+    if (this.saving) {
+      this.saveQueued = true;
+      return;
+    }
+    this.saving = true;
+    try {
+      const data = this.db.export();
+      const buffer = Buffer.from(data);
+      fs.writeFileSync(this.dbPath, buffer);
+    } finally {
+      this.saving = false;
+      if (this.saveQueued) {
+        this.saveQueued = false;
+        this.save();
+      }
+    }
   }
 
   private async createTables(): Promise<void> {

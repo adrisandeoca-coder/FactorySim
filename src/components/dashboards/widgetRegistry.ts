@@ -86,4 +86,58 @@ export const widgetRegistry: Record<DashboardWidgetType, WidgetRegistryEntry> = 
     defaultSize: 'full',
     icon: 'M3 6h18M3 12h12M3 18h18M8 6v12',
   },
+  'sankey-flow': {
+    label: 'Material Flow Sankey',
+    description: 'Sankey diagram showing material flow from sources through stations and buffers to sinks',
+    defaultSize: 'full',
+    icon: 'M4 4v16h16M4 12h4l3-6 4 10 3-4h2',
+  },
+  'cycle-time-pareto': {
+    label: 'Cycle Time Pareto',
+    description: 'Stations ranked by processing time contribution with cumulative % line and 80% threshold',
+    defaultSize: 'lg',
+    icon: 'M3 3v18h18M7 17V9m4 8V5m4 12v-5m4 5v-3',
+  },
+  'throughput-waterfall': {
+    label: 'Throughput Waterfall',
+    description: 'OEE waterfall: Theoretical Max → Availability/Performance/Quality losses → Actual Output',
+    defaultSize: 'lg',
+    icon: 'M3 3v18h18M7 8v9m4-6v6m4-4v4m4-9v9',
+  },
+  'buffer-sparklines': {
+    label: 'Buffer Sparklines',
+    description: 'Compact grid of buffer fill-level sparklines over time',
+    defaultSize: 'full',
+    icon: 'M4 4v16h16M4 12h4l3-6 4 10 3-4h2',
+  },
+  'cost-summary': {
+    label: 'Cost Summary',
+    description: 'Cost breakdown by station with operating, variable, and scrap costs',
+    defaultSize: 'lg',
+    icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  },
+  'energy-chart': {
+    label: 'Energy Consumption',
+    description: 'Energy usage (kWh) per station with cost and CO2 summary',
+    defaultSize: 'lg',
+    icon: 'M13 10V3L4 14h7v7l9-11h-7z',
+  },
+  'maintenance-chart': {
+    label: 'Maintenance Overview',
+    description: 'Planned vs unplanned downtime by station',
+    defaultSize: 'lg',
+    icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z',
+  },
+  'value-stream-map': {
+    label: 'Value Stream Map',
+    description: 'VSM diagram showing process flow, cycle times, WIP inventory, and lead time breakdown',
+    defaultSize: 'full',
+    icon: 'M4 4v16h16M4 12h4l3-6 4 10 3-4h2',
+  },
+  'experiment-results': {
+    label: 'Experiment Results',
+    description: 'Parameter sweep / optimization / replication results with best configuration',
+    defaultSize: 'full',
+    icon: 'M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 2h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 8.172V3L8 2z',
+  },
 };

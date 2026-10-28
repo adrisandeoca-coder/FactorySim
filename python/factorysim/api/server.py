@@ -48,6 +48,7 @@ class JsonRpcServer:
         self.methods = {
             # Simulation methods
             "run_simulation": self._run_simulation,
+            "run_experiment": self._run_experiment,
             "validate_model": self._validate_model,
             "stop_simulation": self._stop_simulation,
             "get_simulation_status": self._get_simulation_status,
@@ -70,12 +71,29 @@ class JsonRpcServer:
             # Code execution (advanced)
             "execute_code": self._execute_code,
 
+            # MQTT connector methods
+            "mqtt_connect": self._mqtt_connect,
+            "mqtt_disconnect": self._mqtt_disconnect,
+            "mqtt_status": self._mqtt_status,
+            "mqtt_publish": self._mqtt_publish,
+            "mqtt_subscribe": self._mqtt_subscribe,
+
+            # OPC-UA connector methods
+            "opcua_connect": self._opcua_connect,
+            "opcua_disconnect": self._opcua_disconnect,
+            "opcua_status": self._opcua_status,
+            "opcua_read": self._opcua_read,
+            "opcua_browse": self._opcua_browse,
+
             # Plugin methods
             "plugin_list": self._plugin_list,
             "plugin_enable": self._plugin_enable,
             "plugin_disable": self._plugin_disable,
             "plugin_logs": self._plugin_logs,
             "plugin_reload": self._plugin_reload,
+
+            # ML optimization
+            "ml_optimize": self._run_ml_optimize,
 
             # System methods
             "ping": self._ping,
@@ -112,6 +130,7 @@ class JsonRpcServer:
             stream_events=options.get("stream_events", options.get("streamEvents", False)),
             start_day_of_week=options.get("start_day_of_week", options.get("startDayOfWeek", 0)),
             start_hour=options.get("start_hour", options.get("startHour", 0.0)),
+            warm_start=options.get("warm_start", options.get("warmStart")),
         )
 
         sim = Simulation(model, config)
@@ -150,14 +169,12 @@ class JsonRpcServer:
                     wip_by_station[name] = getattr(st, 'batch_size', 1) or 1
                 else:
                     wip_by_station[name] = 0
-                # Station utilization = (processing + setup + failed) / total time
-                # Matches dashboard metric for consistent bottleneck detection
+                # Station utilization = processing / total time
+                # Matches Station.get_utilization() for consistent metrics
                 now = sim.env.now
                 if now > 0:
                     total_proc = getattr(st, 'total_processing_time', 0)
-                    total_setup = getattr(st, 'total_setup_time', 0)
-                    total_failed = getattr(st, 'total_failed_time', 0)
-                    station_utilizations[name] = min(1.0, (total_proc + total_setup + total_failed) / now)
+                    station_utilizations[name] = min(1.0, total_proc / now)
                 # Station processed count
                 station_processed_counts[name] = getattr(st, 'items_processed', 0)
 
@@ -260,6 +277,32 @@ class JsonRpcServer:
         with self.lock:
             self.running_simulations[run_id] = sim
 
+        # Capture initial t=0 snapshot so very fast sims still have frame data
+        diag_snapshots.append({
+            "threshold": 0.0,
+            "currentTime": 0,
+            "diagnostics": {
+                "activeProducts": 0,
+                "completedProducts": 0,
+                "stationStates": {(st.name or sid): "idle" for sid, st in sim.stations.items()},
+                "bufferLevels": {
+                    (buf.name or bid): {"level": 0, "capacity": buf.capacity}
+                    for bid, buf in sim.buffers.items()
+                    if not bid.startswith('__arrival_')
+                },
+                "simTimeSec": 0,
+                "simTimeFormatted": "00:00:00",
+                "wipByStation": {},
+                "totalGenerated": 0,
+                "sourceGenerated": {},
+                "sinkExited": {},
+                "stationUtilizations": {},
+                "stationProcessedCounts": {},
+                "batchQueueCounts": {},
+            },
+            "trigger": "initial",
+        })
+
         try:
             result = sim.run(run_id)
             # Always append 100% snapshot from last diagnostics
@@ -306,6 +349,116 @@ class JsonRpcServer:
             with self.lock:
                 if run_id in self.running_simulations:
                     del self.running_simulations[run_id]
+
+    def _run_experiment(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Run an experiment (parameter sweep, optimization, or replication)."""
+        from factorysim.engine.experiment import (
+            ExperimentManager, ExperimentConfig, ParameterRange
+        )
+
+        model = params.get("model", {})
+        sim_options = params.get("sim_options", {})
+        exp_config_raw = params.get("experiment_config", {})
+
+        # Parse parameter ranges
+        param_ranges = []
+        for p in exp_config_raw.get("parameters", []):
+            param_ranges.append(ParameterRange(
+                path=p["path"],
+                min_val=p.get("minVal", p.get("min", 0)),
+                max_val=p.get("maxVal", p.get("max", 100)),
+                step=p.get("step"),
+                name=p.get("name"),
+            ))
+
+        config = ExperimentConfig(
+            parameters=param_ranges,
+            mode=exp_config_raw.get("mode", "sweep"),
+            replications=exp_config_raw.get("replications", 5),
+            base_seed=exp_config_raw.get("baseSeed", 42),
+            objective=exp_config_raw.get("objective", "throughput"),
+            objective_direction=exp_config_raw.get("objectiveDirection", "maximize"),
+            warmup_fraction=exp_config_raw.get("warmupFraction", 0.1),
+            confidence_level=exp_config_raw.get("confidenceLevel", 0.95),
+            population_size=exp_config_raw.get("populationSize", 20),
+            generations=exp_config_raw.get("generations", 30),
+            mutation_rate=exp_config_raw.get("mutationRate", 0.1),
+            crossover_rate=exp_config_raw.get("crossoverRate", 0.7),
+        )
+
+        sim_config = {
+            "duration": sim_options.get("duration", 28800),
+            "warmupTime": sim_options.get("warmupPeriod", sim_options.get("warmupTime", 0)),
+        }
+
+        manager = ExperimentManager(model, sim_config, config)
+
+        # Progress callback
+        def on_progress(progress: float, message: str):
+            if self.event_callback:
+                self.event_callback({
+                    "type": "experiment_progress",
+                    "progress": progress,
+                    "message": message,
+                })
+
+        manager.progress_callback = on_progress
+
+        result = manager.run()
+        return {"success": True, "experiment": result}
+
+    def _run_ml_optimize(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Run ML/surrogate-model-based optimization."""
+        from factorysim.engine.ml_optimizer import MLOptimizer, MLOptimizerConfig
+
+        model = params.get("model", {})
+        sim_options = params.get("sim_options", {})
+        ml_config_raw = params.get("ml_config", {})
+
+        # Parse parameter ranges
+        parameter_ranges = []
+        for p in ml_config_raw.get("parameterRanges", ml_config_raw.get("parameter_ranges", [])):
+            parameter_ranges.append({
+                "path": p["path"],
+                "min": p.get("minVal", p.get("min", 0)),
+                "max": p.get("maxVal", p.get("max", 100)),
+                "step": p.get("step"),
+                "name": p.get("name"),
+            })
+
+        config = MLOptimizerConfig(
+            iterations=ml_config_raw.get("iterations", 5),
+            initial_samples=ml_config_raw.get("initialSamples", ml_config_raw.get("initial_samples", 30)),
+            surrogate_candidates=ml_config_raw.get("surrogateCandidates", ml_config_raw.get("surrogate_candidates", 5000)),
+            top_k=ml_config_raw.get("topK", ml_config_raw.get("top_k", 5)),
+            hidden_layers=ml_config_raw.get("hiddenLayers", ml_config_raw.get("hidden_layers", [64, 32])),
+            learning_rate=ml_config_raw.get("learningRate", ml_config_raw.get("learning_rate", 0.001)),
+            epochs=ml_config_raw.get("epochs", 200),
+            replications=ml_config_raw.get("replications", 1),
+            base_seed=ml_config_raw.get("baseSeed", ml_config_raw.get("base_seed", 42)),
+            objective=ml_config_raw.get("objective", "throughput"),
+            objective_direction=ml_config_raw.get("objectiveDirection", ml_config_raw.get("objective_direction", "maximize")),
+        )
+
+        sim_config = {
+            "duration": sim_options.get("duration", 28800),
+            "warmupTime": sim_options.get("warmupPeriod", sim_options.get("warmupTime", 0)),
+        }
+
+        optimizer = MLOptimizer(parameter_ranges)
+
+        # Progress callback
+        def on_progress(progress: float, message: str):
+            self._send_notification("progress", {
+                "type": "ml_optimize_progress",
+                "progress": progress,
+                "message": message,
+            })
+
+        optimizer.progress_callback = on_progress
+
+        result = optimizer.optimize(model, sim_config, config)
+        return {"success": True, "optimization": result}
 
     def _validate_model(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Validate a factory model."""
@@ -533,6 +686,198 @@ class JsonRpcServer:
             return {"success": True, "result": local_vars.get("result")}
         except Exception as e:
             return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
+
+    # ============ MQTT Connector Methods ============
+
+    def _mqtt_connect(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Connect to an MQTT broker."""
+        broker = params.get("broker", "localhost")
+        port = params.get("port", 1883)
+        username = params.get("username")
+        password = params.get("password")
+        client_id = params.get("clientId", "factorysim")
+        topics = params.get("topics", ["factory/#"])
+
+        try:
+            from ..connectors.mqtt_connector import MQTTConnector, MQTTConfig
+
+            config = MQTTConfig(
+                broker=broker,
+                port=port,
+                username=username,
+                password=password,
+                client_id=client_id,
+                topics=topics,
+            )
+            self._mqtt = MQTTConnector(config)
+            result = self._mqtt.connect()
+
+            if result.get("success"):
+                return {
+                    "status": "connected",
+                    "broker": broker,
+                    "port": port,
+                    "topics": topics,
+                }
+            else:
+                return {
+                    "status": "error",
+                    "error": result.get("error", "Connection failed"),
+                }
+        except ImportError as e:
+            return {"status": "error", "error": f"MQTT library not available: {e}"}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+    def _mqtt_disconnect(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Disconnect from MQTT broker."""
+        if hasattr(self, '_mqtt') and self._mqtt:
+            self._mqtt.disconnect()
+            self._mqtt = None
+        return {"status": "disconnected"}
+
+    def _mqtt_status(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Get MQTT connection status and recent messages."""
+        if hasattr(self, '_mqtt') and self._mqtt:
+            limit = params.get("limit", 50)
+            messages = self._mqtt.get_messages(max_count=limit)
+            # Convert MQTTMessage dataclasses to dicts
+            msg_dicts = []
+            for m in messages:
+                msg_dicts.append({
+                    "topic": m.topic,
+                    "payload": m.payload,
+                    "timestamp": m.timestamp.isoformat(),
+                    "qos": m.qos,
+                })
+            # Also include latest messages per topic
+            latest = {}
+            for topic, m in self._mqtt.last_messages.items():
+                latest[topic] = {
+                    "topic": m.topic,
+                    "payload": m.payload,
+                    "timestamp": m.timestamp.isoformat(),
+                    "qos": m.qos,
+                }
+            return {
+                "connected": self._mqtt.connected,
+                "messageCount": len(msg_dicts),
+                "messages": msg_dicts,
+                "latestByTopic": latest,
+                "broker": self._mqtt.config.broker,
+                "port": self._mqtt.config.port,
+                "topics": self._mqtt.config.topics,
+            }
+        return {"connected": False, "messageCount": 0, "messages": [], "latestByTopic": {}}
+
+    def _mqtt_publish(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Publish a message to an MQTT topic."""
+        if not hasattr(self, '_mqtt') or not self._mqtt or not self._mqtt.connected:
+            return {"status": "error", "error": "Not connected"}
+
+        topic = params.get("topic")
+        payload = params.get("payload")
+        if not topic:
+            return {"status": "error", "error": "Topic is required"}
+
+        try:
+            import json as _json
+            payload_str = _json.dumps(payload) if isinstance(payload, (dict, list)) else str(payload)
+            self._mqtt.client.publish(topic, payload_str, qos=self._mqtt.config.qos)
+            return {"status": "published", "topic": topic}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+    def _mqtt_subscribe(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Subscribe to additional MQTT topics."""
+        if not hasattr(self, '_mqtt') or not self._mqtt or not self._mqtt.connected:
+            return {"status": "error", "error": "Not connected"}
+
+        topics = params.get("topics", [])
+        results = []
+        for topic in topics:
+            result = self._mqtt.subscribe(topic)
+            results.append(result)
+            if result.get("success"):
+                if topic not in self._mqtt.config.topics:
+                    self._mqtt.config.topics.append(topic)
+        return {"status": "ok", "results": results}
+
+    # ---- OPC-UA connector methods ----
+
+    def _opcua_connect(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Connect to an OPC-UA server."""
+        endpoint = params.get("endpoint", "opc.tcp://localhost:4840")
+        username = params.get("username")
+        password = params.get("password")
+        security_policy = params.get("securityPolicy")
+
+        try:
+            from ..connectors.opcua_connector import OPCUAConnector, OPCUAConfig
+
+            config = OPCUAConfig(
+                endpoint=endpoint,
+                username=username,
+                password=password,
+                security_policy=security_policy,
+            )
+            self._opcua = OPCUAConnector(config)
+            result = self._opcua.connect()
+
+            if result.get("success"):
+                return {
+                    "status": "connected",
+                    "endpoint": endpoint,
+                    "serverInfo": result.get("server_info", {}),
+                }
+            else:
+                return {
+                    "status": "error",
+                    "error": result.get("error", "Connection failed"),
+                }
+        except ImportError as e:
+            return {"status": "error", "error": f"OPC-UA library not available: {e}"}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+    def _opcua_disconnect(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Disconnect from OPC-UA server."""
+        if hasattr(self, '_opcua') and self._opcua:
+            self._opcua.disconnect()
+            self._opcua = None
+        return {"status": "disconnected"}
+
+    def _opcua_status(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Get OPC-UA connection status."""
+        if hasattr(self, '_opcua') and self._opcua:
+            return {
+                "connected": self._opcua.connected,
+                "endpoint": self._opcua.config.endpoint,
+            }
+        return {"connected": False}
+
+    def _opcua_read(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Read OPC-UA node value(s)."""
+        if not hasattr(self, '_opcua') or not self._opcua or not self._opcua.connected:
+            return {"status": "error", "error": "Not connected"}
+
+        node_id = params.get("nodeId")
+        node_ids = params.get("nodeIds")
+
+        if node_ids:
+            return self._opcua.read_nodes(node_ids)
+        elif node_id:
+            return self._opcua.read_node(node_id)
+        else:
+            return {"status": "error", "error": "nodeId or nodeIds is required"}
+
+    def _opcua_browse(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Browse OPC-UA server namespace."""
+        if not hasattr(self, '_opcua') or not self._opcua or not self._opcua.connected:
+            return {"status": "error", "error": "Not connected"}
+
+        node_id = params.get("nodeId")
+        return self._opcua.browse_node(node_id)
 
     def _plugin_list(self, params: Dict[str, Any]) -> Dict[str, Any]:
         if not self.plugin_manager:

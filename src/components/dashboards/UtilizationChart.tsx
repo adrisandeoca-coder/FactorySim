@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import type { UtilizationData, ResourceUtilization } from '../../types';
 import { useModelStore } from '../../stores/modelStore';
+import { ChartEmptyState } from './ChartEmptyState';
 
 interface UtilizationChartProps {
   data: UtilizationData;
@@ -18,17 +19,17 @@ const MAX_WIDGET_HEIGHT = 600;
 const CHART_WIDTH = 620;
 
 const categories = [
-  { key: 'busy', color: '#3b82f6', label: 'Busy', pattern: 'pat-busy' },
-  { key: 'idle', color: '#d1d5db', label: 'Idle', pattern: 'pat-idle' },
-  { key: 'setup', color: '#8b5cf6', label: 'Setup', pattern: 'pat-setup' },
-  { key: 'blocked', color: '#f59e0b', label: 'Blocked', pattern: 'pat-blocked' },
-  { key: 'failed', color: '#ef4444', label: 'Failed', pattern: 'pat-failed' },
-  { key: 'starved', color: '#a855f7', label: 'Starved', pattern: 'pat-starved' },
-  { key: 'offShift', color: '#6b7280', label: 'Off Shift', pattern: 'pat-offShift' },
-  { key: 'batchWait', color: '#60a5fa', label: 'Batching', pattern: 'pat-batchWait' },
+  { key: 'busy', color: '#2563EB', label: 'Busy', pattern: 'pat-busy' },
+  { key: 'idle', color: '#D4D4D8', label: 'Idle', pattern: 'pat-idle' },
+  { key: 'setup', color: '#A1A1AA', label: 'Setup', pattern: 'pat-setup' },
+  { key: 'blocked', color: '#F5A524', label: 'Blocked', pattern: 'pat-blocked' },
+  { key: 'failed', color: '#F31260', label: 'Failed', pattern: 'pat-failed' },
+  { key: 'starved', color: '#b8860b', label: 'Starved', pattern: 'pat-starved' },
+  { key: 'offShift', color: '#e5e7eb', label: 'Off Shift', pattern: 'pat-offShift' },
+  { key: 'batchWait', color: '#52525B', label: 'Batching', pattern: 'pat-batchWait' },
 ] as const;
 
-export function UtilizationChart({ data }: UtilizationChartProps) {
+const UtilizationChart = React.memo(function UtilizationChart({ data }: UtilizationChartProps) {
   const { model } = useModelStore();
   const stations = model.stations;
   const [hoveredStation, setHoveredStation] = useState<string | null>(null);
@@ -36,12 +37,8 @@ export function UtilizationChart({ data }: UtilizationChartProps) {
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [showAll, setShowAll] = useState(false);
 
-  if (stations.length === 0) {
-    return (
-      <div className="h-48 flex items-center justify-center text-gray-400 text-sm">
-        No stations in model
-      </div>
-    );
+  if (!data || stations.length === 0 || Object.keys(data.byStation).length === 0) {
+    return <ChartEmptyState message="No utilization data available" height="h-48" />;
   }
 
   // Scale down for large station counts
@@ -91,44 +88,44 @@ export function UtilizationChart({ data }: UtilizationChartProps) {
           style={{ height: contentHeight, minHeight: widgetHeight }}
         >
           <defs>
-            {/* Busy: solid (no overlay pattern needed — default) */}
+            {/* Busy: solid */}
             <pattern id="pat-busy" patternUnits="userSpaceOnUse" width="8" height="8">
-              <rect width="8" height="8" fill="#3b82f6" />
+              <rect width="8" height="8" fill="#2563EB" />
             </pattern>
             {/* Idle: horizontal lines */}
             <pattern id="pat-idle" patternUnits="userSpaceOnUse" width="8" height="8">
-              <rect width="8" height="8" fill="#d1d5db" />
+              <rect width="8" height="8" fill="#D4D4D8" />
               <line x1="0" y1="4" x2="8" y2="4" stroke="#fff" strokeWidth="1.5" opacity="0.5" />
             </pattern>
             {/* Setup: diagonal stripes (45deg) */}
             <pattern id="pat-setup" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
-              <rect width="6" height="6" fill="#8b5cf6" />
+              <rect width="6" height="6" fill="#A1A1AA" />
               <line x1="0" y1="0" x2="6" y2="0" stroke="#fff" strokeWidth="1.5" opacity="0.4" />
             </pattern>
             {/* Blocked: dots */}
             <pattern id="pat-blocked" patternUnits="userSpaceOnUse" width="6" height="6">
-              <rect width="6" height="6" fill="#f59e0b" />
+              <rect width="6" height="6" fill="#F5A524" />
               <circle cx="3" cy="3" r="1.2" fill="#fff" opacity="0.45" />
             </pattern>
             {/* Failed: crosshatch */}
             <pattern id="pat-failed" patternUnits="userSpaceOnUse" width="6" height="6">
-              <rect width="6" height="6" fill="#ef4444" />
+              <rect width="6" height="6" fill="#F31260" />
               <line x1="0" y1="0" x2="6" y2="6" stroke="#fff" strokeWidth="1" opacity="0.4" />
               <line x1="6" y1="0" x2="0" y2="6" stroke="#fff" strokeWidth="1" opacity="0.4" />
             </pattern>
             {/* Starved: diagonal stripes (135deg) */}
             <pattern id="pat-starved" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(135)">
-              <rect width="6" height="6" fill="#a855f7" />
+              <rect width="6" height="6" fill="#b8860b" />
               <line x1="0" y1="0" x2="6" y2="0" stroke="#fff" strokeWidth="1.5" opacity="0.4" />
             </pattern>
             {/* Off Shift: vertical lines */}
             <pattern id="pat-offShift" patternUnits="userSpaceOnUse" width="6" height="6">
-              <rect width="6" height="6" fill="#6b7280" />
+              <rect width="6" height="6" fill="#e5e7eb" />
               <line x1="3" y1="0" x2="3" y2="6" stroke="#fff" strokeWidth="1.5" opacity="0.4" />
             </pattern>
             {/* Batching: checkerboard */}
             <pattern id="pat-batchWait" patternUnits="userSpaceOnUse" width="6" height="6">
-              <rect width="6" height="6" fill="#60a5fa" />
+              <rect width="6" height="6" fill="#64748b" />
               <rect x="0" y="0" width="3" height="3" fill="#fff" opacity="0.25" />
               <rect x="3" y="3" width="3" height="3" fill="#fff" opacity="0.25" />
             </pattern>
@@ -278,7 +275,8 @@ export function UtilizationChart({ data }: UtilizationChartProps) {
       </div>
     </div>
   );
-}
+});
+export { UtilizationChart };
 
 /** Compact operator utilization bars — only renders when resource data exists */
 function OperatorUtilizationSection({ byResource }: { byResource: Record<string, number | ResourceUtilization> }) {
@@ -297,7 +295,7 @@ function OperatorUtilizationSection({ byResource }: { byResource: Record<string,
       <div className="space-y-1.5">
         {entries.map((op) => {
           const pct = Math.round(op.utilization * 100);
-          const color = pct > 90 ? '#ef4444' : pct > 70 ? '#f59e0b' : pct > 40 ? '#3b82f6' : '#9ca3af';
+          const color = pct > 90 ? '#dc2626' : pct > 70 ? '#d97706' : '#374151';
           return (
             <div key={op.id} className="flex items-center gap-2">
               <span className="text-xs text-gray-600 w-28 truncate text-right" title={op.name}>{op.name}</span>

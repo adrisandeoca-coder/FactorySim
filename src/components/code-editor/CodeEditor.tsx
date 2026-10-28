@@ -5,8 +5,7 @@ import { Card, CardHeader } from '../common/Card';
 import { Button } from '../common/Button';
 import { useModelStore } from '../../stores/modelStore';
 import { useAppStore } from '../../stores/appStore';
-import { captureToBase64 } from '../../services/screenshotService';
-import { registerElement, setCachedImage } from '../../services/elementRegistry';
+import { useElementScreenshot } from '../../hooks/useElementScreenshot';
 
 // Configure Monaco to use local package instead of CDN (CDN fails in Electron)
 loader.config({ monaco });
@@ -29,21 +28,8 @@ export function CodeEditor() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [diffSummary, setDiffSummary] = useState<string>('');
-  const codeEditorRef = useRef<HTMLDivElement>(null);
+  const codeEditorRef = useElementScreenshot('code-editor-tab');
   const exportRef = useRef<HTMLDivElement>(null);
-
-  // Register code editor tab for cross-tab screenshot capture
-  useEffect(() => {
-    registerElement('code-editor-tab', codeEditorRef.current);
-    return () => {
-      if (codeEditorRef.current) {
-        captureToBase64(codeEditorRef.current)
-          .then((base64) => setCachedImage('code-editor-tab', base64))
-          .catch(() => {});
-      }
-      registerElement('code-editor-tab', null);
-    };
-  }, []);
 
   // Close export dropdown on outside click
   useEffect(() => {

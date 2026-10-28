@@ -1,33 +1,22 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader } from './common/Card';
 import { Button } from './common/Button';
 import { ConfirmDialog } from './common/ConfirmDialog';
 import { useAppStore } from '../stores/appStore';
 import { useSimulationStore } from '../stores/simulationStore';
-import { captureToBase64 } from '../services/screenshotService';
-import { registerElement, setCachedImage } from '../services/elementRegistry';
-import { Check, X, ChevronDown } from 'lucide-react';
+import { useElementScreenshot } from '../hooks/useElementScreenshot';
+import { downloadLogs } from '../services/logger';
+import { Check, X, ChevronDown, Download } from 'lucide-react';
 
 export function Settings() {
   const { currentUser, addToast } = useAppStore();
   const { defaultOptions, setDefaultOptions } = useSimulationStore();
-  const settingsRef = useRef<HTMLDivElement>(null);
-
-  // Register settings tab for cross-tab screenshot capture
-  useEffect(() => {
-    registerElement('settings-tab', settingsRef.current);
-    return () => {
-      if (settingsRef.current) {
-        captureToBase64(settingsRef.current)
-          .then((base64) => setCachedImage('settings-tab', base64))
-          .catch(() => {});
-      }
-      registerElement('settings-tab', null);
-    };
-  }, []);
+  const settingsRef = useElementScreenshot('settings-tab');
 
   const [duration, setDuration] = useState(defaultOptions.duration);
   const [seed, setSeed] = useState(defaultOptions.seed || '');
+  const [replications, setReplications] = useState(defaultOptions.replications || 1);
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
   const [simStartDate, setSimStartDate] = useState(() => {
     if (defaultOptions.simulationStartDate) return defaultOptions.simulationStartDate;
     // Default: today at 06:00
@@ -37,11 +26,49 @@ export function Settings() {
   });
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
+  // Theme toggle
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else if (theme === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.classList.toggle('dark', prefersDark);
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  const handleBackupDatabase = async () => {
+    try {
+      const win = window as any;
+      const result = await win.factorySim?.dialog?.showSaveDialog({
+        defaultPath: `factorysim-backup-${new Date().toISOString().slice(0, 10)}.db`,
+        filters: [{ name: 'Database', extensions: ['db'] }],
+      });
+      if (result?.filePath) {
+        const userDataPath = await win.factorySim?.app?.getUserDataPath?.();
+        if (userDataPath) {
+          const fs = win.require?.('fs');
+          const path = win.require?.('path');
+          if (fs && path) {
+            const srcPath = path.join(userDataPath, 'factorysim.db');
+            fs.copyFileSync(srcPath, result.filePath);
+            addToast({ type: 'success', message: `Database backed up to ${result.filePath}` });
+          } else {
+            addToast({ type: 'info', message: 'Backup requires Electron environment' });
+          }
+        }
+      }
+    } catch {
+      addToast({ type: 'error', message: 'Failed to backup database' });
+    }
+  };
+
   const handleSaveSimSettings = () => {
     setDefaultOptions({
       duration,
       seed: seed ? Number(seed) : undefined,
-      replications: 1,
+      replications,
       simulationStartDate: simStartDate,
     });
     addToast({ type: 'success', message: 'Simulation settings saved' });
@@ -125,15 +152,16 @@ export function Settings() {
               <label className="input-label">Replications</label>
               <input
                 type="number"
-                value={1}
-                disabled
-                className="input bg-gray-50 text-gray-400"
+                value={replications}
+                onChange={(e) => setReplications(Math.max(1, Number(e.target.value)))}
+                min={1}
+                max={30}
+                className="input"
               />
-              <p className="text-xs text-gray-400 mt-1">
-                Multi-replication support coming soon.{' '}
-                <a href="https://github.com/adrisandeoca-coder/FactorySim/discussions" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">
-                  Vote for this feature
-                </a>
+              <p className="text-xs text-gray-500 mt-1">
+                {replications > 1
+                  ? `Will run ${replications} replications with ${Math.round((defaultOptions.confidenceLevel || 0.95) * 100)}% confidence intervals.`
+                  : 'Set to 2+ for confidence intervals on KPI metrics.'}
               </p>
             </div>
           </div>
@@ -175,9 +203,13 @@ export function Settings() {
         <div className="space-y-4">
           <div>
             <label className="input-label">Theme</label>
-            <select className="input" defaultValue="light">
+            <select
+              className="input"
+              value={theme}
+              onChange={(e) => setTheme(e.target.value as 'light' | 'dark' | 'system')}
+            >
               <option value="light">Light</option>
-              <option value="dark">Dark (Coming Soon)</option>
+              <option value="dark">Dark</option>
               <option value="system">System</option>
             </select>
           </div>
@@ -214,12 +246,20 @@ export function Settings() {
             <div className="text-sm text-gray-600">~15.2 MB</div>
           </div>
 
-          <div className="flex space-x-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant="secondary"
-              onClick={() => addToast({ type: 'info', message: 'Exporting data...' })}
+              onClick={handleBackupDatabase}
+              icon={<Download className="w-4 h-4" />}
             >
-              Export All Data
+              Backup Database
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => downloadLogs()}
+              icon={<Download className="w-4 h-4" />}
+            >
+              Export Logs
             </Button>
             <Button
               variant="danger"

@@ -6,6 +6,8 @@ export interface SimulationAPI {
   validateModel: (model: object) => Promise<ValidationResult>;
   stopSimulation: (runId: string) => Promise<void>;
   getSimulationStatus: (runId: string) => Promise<SimulationStatus>;
+  runExperiment: (model: object, simOptions: object, experimentConfig: object) => Promise<unknown>;
+  mlOptimize: (model: object, simOptions: object, mlConfig: object) => Promise<unknown>;
 }
 
 export interface ModelAPI {
@@ -39,7 +41,7 @@ export interface DialogAPI {
 }
 
 export interface AppAPI {
-  getVersion: () => string;
+  getVersion: () => Promise<string>;
   getPlatform: () => string;
   getUserDataPath: () => Promise<string>;
   onSimulationProgress: (callback: (progress: SimulationProgress) => void) => () => void;
@@ -345,6 +347,10 @@ contextBridge.exposeInMainWorld('factorySim', {
       ipcRenderer.invoke('simulation:stop', runId),
     getSimulationStatus: (runId: string) =>
       ipcRenderer.invoke('simulation:status', runId),
+    runExperiment: (model: object, simOptions: object, experimentConfig: object) =>
+      ipcRenderer.invoke('simulation:runExperiment', model, simOptions, experimentConfig),
+    mlOptimize: (model: object, simOptions: object, mlConfig: object) =>
+      ipcRenderer.invoke('simulation:mlOptimize', model, simOptions, mlConfig),
   } as SimulationAPI,
 
   model: {
@@ -401,7 +407,7 @@ contextBridge.exposeInMainWorld('factorySim', {
   },
 
   app: {
-    getVersion: () => ipcRenderer.sendSync('app:version'),
+    getVersion: () => ipcRenderer.invoke('app:version'),
     getPlatform: () => process.platform,
     getUserDataPath: () => ipcRenderer.invoke('app:userDataPath'),
     writeDiag: (content: string) => ipcRenderer.invoke('app:writeDiag', content),
@@ -447,6 +453,34 @@ contextBridge.exposeInMainWorld('factorySim', {
       ipcRenderer.invoke('artifacts:loadRunFrames', runPath),
     loadRunEventLog: (runPath: string) =>
       ipcRenderer.invoke('artifacts:loadRunEventLog', runPath),
+  },
+
+  mqtt: {
+    connect: (config: {
+      broker: string;
+      port?: number;
+      username?: string;
+      password?: string;
+      clientId?: string;
+      topics?: string[];
+    }) => ipcRenderer.invoke('mqtt:connect', config),
+    disconnect: () => ipcRenderer.invoke('mqtt:disconnect'),
+    status: (options?: { limit?: number }) => ipcRenderer.invoke('mqtt:status', options),
+    publish: (data: { topic: string; payload: unknown }) => ipcRenderer.invoke('mqtt:publish', data),
+    subscribe: (data: { topics: string[] }) => ipcRenderer.invoke('mqtt:subscribe', data),
+  },
+
+  opcua: {
+    connect: (config: {
+      endpoint: string;
+      username?: string;
+      password?: string;
+      securityPolicy?: string;
+    }) => ipcRenderer.invoke('opcua:connect', config),
+    disconnect: () => ipcRenderer.invoke('opcua:disconnect'),
+    status: () => ipcRenderer.invoke('opcua:status'),
+    read: (data: { nodeId?: string; nodeIds?: string[] }) => ipcRenderer.invoke('opcua:read', data),
+    browse: (data?: { nodeId?: string }) => ipcRenderer.invoke('opcua:browse', data),
   },
 
   help: {

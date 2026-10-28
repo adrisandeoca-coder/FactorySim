@@ -1,19 +1,67 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../stores/appStore';
 import { useModelStore } from '../../stores/modelStore';
+import { useLiveSimulationStore } from '../../stores/liveSimulationStore';
 import { ModelManager } from './ModelManager';
-import { Menu, Factory, Save, FolderOpen, HelpCircle } from 'lucide-react';
+import { RibbonSlot, RibbonGroup, RibbonButton } from './Ribbon';
+import {
+  Save, FolderOpen, HelpCircle, FilePlus2, Settings as SettingsIcon, Boxes, Play, BarChart3,
+  RefreshCw, Clock, Terminal, Zap, FlaskConical, GitBranch,
+} from 'lucide-react';
+
+/**
+ * App shell header in engineering-desktop style: title bar with quick-access
+ * buttons, a File menu, page tabs, and the ribbon (filled by the active page
+ * via <RibbonContent>, or default groups when a page provides none).
+ */
+
+type Tab = { id: string; label: string; path: string; match: string[]; expertOnly?: boolean };
+
+const TABS: Tab[] = [
+  { id: 'build', label: 'Build', path: '/builder', match: ['/builder'] },
+  { id: 'run', label: 'Run & Results', path: '/dashboard', match: ['/dashboard'] },
+  { id: 'compare', label: 'Compare', path: '/scenarios', match: ['/scenarios'] },
+  { id: 'world', label: '3D World', path: '/world', match: ['/world'], expertOnly: true },
+  { id: 'orders', label: 'Orders', path: '/orders', match: ['/orders'], expertOnly: true },
+  { id: 'tools', label: 'Tools', path: '/sweep', match: ['/data', '/sweep', '/code', '/plugins', '/experiments', '/hierarchy'], expertOnly: true },
+];
+
+const TOOL_PAGES = [
+  { path: '/sweep', label: 'Parameter Sweep', icon: <Clock size={24} color="#2563EB" /> },
+  { path: '/experiments', label: 'Experiments', icon: <FlaskConical size={24} color="#7C3AED" /> },
+  { path: '/data', label: 'Data Sync', icon: <RefreshCw size={24} color="#059669" /> },
+  { path: '/code', label: 'Code Editor', icon: <Terminal size={24} color="#334155" /> },
+  { path: '/plugins', label: 'Plugins', icon: <Zap size={24} color="#D97706" /> },
+  { path: '/hierarchy', label: 'Hierarchy', icon: <GitBranch size={24} color="#0891B2" /> },
+];
+
+/* Inline brand mark — no external image needed */
+function BrandMark({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" aria-hidden>
+      <rect width="28" height="28" rx="5" fill="#2563EB" />
+      <circle cx="5.5" cy="14" r="2.5" fill="white" fillOpacity="0.75" />
+      <path d="M8 14h3.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="11.5" y="10.5" width="5" height="7" rx="1" fill="white" />
+      <path d="M16.5 14h3.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="22.5" cy="14" r="2.5" fill="white" fillOpacity="0.45" />
+    </svg>
+  );
+}
 
 export function Header() {
-  const { toggleSidebar, currentUser, isSimulating, simulationProgress, addToast } = useAppStore();
-  const { model, setModelName, saveModel } = useModelStore();
+  const { isSimulating, simulationProgress, addToast, simpleMode, setSimpleMode } = useAppStore();
+  const { model, setModelName, saveModel, resetModel } = useModelStore();
+  const isReplaying = useLiveSimulationStore((s) => s.isReplaying);
 
   const location = useLocation();
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(model.name);
   const [showModelManager, setShowModelManager] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -23,7 +71,6 @@ export function Header() {
     }
   }, [isEditing]);
 
-  // F1 shortcut for help
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'F1') { e.preventDefault(); setShowHelp(true); }
@@ -32,56 +79,38 @@ export function Header() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const handleStartEdit = () => {
-    setEditValue(model.name);
-    setIsEditing(true);
-  };
-
+  const handleStartEdit = () => { setEditValue(model.name); setIsEditing(true); };
   const handleConfirmEdit = () => {
     const trimmed = editValue.trim();
-    if (trimmed && trimmed !== model.name) {
-      setModelName(trimmed);
-    }
+    if (trimmed && trimmed !== model.name) setModelName(trimmed);
     setIsEditing(false);
   };
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleConfirmEdit();
-    } else if (e.key === 'Escape') {
-      setIsEditing(false);
-    }
+    if (e.key === 'Enter') handleConfirmEdit();
+    else if (e.key === 'Escape') setIsEditing(false);
+  };
+  const handleSave = async () => {
+    try { await saveModel(); addToast({ type: 'success', message: 'Model saved' }); }
+    catch { addToast({ type: 'error', message: 'Failed to save model' }); }
+  };
+  const handleNew = () => {
+    resetModel();
+    navigate('/builder');
+    addToast({ type: 'info', message: 'New model created' });
   };
 
-  const handleSave = async () => {
-    try {
-      await saveModel();
-      addToast({ type: 'success', message: 'Model saved' });
-    } catch {
-      addToast({ type: 'error', message: 'Failed to save model' });
-    }
-  };
+  const tabs = TABS.filter((t) => !simpleMode || !t.expertOnly);
+  const activeTab = TABS.find((t) => t.match.some((m) => location.pathname.startsWith(m)));
 
   return (
     <>
-      <header className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-3">
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={toggleSidebar}
-            className="p-1.5 hover:bg-gray-100 rounded-md transition-colors"
-            title="Toggle Sidebar"
-          >
-            <Menu className="w-4 h-4 text-gray-500" strokeWidth={1.75} />
-          </button>
-
-          <div className="flex items-center space-x-2">
-            <Factory className="w-5 h-5 text-blue-600" strokeWidth={1.75} />
-            <span className="font-semibold text-sm text-gray-900 tracking-tight">FactorySim</span>
-          </div>
-
-          <div className="h-4 w-px bg-gray-200" />
-
-          {/* Inline editable model name */}
+      {/* ── Title bar ── */}
+      <div className="app-titlebar">
+        <div className="app-titlebar-left">
+          <BrandMark />
+          <button className="qa-btn" onClick={handleSave} title="Save model (Ctrl+S)" aria-label="Save model"><Save size={14} /></button>
+          <button className="qa-btn" onClick={() => setShowModelManager(true)} title="Open saved models" aria-label="Open model"><FolderOpen size={14} /></button>
+          <span className="app-titlebar-sep" />
           {isEditing ? (
             <input
               ref={inputRef}
@@ -90,131 +119,153 @@ export function Header() {
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={handleConfirmEdit}
               onKeyDown={handleKeyDown}
-              className="text-xs text-gray-900 border border-blue-400 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300 w-44"
+              className="app-titlebar-input"
             />
           ) : (
-            <button
-              onClick={handleStartEdit}
-              className="text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded px-2 py-1 transition-colors"
-              title="Click to rename"
-            >
+            <button className="app-titlebar-title" onClick={handleStartEdit} title="Click to rename model">
               {model.name || 'Untitled Model'}
             </button>
           )}
-
-          <button
-            onClick={handleSave}
-            className="p-1 hover:bg-gray-100 rounded-md transition-colors"
-            title="Save Model"
-          >
-            <Save className="w-3.5 h-3.5 text-gray-400" strokeWidth={1.75} />
-          </button>
-
-          <button
-            onClick={() => setShowModelManager(true)}
-            className="p-1 hover:bg-gray-100 rounded-md transition-colors"
-            title="Saved Models"
-          >
-            <FolderOpen className="w-3.5 h-3.5 text-gray-400" strokeWidth={1.75} />
-          </button>
+          <span className="app-titlebar-app">— FactorySim</span>
         </div>
-
-        <div className="flex items-center space-x-3">
+        <div className="app-titlebar-right">
           {isSimulating && (
-            <div className="flex items-center space-x-2">
-              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600" />
-              <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-600 transition-all duration-300"
-                  style={{ width: `${simulationProgress * 100}%` }}
-                />
-              </div>
-              <span className="text-xs text-blue-600 font-mono font-medium tabular-nums">
-                {Math.round(simulationProgress * 100)}%
-              </span>
-            </div>
+            <span className="app-titlebar-status">
+              <span className="status-dot status-dot-good" style={{ background: '#3B82F6' }} />
+              Simulating {Math.round(simulationProgress * 100)}%
+            </span>
           )}
-
-          <button
-            onClick={() => setShowHelp(true)}
-            className="p-1 hover:bg-gray-100 rounded-md transition-colors"
-            title="Quick Help (F1)"
-          >
-            <HelpCircle className="w-4 h-4 text-gray-400" strokeWidth={1.75} />
-          </button>
-
-          <div className="flex items-center space-x-2">
-            <div className="w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center">
-              <span className="text-xs font-medium text-white">
-                {currentUser?.displayName?.[0]?.toUpperCase() || 'U'}
-              </span>
-            </div>
-            <div className="text-xs leading-tight">
-              <div className="font-medium text-gray-900">{currentUser?.displayName || 'User'}</div>
-              <div className="text-gray-400">{currentUser?.role || 'Engineer'}</div>
-            </div>
-          </div>
+          {isReplaying && !isSimulating && <span className="app-titlebar-status">Replay</span>}
+          <label className="titlebar-switch" title="Simple mode shows the essential workflow. Switch off for all expert tools.">
+            <span>Simple mode</span>
+            <input type="checkbox" role="switch" checked={simpleMode} onChange={(e) => setSimpleMode(e.target.checked)} />
+          </label>
+          <button className="qa-btn" onClick={() => setShowHelp(true)} title="Help (F1)" aria-label="Help"><HelpCircle size={15} /></button>
         </div>
-      </header>
+      </div>
 
-      {/* Model Manager Modal */}
+      {/* ── Tab row ── */}
+      <nav className="ribbon-tabs" aria-label="Main">
+        <div style={{ position: 'relative' }}>
+          <button className="ribbon-file-tab" onClick={() => setFileMenuOpen((v) => !v)} aria-expanded={fileMenuOpen}>File</button>
+          {fileMenuOpen && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 60 }} onClick={() => setFileMenuOpen(false)} />
+              <div className="file-menu" role="menu">
+                {[
+                  { label: 'New model', icon: <FilePlus2 size={15} />, fn: handleNew },
+                  { label: 'Open…', icon: <FolderOpen size={15} />, fn: () => setShowModelManager(true) },
+                  { label: 'Save', icon: <Save size={15} />, fn: handleSave },
+                  { label: 'Settings', icon: <SettingsIcon size={15} />, fn: () => navigate('/settings') },
+                  { label: 'Help', icon: <HelpCircle size={15} />, fn: () => setShowHelp(true) },
+                ].map((item) => (
+                  <button key={item.label} role="menuitem" className="file-menu-item" onClick={() => { setFileMenuOpen(false); item.fn(); }}>
+                    {item.icon}{item.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            className={`ribbon-tab ${activeTab?.id === t.id ? 'is-active' : ''}`}
+            onClick={() => navigate(t.path)}
+            aria-current={activeTab?.id === t.id ? 'page' : undefined}
+          >
+            {t.label}
+          </button>
+        ))}
+        {/* Simulation progress runs along the bottom of the tab row */}
+        {isSimulating && (
+          <div className="ribbon-progress"><div style={{ width: `${simulationProgress * 100}%` }} /></div>
+        )}
+      </nav>
+
+      {/* ── Ribbon body ── */}
+      <div className="ribbon">
+        <RibbonSlot />
+        <div className="ribbon-fallback">
+          {activeTab?.id === 'tools' ? (
+            <RibbonGroup label="Analysis tools">
+              {TOOL_PAGES.map((p) => (
+                <RibbonButton
+                  key={p.path}
+                  icon={p.icon}
+                  label={p.label}
+                  active={location.pathname.startsWith(p.path)}
+                  onClick={() => navigate(p.path)}
+                />
+              ))}
+            </RibbonGroup>
+          ) : (
+            <>
+              <RibbonGroup label="Model">
+                <RibbonButton icon={<FilePlus2 size={24} color="#334155" />} label="New" onClick={handleNew} />
+                <RibbonButton icon={<FolderOpen size={24} color="#D97706" />} label="Open" onClick={() => setShowModelManager(true)} />
+                <RibbonButton icon={<Save size={24} color="#2563EB" />} label="Save" onClick={handleSave} />
+              </RibbonGroup>
+              <RibbonGroup label="Workflow">
+                <RibbonButton icon={<Boxes size={24} color="#2563EB" />} label="Build line" onClick={() => navigate('/builder')} />
+                <RibbonButton icon={<Play size={24} color="#059669" />} label="Run" onClick={() => navigate('/dashboard')} />
+                <RibbonButton icon={<BarChart3 size={24} color="#7C3AED" />} label="Compare" onClick={() => navigate('/scenarios')} />
+              </RibbonGroup>
+            </>
+          )}
+        </div>
+      </div>
+
       <ModelManager isOpen={showModelManager} onClose={() => setShowModelManager(false)} />
 
-      {/* Help Overlay */}
       {showHelp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowHelp(false)}>
-          <div className="bg-white rounded-xl shadow-2xl w-[480px] max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b">
-              <h2 className="text-sm font-bold text-gray-900">Quick Help</h2>
-              <button onClick={() => setShowHelp(false)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }} onClick={() => setShowHelp(false)}>
+          <div className="card" style={{ width: 440, maxHeight: '70vh', overflowY: 'auto', padding: 0, boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+              <span className="text-title">Quick Help</span>
+              <button onClick={() => setShowHelp(false)} style={{ background: 'none', border: 'none', fontSize: 18, color: 'var(--text-tertiary)', cursor: 'pointer', lineHeight: 1 }}>&times;</button>
             </div>
-            <div className="px-5 py-4 space-y-4 text-sm">
-              {/* Context-sensitive tips */}
-              {location.pathname.includes('builder') && (
-                <section>
-                  <h3 className="font-semibold text-gray-800 mb-1">Factory Builder</h3>
-                  <ul className="space-y-1 text-gray-600">
-                    <li>Click palette icons to add stations, buffers, and other elements</li>
-                    <li>Drag from a node handle to another to create connections</li>
-                    <li>Select a node to edit its properties in the right panel</li>
-                    <li>Toggle "Zones" to see auto-detected zone groupings</li>
-                    <li>Press <kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs font-mono">Delete</kbd> to remove selected elements</li>
-                  </ul>
-                </section>
-              )}
+            <div style={{ padding: 16, fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
               {location.pathname.includes('dashboard') && (
-                <section>
-                  <h3 className="font-semibold text-gray-800 mb-1">Dashboard</h3>
-                  <ul className="space-y-1 text-gray-600">
-                    <li>Click "Run Simulation" to start — the live animation shows real-time state</li>
-                    <li>Use the section nav bar to jump between chart widgets</li>
-                    <li>Click station names in the performance table to navigate to the editor</li>
-                    <li>Use "Export" to download KPI data as CSV</li>
-                    <li>Use "Customize" to add/remove/reorder dashboard widgets</li>
+                <div style={{ marginBottom: 12 }}>
+                  <div className="text-title" style={{ marginBottom: 4 }}>Dashboard</div>
+                  <ul style={{ paddingLeft: 16, margin: 0 }}>
+                    <li>Set the run length under Settings in the ribbon, then press Run simulation</li>
+                    <li>The Results summary names the bottleneck and what to try</li>
+                    <li>Click a station name to open it in the builder</li>
+                    <li>Customize (ribbon, View group) adds or removes panels</li>
                   </ul>
-                </section>
-              )}
-              <section>
-                <h3 className="font-semibold text-gray-800 mb-1">Keyboard Shortcuts</h3>
-                <div className="grid grid-cols-2 gap-1 text-gray-600">
-                  <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs font-mono">Ctrl+Z</kbd> Undo</span>
-                  <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs font-mono">Ctrl+Y</kbd> Redo</span>
-                  <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs font-mono">Ctrl+F</kbd> Search nodes</span>
-                  <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs font-mono">Esc</kbd> Exit fullscreen / close</span>
-                  <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs font-mono">Delete</kbd> Remove selected</span>
-                  <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs font-mono">F1</kbd> Open this help</span>
                 </div>
-              </section>
-              <section>
-                <h3 className="font-semibold text-gray-800 mb-1">Getting Started</h3>
-                <ol className="space-y-1 text-gray-600 list-decimal list-inside">
-                  <li>Load a template or build your factory in the Builder</li>
-                  <li>Configure station cycle times, buffer capacities, and connections</li>
-                  <li>Go to Dashboard and click "Run Simulation"</li>
-                  <li>Watch the live animation, then analyze KPI charts</li>
-                  <li>Use Scenarios to compare different configurations</li>
-                </ol>
-              </section>
+              )}
+              {location.pathname.includes('builder') && (
+                <div style={{ marginBottom: 12 }}>
+                  <div className="text-title" style={{ marginBottom: 4 }}>Factory Builder</div>
+                  <ul style={{ paddingLeft: 16, margin: 0 }}>
+                    <li>Add elements from the ribbon (Add element group)</li>
+                    <li>Drag from a handle to connect two elements</li>
+                    <li>Select an element in the Outline or on the canvas to edit its details</li>
+                    <li>Press Delete to remove the selected element</li>
+                  </ul>
+                </div>
+              )}
+              <div>
+                <div className="text-title" style={{ marginBottom: 4 }}>Shortcuts</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 11 }}>
+                  {[
+                    ['Ctrl+Z', 'Undo'],
+                    ['Ctrl+Y', 'Redo'],
+                    ['Del', 'Remove'],
+                    ['F1', 'This help'],
+                    ['Ctrl+F', 'Search nodes'],
+                    ['Ctrl+S', 'Save model'],
+                  ].map(([key, label]) => (
+                    <span key={key}>
+                      <kbd style={{ padding: '1px 5px', background: 'var(--gray-100)', borderRadius: 4, fontSize: 10, fontFamily: 'monospace', border: '1px solid var(--border)' }}>{key}</kbd>
+                      {' '}{label}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>

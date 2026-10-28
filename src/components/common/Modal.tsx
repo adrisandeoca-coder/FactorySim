@@ -11,6 +11,7 @@ interface ModalProps {
 
 export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedRef = useRef<Element | null>(null);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -20,15 +21,30 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
     };
 
     if (isOpen) {
+      previouslyFocusedRef.current = document.activeElement;
       document.addEventListener('keydown', handleEscape);
       document.body.style.overflow = 'hidden';
+      // Focus trap: focus the modal on open
+      modalRef.current?.focus();
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = '';
+      // Restore focus to the element that was focused before the modal opened
+      if (previouslyFocusedRef.current instanceof HTMLElement) {
+        previouslyFocusedRef.current.focus();
+        previouslyFocusedRef.current = null;
+      }
     };
   }, [isOpen, onClose]);
+
+  // Ensure body overflow is restored if component unmounts while open
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
 
   if (!isOpen) return null;
 
@@ -50,13 +66,18 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
       {/* Modal */}
       <div
         ref={modalRef}
-        className={`relative bg-white rounded-lg shadow-xl w-full ${sizeClasses[size]} mx-4 animate-fade-in`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        tabIndex={-1}
+        className={`relative bg-white rounded-lg shadow-xl w-full ${sizeClasses[size]} mx-4 animate-fade-in focus:outline-none`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
-          <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
+          <h2 id="modal-title" className="text-sm font-semibold text-gray-900">{title}</h2>
           <button
             onClick={onClose}
+            aria-label="Close dialog"
             className="p-1 hover:bg-gray-100 rounded-md transition-colors"
           >
             <X className="w-4 h-4 text-gray-400" strokeWidth={1.75} />

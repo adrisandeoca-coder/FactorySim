@@ -3,6 +3,9 @@ import { LiveSimulationView } from './LiveSimulationView';
 import { useModelStore } from '../../stores/modelStore';
 import { useLiveSimulationStore, StreamedEvent } from '../../stores/liveSimulationStore';
 import type { FactoryModel } from '../../types';
+import { createLogger } from '../../services/logger';
+
+const log = createLogger('ReplayPlayer');
 
 interface ReplayPlayerProps {
   runPath: string;
@@ -86,7 +89,7 @@ export function ReplayPlayer({ runPath, onClose }: ReplayPlayerProps) {
 
       setLoading(false);
     }).catch((err) => {
-      console.error('Failed to load event log:', err);
+      log.error('Failed to load event log', err);
       if (!cancelled) {
         setLoadingMsg('Failed to load event log');
         setLoading(false);
@@ -295,7 +298,7 @@ export function ReplayPlayer({ runPath, onClose }: ReplayPlayerProps) {
             className="absolute top-2.5 left-0 h-1.5 rounded-full transition-none"
             style={{
               width: `${progress * 100}%`,
-              background: 'linear-gradient(90deg, #3b82f6, #22c55e)',
+              background: 'linear-gradient(90deg, #2563EB, #17C964)',
             }}
           />
           {/* Hour markers */}

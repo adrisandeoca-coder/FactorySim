@@ -21,14 +21,14 @@ interface GanttScheduleViewProps {
 
 // State colors matching the app's visual language
 const STATE_COLORS: Record<string, string> = {
-  processing: '#22c55e', // green-500
-  setup: '#f59e0b',      // amber-500
+  processing: '#374151', // gray-700 — productive
+  setup: '#9ca3af',      // gray-400
   idle: '#e5e7eb',        // gray-200
-  blocked: '#ef4444',     // red-500
-  starved: '#a855f7',     // purple-500
-  failed: '#dc2626',      // red-600
-  offShift: '#6b7280',    // gray-500
-  batchWait: '#3b82f6',   // blue-500
+  blocked: '#F5A524',     // amber-600 — warning
+  starved: '#b8860b',     // dark amber — warning
+  failed: '#F31260',      // red-600 — problem (only red)
+  offShift: '#e5e7eb',    // gray-200
+  batchWait: '#64748b',   // slate-500
 };
 
 const STATE_LABELS: Record<string, string> = {
@@ -103,7 +103,7 @@ function shortProductLabel(productType?: string, productId?: string): string {
   return raw.length > 6 ? raw.slice(0, 5) + '…' : raw;
 }
 
-export function GanttScheduleView({ result, stations, utilization, startDayOfWeek = 0, startHour = 0 }: GanttScheduleViewProps) {
+const GanttScheduleView = React.memo(function GanttScheduleView({ result, stations, utilization, startDayOfWeek = 0, startHour = 0 }: GanttScheduleViewProps) {
   const [zoomIndex, setZoomIndex] = useState(0);
   const [localPlaying, setLocalPlaying] = useState(false);
   const [localPlayheadTime, setLocalPlayheadTime] = useState(0);
@@ -746,12 +746,12 @@ export function GanttScheduleView({ result, stations, utilization, startDayOfWee
                   className="absolute top-0 bottom-0 w-0.5 z-30 pointer-events-none"
                   style={{
                     left: playheadX,
-                    backgroundColor: isReplaying ? '#6366f1' : '#2563eb', // indigo when synced, blue when local
+                    backgroundColor: isReplaying ? '#6366f1' : '#1D4ED8', // indigo when synced, blue when local
                   }}
                 >
                   <div
                     className="absolute -top-1 -left-1.5 w-3.5 h-3.5 rounded-full border-2 border-white shadow"
-                    style={{ backgroundColor: isReplaying ? '#6366f1' : '#2563eb' }}
+                    style={{ backgroundColor: isReplaying ? '#6366f1' : '#1D4ED8' }}
                   />
                 </div>
               )}
@@ -915,4 +915,5 @@ export function GanttScheduleView({ result, stations, utilization, startDayOfWee
       </div>
     </div>
   );
-}
+});
+export { GanttScheduleView };
