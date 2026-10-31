@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { PRODUCT_PALETTE } from '../../utils/productColors';
 
+import { t } from '../../i18n';
 /**
  * Results of Warehouse elements (engine/warehouse.py → kpis.warehouses).
  *
@@ -174,43 +175,43 @@ function OneWarehouse({ wh, name, compact = false }: { wh: Any; name: string; co
         </div>
       </div>
       <div style={{ display: 'grid', gap: 8, gridTemplateColumns: compact ? '1fr' : 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-        <Tile label="Rack utilisation" value={pct(st.avgUtilization)} sub={`peak ${pct(st.maxUtilization)}${st.fullWaits ? ` · full ${st.fullWaits}×` : ''}`}
+        <Tile label={t('Rack utilisation')} value={pct(st.avgUtilization)} sub={`peak ${pct(st.maxUtilization)}${st.fullWaits ? ` · full ${st.fullWaits}×` : ''}`}
           tone={st.fullWaits ? 'bad' : st.maxUtilization > 0.9 ? 'warn' : undefined} />
         {asrs ? (() => {
           const peak = Math.max(0, ...(cr.byAisle || []));
-          return <Tile label="Cranes busy" value={pct(cr.utilization)} sub={`${cr.count} cranes · busiest aisle ${pct(peak)} · ${moves} moves`}
+          return <Tile label={t('Cranes busy')} value={pct(cr.utilization)} sub={`${cr.count} cranes · busiest aisle ${pct(peak)} · ${moves} moves`}
             tone={peak > 0.9 ? 'bad' : peak > 0.8 ? 'warn' : undefined} />;
         })() : (
-          <Tile label="Forklifts busy" value={pct(fl.utilization)} sub={`${fl.count} forklifts · ${moves} moves`}
+          <Tile label={t('Forklifts busy')} value={pct(fl.utilization)} sub={`${fl.count} forklifts · ${moves} moves`}
             tone={fl.utilization > 0.9 ? 'bad' : fl.utilization > 0.8 ? 'warn' : undefined} />
         )}
         {!asrs && cg.maxPerAisle > 0 && (
-          <Tile label="Aisle congestion" value={cg.waits ? fmtTime(cg.avgWait || 0) : 'none'}
+          <Tile label={t('Aisle congestion')} value={cg.waits ? fmtTime(cg.avgWait || 0) : 'none'}
             sub={cg.waits ? `${cg.waits} waits at aisle entry (max ${cg.maxPerAisle}/aisle)` : `max ${cg.maxPerAisle} forklift${cg.maxPerAisle === 1 ? '' : 's'} per aisle`}
             tone={cg.avgWait > 30 ? 'warn' : undefined} />
         )}
         {hasOrders && <>
-          <Tile label="Orders shipped" value={Number(o.shipped).toLocaleString()} sub={`${o.ordersPerHour}/h · ${o.openEnd} open at end`} />
-          <Tile label="Order cycle time" value={fmtTime(o.cycleTimeMean || 0)} sub={`95% within ${fmtTime(o.cycleTimeP95 || 0)}`} />
-          <Tile label="Fill rate" value={pct(o.fillRate)} sub="lines in stock on arrival" tone={o.fillRate != null && o.fillRate < 0.95 ? (o.fillRate < 0.85 ? 'bad' : 'warn') : undefined} />
-          <Tile label="Pickers busy" value={pct(pk.utilization)} sub={`${pk.count} pickers · ${fmtTime(pk.avgPickTime || 0)}/order`} tone={pk.utilization > 0.9 ? 'bad' : pk.utilization > 0.8 ? 'warn' : undefined} />
+          <Tile label={t('Orders shipped')} value={Number(o.shipped).toLocaleString()} sub={`${o.ordersPerHour}/h · ${o.openEnd} open at end`} />
+          <Tile label={t('Order cycle time')} value={fmtTime(o.cycleTimeMean || 0)} sub={`95% within ${fmtTime(o.cycleTimeP95 || 0)}`} />
+          <Tile label={t('Fill rate')} value={pct(o.fillRate)} sub="lines in stock on arrival" tone={o.fillRate != null && o.fillRate < 0.95 ? (o.fillRate < 0.85 ? 'bad' : 'warn') : undefined} />
+          <Tile label={t('Pickers busy')} value={pct(pk.utilization)} sub={`${pk.count} pickers · ${fmtTime(pk.avgPickTime || 0)}/order`} tone={pk.utilization > 0.9 ? 'bad' : pk.utilization > 0.8 ? 'warn' : undefined} />
         </>}
-        {hasSupply && <Tile label="Line supplied" value={Number(ls.parts).toLocaleString()} sub={ls.starvedParts > 1 ? `line waited ${ls.starvedParts}× (avg ${fmtTime(ls.avgWait)})` : 'line never waited'} tone={ls.starvedParts > 1 ? 'warn' : undefined} />}
-        {hasFg && <Tile label="Finished goods in" value={Number(fg.units).toLocaleString()} sub="units from the line" />}
-        {docks.trucks > 0 && <Tile label="Trucks received" value={String(docks.trucks)} sub={`doors busy ${pct(docks.utilization)} · wait ${fmtTime(docks.avgDoorWait || 0)}`} />}
-        {docks.outboundTrucks > 0 && <Tile label="Trucks dispatched" value={String(docks.outboundTrucks)} sub={`${docks.ordersPerOutboundTruck} orders per truck`} />}
-        {xd.enabled && (xd.pallets > 0 || docks.trucks > 0) && <Tile label="Cross-docked" value={`${xd.pallets} pallets`} sub={`${Number(xd.units).toLocaleString()} units picked at the dock`} />}
-        {hasOrders && bo.lines > 0 && <Tile label="Backordered lines" value={String(bo.lines)} sub={`waited ${fmtTime(bo.avgWait || 0)} on average`} tone={o.fillRate < 0.85 ? 'bad' : 'warn'} />}
-        {sh.calendar && <Tile label="Off-shift waits" value={fmtTime(sh.totalWait || 0)} sub={`${sh.waits} picks/packs waited for the shift`} />}
+        {hasSupply && <Tile label={t('Line supplied')} value={Number(ls.parts).toLocaleString()} sub={ls.starvedParts > 1 ? `line waited ${ls.starvedParts}× (avg ${fmtTime(ls.avgWait)})` : 'line never waited'} tone={ls.starvedParts > 1 ? 'warn' : undefined} />}
+        {hasFg && <Tile label={t('Finished goods in')} value={Number(fg.units).toLocaleString()} sub="units from the line" />}
+        {docks.trucks > 0 && <Tile label={t('Trucks received')} value={String(docks.trucks)} sub={`doors busy ${pct(docks.utilization)} · wait ${fmtTime(docks.avgDoorWait || 0)}`} />}
+        {docks.outboundTrucks > 0 && <Tile label={t('Trucks dispatched')} value={String(docks.outboundTrucks)} sub={`${docks.ordersPerOutboundTruck} orders per truck`} />}
+        {xd.enabled && (xd.pallets > 0 || docks.trucks > 0) && <Tile label={t('Cross-docked')} value={`${xd.pallets} pallets`} sub={`${Number(xd.units).toLocaleString()} units picked at the dock`} />}
+        {hasOrders && bo.lines > 0 && <Tile label={t('Backordered lines')} value={String(bo.lines)} sub={`waited ${fmtTime(bo.avgWait || 0)} on average`} tone={o.fillRate < 0.85 ? 'bad' : 'warn'} />}
+        {sh.calendar && <Tile label={t('Off-shift waits')} value={fmtTime(sh.totalWait || 0)} sub={`${sh.waits} picks/packs waited for the shift`} />}
       </div>
 
       {!compact && chart.x.length > 1 && (
         <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
           {chart.skuSeries.length > 0 && (
-            <LineChart title="Stock on hand per SKU (units)" series={chart.skuSeries} x={chart.x} unit="units"
+            <LineChart title={t('Stock on hand per SKU (units)')} series={chart.skuSeries} x={chart.x} unit="units"
               ariaLabel={`Stock on hand over time for ${chart.skuSeries.map((s) => s.name).join(', ')}`} />
           )}
-          <LineChart title="Occupied rack locations" series={chart.occ} x={chart.x} unit="pallets"
+          <LineChart title={t('Occupied rack locations')} series={chart.occ} x={chart.x} unit="pallets"
             ariaLabel="Occupied rack locations over time" />
         </div>
       )}
@@ -251,8 +252,8 @@ export function WarehouseResults({ warehouses, names, compact = false }: { wareh
   const list = Object.entries(warehouses).map(([id, w]) => [id, norm(w)] as const);
   if (list.length === 0) return null;
   return (
-    <section aria-label="Warehouse results" className="dock-panel">
-      <div className="dock-panel-title">Warehouse{list.length > 1 ? 's' : ''}</div>
+    <section aria-label={t('Warehouse results')} className="dock-panel">
+      <div className="dock-panel-title">{t('Warehouse')}{list.length > 1 ? 's' : ''}</div>
       <div style={{ padding: '14px 16px', display: 'grid', gap: 24 }}>
         {list.map(([id, w]) => <OneWarehouse key={id} wh={w} compact={compact} name={names[id] || (w as Any).name || id} />)}
       </div>

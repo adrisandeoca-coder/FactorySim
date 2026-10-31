@@ -10,6 +10,10 @@ import { getLibraryBuilders } from './model-library/ModelLibraryRegistry';
 import { setStatusLampState } from './shared/helpers';
 import { M } from './shared/materials';
 import { productColorNum, PRODUCT_PALETTE, type ProductRef } from '../../../utils/productColors';
+import { StationWorker, Walker, type HumanState } from './shared/HumanBehaviour';
+import { buildRobotCell, type RobotCellController, type CellState, type RobotCellKind } from './machines/RobotCell';
+import { t } from '../../../i18n';
+import { HumanRig, lookFor } from './shared/HumanRig';
 import { buildSurroundings, frameLayout, SURROUNDINGS_SHARED_MATS, type LayoutInfo } from './shared/Surroundings';
 import { buildRackWarehouse, rackLayoutOf, rackEquipmentOf, initialMoves, type RackWarehouse } from './shared/RackWarehouse';
 import { PostProcessingPipeline } from './shared/PostProcessing';
@@ -630,7 +634,20 @@ function createConveyorConnection(
 
 // ── Visual Components–style detailing: plinth, edge lines, safety fence ──
 const FENCE_POST_MAT = new THREE.MeshStandardMaterial({ color: 0xf2c200, metalness: 0.15, roughness: 0.5 });
-const FENCE_MESH_MAT = new THREE.MeshStandardMaterial({ color: 0x6f7883, metalness: 0.3, roughness: 0.6, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false });
+/** Welded wire mesh (50 mm squares): a small canvas grid tiled every 0.2 m, see-through between the wires. */
+function wireMeshTexture(): THREE.Texture {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  g.clearRect(0, 0, 64, 64);
+  g.strokeStyle = 'rgba(70,76,84,1)'; g.lineWidth = 2;
+  for (let i = 0; i <= 64; i += 16) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 64); g.stroke(); g.beginPath(); g.moveTo(0, i); g.lineTo(64, i); g.stroke(); }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 4;
+  return t;
+}
+const WELD_SCREEN_MAT = new THREE.MeshStandardMaterial({ color: 0xe8641a, roughness: 0.6, transparent: true, opacity: 0.62, side: THREE.DoubleSide, depthWrite: false });
+const FENCE_MESH_MAT = new THREE.MeshStandardMaterial({ color: 0x4e5560, map: wireMeshTexture(), metalness: 0.4, roughness: 0.5, transparent: true, alphaTest: 0.3, side: THREE.DoubleSide });
 SHARED_MATS.add(FENCE_POST_MAT); SHARED_MATS.add(FENCE_MESH_MAT);
 
 const _bb = new THREE.Box3();
@@ -675,12 +692,19 @@ function addSafetyFence(group: THREE.Group, openings: THREE.Vector3[] = []) {
     const p = new THREE.Mesh(new THREE.BoxGeometry(POST, H, POST), FENCE_POST_MAT);
     p.position.set(c.x + x, H / 2, c.z + z); p.castShadow = true; fence.add(p);
   };
-  const run = (x1: number, z1: number, x2: number, z2: number) => {
+  // Welding cells: the operator side gets orange welding screens instead of mesh (arc light)
+  let robotKind: string | undefined;
+  group.traverse((o) => { if (o.userData.robotKind) robotKind = o.userData.robotKind; });
+  const run = (x1: number, z1: number, x2: number, z2: number, screen = false) => {
     const len = Math.hypot(x2 - x1, z2 - z1);
     if (len < 0.05) return;
     const ry = Math.atan2(x2 - x1, z2 - z1) - Math.PI / 2;
     const mx = c.x + (x1 + x2) / 2, mz = c.z + (z1 + z2) / 2;
-    const pn = new THREE.Mesh(new THREE.PlaneGeometry(len, H * 0.82), FENCE_MESH_MAT);
+    const pg = new THREE.PlaneGeometry(len, H * 0.82);
+    // Tile the mesh texture at its real size (0.2 m per tile) whatever the panel length
+    const uv = pg.getAttribute('uv') as THREE.BufferAttribute;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * len * sc / 0.2, uv.getY(i) * H * 0.82 * sc / 0.2);
+    const pn = new THREE.Mesh(pg, screen ? WELD_SCREEN_MAT : FENCE_MESH_MAT);
     pn.position.set(mx, H * 0.5, mz); pn.rotation.y = ry; fence.add(pn);
     for (const y of [H - RAIL / 2, H * 0.09]) {
       const rail = new THREE.Mesh(new THREE.BoxGeometry(len, RAIL, RAIL), FENCE_POST_MAT);
@@ -710,13 +734,14 @@ function addSafetyFence(group: THREE.Group, openings: THREE.Vector3[] = []) {
     const pt = (u: number): [number, number] => alongX ? [x1 + dir * u, z1] : [x1, z1 + dir * u];
     for (const g of gaps) {
       const g0 = Math.max(t, g - GAP / 2), g1 = Math.min(len, g + GAP / 2);
-      if (g0 > t) run(...pt(t), ...pt(g0));
+      if (g0 > t) run(...pt(t), ...pt(g0), si === 2 && robotKind === 'weld');
       t = Math.max(t, g1);
     }
-    if (t < len) run(...pt(t), ...pt(len));
+    if (t < len) run(...pt(t), ...pt(len), si === 2 && robotKind === 'weld');
   });
   fence.traverse((o) => { (o as THREE.Mesh).raycast = () => {}; });
   group.add(fence);
+  group.userData.fenced = true;
 }
 
 const FENCED = /robot|weld|laser|press|cell/i;
@@ -778,15 +803,37 @@ function paintMachine(root: THREE.Object3D, modelId: string) {
 
 /** Uniform scale per node type that brings the model to real-world size. */
 const PEOPLE_TYPES = new Set(['operator', 'humanoid']);
+
+/**
+ * Operator resource node: its people (up to 4 shown) standing side by side,
+ * each an articulated HumanRig whose posture follows the connected station.
+ * A library model override still uses the library figure instead.
+ */
+function buildOperatorCrew(count: number, seed: string): THREE.Group {
+  const g = new THREE.Group();
+  const n = Math.max(1, Math.min(4, count));
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  const people: StationWorker[] = [];
+  for (let i = 0; i < n; i++) {
+    const rig = new HumanRig(lookFor(Math.abs(h) + i));
+    rig.group.position.x = (i - (n - 1) / 2) * 0.75;
+    g.add(rig.group);
+    const x0 = rig.group.position.x;
+    const at = (x: number, y: number, z: number) => new THREE.Vector3(x0 + x, y, z);
+    // Work points in the crew group's frame (the group is placed after this)
+    people.push(new StationWorker(rig, { part: at(0, 1.0, 0.45), bin: at(-0.35, 1.0, 0.35), hmi: at(0.35, 1.2, 0.4) }, 6 + i, g));
+  }
+  g.userData.people = people;
+  return g;
+}
 const FLOW_ALIGNED = new Set(['buffer', 'source', 'sink']);
 const FLOW_ALIGNED_MODELS = new Set(['infeed-station', 'outfeed-station', 'accumulation-conveyor']);
 const VEHICLE_TYPES = new Set(['agv', 'forklift']);
 
 const REAL_SCALE: Record<string, number> = {
-  operator: 1.85,     // 0.94 m → 1.75 m person
   humanoid: 1.95,
   agv: 1.6,           // 0.74 m → 1.2 m long AGV
-  roboticcell: 2.4,   // 1 m → 2.4 m fenced cell
   forklift: 1.25,
 };
 
@@ -827,6 +874,19 @@ function getParticleEffectType(nodeType: string): EffectType | null {
 }
 
 function getNodeBuilder(type: string, name: string, libraryModelId?: string): () => THREE.Group {
+  // Robot library models on a station / robot cell become full robot cells (robot, fixture, controller, tower)
+  const ROBOT_CELL_MODELS: Record<string, RobotCellKind> = {
+    'welding-station': 'weld', 'palletizer-robot': 'pallet', 'industrial-robot': 'handling', 'pick-and-place-robot': 'handling',
+  };
+  if (libraryModelId && ROBOT_CELL_MODELS[libraryModelId] && ['station', 'roboticcell', 'weldingcell', 'palletize'].includes(type)) {
+    // A generic robot model takes its job from the name (a "Welding Robot" with the
+    // industrial-robot model is still a weld cell)
+    const nm = name.toLowerCase();
+    let kind = ROBOT_CELL_MODELS[libraryModelId];
+    if (kind === 'handling' && /weld/.test(nm)) kind = 'weld';
+    else if (kind === 'handling' && /pallet/.test(nm)) kind = 'pallet';
+    return () => buildRobotCell(kind);
+  }
   // Library model override takes priority
   if (libraryModelId) {
     const libBuilder = LIBRARY_BUILDERS[libraryModelId] || LIBRARY_BUILDERS[libraryModelId.replace(/-/g, '')];
@@ -834,6 +894,13 @@ function getNodeBuilder(type: string, name: string, libraryModelId?: string): ()
   }
 
   const lower = name.toLowerCase();
+
+  // Robot cells by job: welding, palletizing, or handling for any other robot station
+  if (type === 'station' || type === 'roboticcell') {
+    if (/weld/.test(lower) && (type === 'roboticcell' || /robot|weld/.test(lower))) return () => buildRobotCell('weld');
+    if (/pallet/.test(lower) && /robot/.test(lower)) return () => buildRobotCell('pallet');
+    if (/robot/.test(lower)) return () => buildRobotCell('handling');
+  }
 
   if (type === 'station') {
     if (lower.includes('cnc') || lower.includes('mill') || lower.includes('turn') || lower.includes('lathe'))
@@ -1034,12 +1101,19 @@ class SimulationAnimator {
 
   /** Check if an edge involves palletized material or AGV transport */
   private isEdgePalletized(sourceId: string, targetId: string): boolean {
+    const mode = this.edgeTransport.get(`${sourceId}->${targetId}`);
+    if (mode === 'forklift' || mode === 'agv') return true;
+    if (mode === 'manual' || mode === 'conveyor') return false;
     return this.isPalletNode(sourceId) || this.isPalletNode(targetId) ||
            this.isAGVNode(sourceId) || this.isAGVNode(targetId);
   }
 
   /** Determine transport type for an edge */
   private getTransportType(sourceId: string, targetId: string): 'operator' | 'forklift' | 'agv' | 'humanoid' {
+    const mode = this.edgeTransport.get(`${sourceId}->${targetId}`);
+    if (mode === 'forklift') return 'forklift';
+    if (mode === 'agv') return 'agv';
+    if (mode === 'manual' || mode === 'conveyor') return 'operator';
     if (this.isAGVNode(sourceId) || this.isAGVNode(targetId)) return 'agv';
     if (this.isPalletNode(sourceId) || this.isPalletNode(targetId)) return 'forklift';
     if (this.isHumanoidNode(sourceId) || this.isHumanoidNode(targetId)) return 'humanoid';
@@ -1047,6 +1121,8 @@ class SimulationAnimator {
   }
 
   private modelProducts: ProductRef[] = [];
+  /** Explicit transport per edge (connection.transport), when not automatic. */
+  private edgeTransport = new Map<string, string>();
 
   updateTopology(model: { stations: any[]; buffers: any[]; extraNodes: any[]; connections: any[]; products?: ProductRef[] }) {
     this.modelProducts = model.products ?? [];
@@ -1071,7 +1147,9 @@ class SimulationAnimator {
       this.nameToId.set(e.data?.name || e.type, e.id);
       this.nodeTypes.set(e.id, e.type || 'extra');
     }
+    this.edgeTransport.clear();
     for (const c of model.connections) {
+      if (c.transport && c.transport !== 'auto') this.edgeTransport.set(`${c.source}->${c.target}`, c.transport);
       if (!this.edgeIncoming.has(c.target)) this.edgeIncoming.set(c.target, []);
       this.edgeIncoming.get(c.target)!.push(c.source);
       if (!this.edgeOutgoing.has(c.source)) this.edgeOutgoing.set(c.source, []);
@@ -1105,78 +1183,17 @@ class SimulationAnimator {
     return m;
   }
 
-  /** Build operator figure carrying a product — based on the proven Operator.ts model */
+  /** Operator carrying a product: articulated person (HumanRig) with the box in both hands. */
   private buildOperatorTransport(color: number): THREE.Group {
     const g = new THREE.Group();
-    const add = SimulationAnimator._m;
-
-    const skin  = M.skin;
-    const fab   = M.fabric;
-    const boot  = M.rubber;
-    const vest  = M.vest;
-    const refl  = M.chrome;
-    const glass = M.darkChrome;
-    const hat   = M.safety;
-
-    // Boots
-    add(g, new THREE.BoxGeometry(0.07, 0.05, 0.10), boot, -0.06, 0.025, 0.01);
-    add(g, new THREE.BoxGeometry(0.07, 0.05, 0.10), boot, 0.06, 0.025, 0.01);
-
-    // Legs (named for walk animation)
-    add(g, new THREE.CylinderGeometry(0.035, 0.032, 0.30, 8), fab, -0.06, 0.20, 0, 0, 0, 0, 'legL');
-    add(g, new THREE.CylinderGeometry(0.035, 0.032, 0.30, 8), fab, 0.06, 0.20, 0, 0, 0, 0, 'legR');
-
-    // Tool belt
-    add(g, new THREE.BoxGeometry(0.20, 0.03, 0.10), boot, 0, 0.37, 0);
-
-    // Torso
-    add(g, new THREE.BoxGeometry(0.18, 0.26, 0.10), fab, 0, 0.52, 0);
-
-    // Safety vest panels (front, back, sides)
-    add(g, new THREE.BoxGeometry(0.19, 0.24, 0.005), vest, 0, 0.53, 0.053);
-    add(g, new THREE.BoxGeometry(0.19, 0.24, 0.005), vest, 0, 0.53, -0.053);
-    add(g, new THREE.BoxGeometry(0.005, 0.24, 0.10), vest, -0.095, 0.53, 0);
-    add(g, new THREE.BoxGeometry(0.005, 0.24, 0.10), vest, 0.095, 0.53, 0);
-
-    // Reflective strips on vest
-    add(g, new THREE.BoxGeometry(0.18, 0.012, 0.006), refl, 0, 0.47, 0.056);
-    add(g, new THREE.BoxGeometry(0.18, 0.012, 0.006), refl, 0, 0.58, 0.056);
-
-    // Shoulders
-    add(g, new THREE.BoxGeometry(0.24, 0.04, 0.10), fab, 0, 0.67, 0);
-
-    // Arms angled forward to carry product
-    add(g, new THREE.CylinderGeometry(0.028, 0.025, 0.18, 8), fab, -0.14, 0.57, 0.04, 0.4);
-    add(g, new THREE.CylinderGeometry(0.025, 0.022, 0.16, 8), skin, -0.14, 0.44, 0.14, 0.8);
-    add(g, new THREE.CylinderGeometry(0.028, 0.025, 0.18, 8), fab, 0.14, 0.57, 0.04, 0.4);
-    add(g, new THREE.CylinderGeometry(0.025, 0.022, 0.16, 8), skin, 0.14, 0.44, 0.14, 0.8);
-    // Hands
-    add(g, new THREE.BoxGeometry(0.03, 0.04, 0.025), skin, -0.14, 0.37, 0.22);
-    add(g, new THREE.BoxGeometry(0.03, 0.04, 0.025), skin, 0.14, 0.37, 0.22);
-
-    // Neck
-    add(g, new THREE.CylinderGeometry(0.025, 0.025, 0.04, 8), skin, 0, 0.71, 0);
-
-    // Head
-    add(g, new THREE.SphereGeometry(0.065, 12, 12), skin, 0, 0.79, 0);
-    // Ears
-    add(g, new THREE.SphereGeometry(0.015, 6, 6), skin, -0.065, 0.78, 0);
-    add(g, new THREE.SphereGeometry(0.015, 6, 6), skin, 0.065, 0.78, 0);
-
-    // Safety glasses
-    add(g, new THREE.BoxGeometry(0.09, 0.018, 0.015), glass, 0, 0.80, 0.06);
-
-    // Hard hat
-    add(g, new THREE.CylinderGeometry(0.09, 0.09, 0.012, 16), hat, 0, 0.85, 0);
-    add(g, new THREE.CylinderGeometry(0.075, 0.08, 0.05, 16), hat, 0, 0.88, 0);
-    add(g, new THREE.CylinderGeometry(0.04, 0.075, 0.03, 16), hat, 0, 0.92, 0);
-
-    // Product box held in hands
-    const productMat = new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.1, emissive: color, emissiveIntensity: 0.12 });
-    add(g, new THREE.BoxGeometry(0.14, 0.10, 0.10), productMat, 0, 0.38, 0.22, 0, 0, 0, 'product');
-
+    const rig = new HumanRig(lookFor(this.walkerSeq++));
+    rig.carried.material = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
+    g.add(rig.group);
+    g.userData.walker = new Walker(rig);
     return g;
   }
+  private walkerSeq = 0;
+
 
   /** Build a forklift carrying a pallet with product boxes */
   private buildForkliftTransport(color: number): THREE.Group {
@@ -1417,6 +1434,8 @@ class SimulationAnimator {
     const tgt = this.nodePositions.get(targetId);
     if (!src || !tgt || this.products.length >= MAX_PRODUCTS) return null;
 
+    // Direct hand-over: nothing travels between the two elements
+    if (this.edgeTransport.get(`${sourceId}->${targetId}`) === 'direct') return null;
     const route = this.conveyorRoutes.get(`${sourceId}->${targetId}`);
     if (route && this.getTransportType(sourceId, targetId) === 'operator') {
       return this.spawnOnConveyor(route, productType, processingAt, processDuration);
@@ -1589,7 +1608,17 @@ class SimulationAnimator {
 
   /** Animate walking (leg swing) for operator meshes */
   private animateWalk(p: AnimProduct, elapsed: number, progressVal: number) {
-    // Walk animation for operators and humanoids (leg swing)
+    const walker = p.mesh.userData.walker as Walker | undefined;
+    if (walker) {
+      const last = (p.mesh.userData.lastPos as THREE.Vector3 | undefined) ?? p.mesh.position.clone();
+      const lastT = (p.mesh.userData.lastT as number | undefined) ?? elapsed;
+      const d = Math.hypot(p.mesh.position.x - last.x, p.mesh.position.z - last.z);
+      walker.stride(d, Math.max(1e-3, elapsed - lastT), true);
+      p.mesh.userData.lastPos = p.mesh.position.clone();
+      p.mesh.userData.lastT = elapsed;
+      return;
+    }
+    // Walk animation for humanoids (leg swing)
     const legL = p.mesh.getObjectByName('legL') as THREE.Mesh;
     const legR = p.mesh.getObjectByName('legR') as THREE.Mesh;
     if (legL && legR) {
@@ -1601,6 +1630,8 @@ class SimulationAnimator {
 
   /** Stop legs in neutral position */
   private stopLegs(p: AnimProduct) {
+    const walker = p.mesh.userData.walker as Walker | undefined;
+    if (walker) { walker.stride(0, 1, true); return; }
     const legL = p.mesh.getObjectByName('legL') as THREE.Mesh;
     const legR = p.mesh.getObjectByName('legR') as THREE.Mesh;
     if (legL) legL.rotation.x = 0;
@@ -2026,6 +2057,10 @@ export function Factory3DView() {
     try { return localStorage.getItem('fs3d-scenery') !== 'off'; } catch { return true; }
   });
   const sceneryRef = useRef(scenery);
+  // Ergonomics view: operators coloured by posture load (RULA-like, per body region)
+  const [ergonomics, setErgonomics] = useState(false);
+  const ergoRef = useRef(ergonomics);
+  useEffect(() => { ergoRef.current = ergonomics; }, [ergonomics]);
 
   // React subscriptions for model data
   const model = useModelStore(s => s.model);
@@ -2308,6 +2343,8 @@ export function Factory3DView() {
       anisotropicMetal: null as AnisotropicMetalManager | null,
     };
     sceneRef.current = state;
+    // Dev builds: expose the scene for automated screenshots and debugging
+    if (import.meta.env.DEV) (window as unknown as { __fs3d?: unknown }).__fs3d = state;
 
     // ── Initialize enhanced 3D systems ───────────────────────────────────────
 
@@ -2608,6 +2645,23 @@ export function Factory3DView() {
 
       // ── Camera bookmark fly-to ────────────────────────────────────
       state.cameraBookmarks?.update(safeDt);
+
+      // ── Operators at staffed machines: work cycle follows the station state ──
+      const workers = (state.surroundings as THREE.Group | null)?.userData.workers as THREE.Group[] | undefined;
+      if (workers?.length) {
+        const live = liveState.isReplaying || useSimulationStore.getState().isRunning;
+        for (const wg of workers) {
+          // Live states are keyed by station name (some paths use the id)
+          const sid = wg.userData.stationId as string;
+          const nm = state.nodeGroups.get(sid)?.userData.nodeName as string | undefined;
+          const st = live ? (liveState.stationStates[sid] ?? (nm ? liveState.stationStates[nm] : undefined) ?? 'idle') : 'idle';
+          const sw = wg.userData.worker as StationWorker;
+          sw.update(safeDt, st as HumanState);
+          // Re-colour a few times a second; restoring the clothes is a no-op when already off
+          if (!ergoRef.current) sw.rig.showErgonomics(false);
+          else if (frameCount % 6 === 0) sw.rig.showErgonomics(true);
+        }
+      }
 
       // ── Warehouse racks: pallets appear/disappear from the run's move log ──
       if (frameCount % 3 === 0) {
@@ -3130,7 +3184,7 @@ export function Factory3DView() {
         if (frameCount % 3 === 0) {
           state.nodeGroups.forEach((group) => {
             const nodeType = group.userData.nodeType;
-            if (nodeType === 'operator' || nodeType === 'humanoid') {
+            if ((nodeType === 'operator' && !group.userData.people) || nodeType === 'humanoid') {
               const connName = group.userData._connectedStationName as string | undefined;
               const connState = connName ? (liveState.stationStates[connName] || 'idle') : 'idle';
               state.operatorAnimation!.setState(group.userData.nodeId, connState);
@@ -3139,6 +3193,29 @@ export function Factory3DView() {
         }
         state.operatorAnimation.update(safeDt, elapsed);
       }
+      // Robot cells: program runs while the station processes, parks / holds / stops otherwise
+      {
+        const live = liveState.isReplaying || useSimulationStore.getState().isRunning;
+        state.nodeGroups.forEach((group, id) => {
+          const rc = group.userData.robotCell as RobotCellController | undefined;
+          if (!rc) return;
+          const st = live ? (liveState.stationStates[id] || liveState.stationStates[group.userData.nodeName] || 'idle') : 'processing';
+          rc.update(safeDt, st as CellState);
+        });
+      }
+      // Operator crews (articulated people): posture follows the connected station
+      state.nodeGroups.forEach((group) => {
+        const people = group.userData.people as StationWorker[] | undefined;
+        if (!people) return;
+        const connName = group.userData._connectedStationName as string | undefined;
+        const live = liveState.isReplaying || useSimulationStore.getState().isRunning;
+        const st = live && connName ? (liveState.stationStates[connName] || 'idle') : 'idle';
+        for (const w of people) {
+          w.update(safeDt, st as HumanState);
+          if (!ergoRef.current) w.rig.showErgonomics(false);
+          else if (frameCount % 6 === 0) w.rig.showErgonomics(true);
+        }
+      });
 
       // Particle effects
       if (state.particleEffects) {
@@ -3440,7 +3517,9 @@ export function Factory3DView() {
           rack.showAt({ moves: group.userData.rackDesignMoves }, 0);
           group.userData.rackMode = 'design';
         } else {
-          group = getNodeBuilder(n.type, n.name, n.libraryModelId)();
+          group = n.type === 'operator' && !n.libraryModelId
+            ? buildOperatorCrew(Math.round(n.data?.count ?? 1), n.id)
+            : getNodeBuilder(n.type, n.name, n.libraryModelId)();
         }
         group.userData.nodeId = n.id;
         group.userData.nodeType = n.type;
@@ -3472,7 +3551,7 @@ export function Factory3DView() {
         // close to life size, but people, robots and vehicles were modelled
         // at roughly half size, which made machines look gigantic.
         if (!rack && !PEOPLE_TYPES.has(n.type) && !FLOW_ALIGNED_MODELS.has(n.libraryModelId || '')) {
-          paintMachine(group, n.libraryModelId || n.type);
+          if (!group.userData.robotCell) paintMachine(group, n.libraryModelId || n.type);
         }
         const realScale = REAL_SCALE[n.type];
         if (realScale) group.scale.setScalar(realScale);
@@ -3518,6 +3597,8 @@ export function Factory3DView() {
         const label = createTextSprite(n.name);
         // Just above the machine (labels are in the group's scaled space)
         label.position.set(0, (half.top + 0.45) / (group.scale.y || 1), 0);
+        // Screen-constant size: undo the group's real-scale factor (AGV, humanoid…)
+        label.scale.divideScalar(group.scale.x || 1);
         group.add(label);
 
         // Stats badge (shown during simulation/replay for stations)
@@ -3584,7 +3665,7 @@ export function Factory3DView() {
             s.vehicleAnimation.registerCrane(n.id, group, (n as any).spanWidth || 6);
           }
         }
-        if (s.operatorAnimation && (n.type === 'operator' || n.type === 'humanoid')) {
+        if (s.operatorAnimation && (n.type === 'humanoid' || (n.type === 'operator' && !group.userData.people))) {
           s.operatorAnimation.register(n.id, group);
         }
         // Particle effects for specific machine types
@@ -3604,7 +3685,7 @@ export function Factory3DView() {
           s.machineAnimations.register(n.id, n.type, group);
         }
         // Phase 2: Register robot arms for IK animation
-        if (s.robotArmAnimation && n.type === 'roboticcell') {
+        if (s.robotArmAnimation && n.type === 'roboticcell' && !group.userData.robotCell) {
           s.robotArmAnimation.register(n.id, group);
         }
         // Phase 2: Register heat sources for atmospheric heat distortion
@@ -3705,8 +3786,17 @@ export function Factory3DView() {
 
       const floorStart = new THREE.Vector3(srcPos.x, 0, srcPos.z);
       const floorEnd = new THREE.Vector3(tgtPos.x, 0, tgtPos.z);
-      const isForklift = isNodePallet(srcNode) || isNodePallet(tgtNode);
-      const isVehicle = VEHICLE_TYPES.has(srcNode.type) || VEHICLE_TYPES.has(tgtNode.type);
+      const mode = (conn as { transport?: string }).transport ?? 'auto';
+      // Not every link is a conveyor: hand-over, carried by a person, or by a vehicle
+      if (mode === 'direct') return;
+      if (mode === 'manual') {
+        const walkway = createFloorPath(floorStart, floorEnd, false);
+        s.scene.add(walkway);
+        s.floorPaths.push(walkway);
+        return;
+      }
+      const isForklift = mode === 'forklift' || mode === 'agv' || (mode === 'auto' && isNodePallet(srcNode)) || (mode === 'auto' && isNodePallet(tgtNode));
+      const isVehicle = mode === 'auto' && (VEHICLE_TYPES.has(srcNode.type) || VEHICLE_TYPES.has(tgtNode.type));
       if (isForklift || isVehicle) {
         // Vehicles drive on a marked floor route instead of a conveyor
         const floorPath = createFloorPath(floorStart, floorEnd, true);
@@ -3759,7 +3849,8 @@ export function Factory3DView() {
         const g = s.nodeGroups.get(n.id);
         const p = positions3d.get(n.id)!;
         const rb = g?.userData.rackBounds;
-        return { id: n.id, type: n.type, x: p.x, z: p.z, hx: g?.userData.halfX ?? 0.8, hz: g?.userData.halfZ ?? 0.6,
+        return { id: n.id, type: n.type, x: p.x, z: p.z, hx: g?.userData.halfX ?? 0.8, hz: g?.userData.halfZ ?? 0.6, top: g?.userData.top,
+          staff: g?.userData.robotKind ? (g.userData.robotKind === 'weld' ? 'outside' : 'none') : g?.userData.fenced ? 'outside' : undefined,
           block: rb ? { x0: p.x + rb.x0, x1: p.x + rb.x1, z0: p.z + rb.z0, z1: p.z + rb.z1 } : undefined,
           yard: rb?.yard ? { x0: p.x + rb.yard.x0, x1: p.x + rb.yard.x1, z0: p.z + rb.yard.z0, z1: p.z + rb.yard.z1 } : undefined };
       }),
@@ -3874,7 +3965,7 @@ export function Factory3DView() {
       }}>
         {([
           {
-            label: 'Fit All',
+            label: t('Fit All'),
             icon: (
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M1 5V1h4M11 1h4v4M15 11v4h-4M5 15H1v-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3892,7 +3983,7 @@ export function Factory3DView() {
             },
           },
           {
-            label: 'Top',
+            label: t('Top'),
             icon: (
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.3"/>
@@ -3908,7 +3999,7 @@ export function Factory3DView() {
             },
           },
           {
-            label: 'Front',
+            label: t('Front'),
             icon: (
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="2" y="4" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
@@ -3924,7 +4015,7 @@ export function Factory3DView() {
             },
           },
           {
-            label: 'Reset',
+            label: t('Reset'),
             icon: (
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M2 8a6 6 0 1 1 1.5 3.96" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
@@ -3946,7 +4037,7 @@ export function Factory3DView() {
             },
           },
           {
-            label: scenery ? 'Hide scenery (people, racks, forklift — not simulated)' : 'Show scenery (people, racks, forklift — not simulated)',
+            label: scenery ? t('Hide scenery (people, racks, forklift — not simulated)') : t('Show scenery (people, racks, forklift — not simulated)'),
             active: scenery,
             icon: (
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -3957,6 +4048,19 @@ export function Factory3DView() {
               </svg>
             ),
             action: () => setScenery(v => !v),
+          },
+          {
+            label: ergonomics
+              ? t('Hide ergonomics (posture load: green fine, amber take care, red high risk)')
+              : t('Show ergonomics: colour operators by posture load (trunk, arms, legs)'),
+            active: ergonomics,
+            icon: (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="2.6" r="1.5" stroke="currentColor" strokeWidth="1.3"/>
+                <path d="M8 4.5v4.2M8 8.7l-2.6 5M8 8.7l2.6 5M4 6.2l4 .9 4-.9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+            ),
+            action: () => setErgonomics(v => !v),
           },
         ] as { label: string; icon: React.ReactNode; action: () => void; active?: boolean }[]).map(btn => (
           <button

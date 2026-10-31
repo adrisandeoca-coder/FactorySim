@@ -559,7 +559,7 @@ const GanttScheduleView = React.memo(function GanttScheduleView({ result, statio
       )}
 
       {/* Main Gantt area */}
-      <div className="flex border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+      <div className="flex border border-slate-300 rounded-sm overflow-hidden bg-white">
         {/* KPI sidebar */}
         {stationKpis && (
           <div className="flex-shrink-0 bg-gray-50 border-r border-gray-200" style={{ width: SIDEBAR_WIDTH }}>
@@ -761,7 +761,7 @@ const GanttScheduleView = React.memo(function GanttScheduleView({ result, statio
           {/* Tooltip */}
           {tooltip && (
             <div
-              className="absolute z-50 pointer-events-none bg-gray-900 text-white px-3 py-2 rounded-lg shadow-xl text-xs max-w-[250px]"
+              className="absolute z-50 eng-tooltip pointer-events-none max-w-[250px]"
               style={{ left: tooltip.x, top: tooltip.y }}
             >
               <div className="font-bold mb-1 flex items-center gap-1.5">
@@ -771,15 +771,15 @@ const GanttScheduleView = React.memo(function GanttScheduleView({ result, statio
                 />
                 {STATE_LABELS[tooltip.block.state] || tooltip.block.state}
               </div>
-              <div className="text-gray-300 space-y-0.5">
+              <div className="text-slate-600 space-y-0.5">
                 <div>Station: {shortName(tooltip.block.stationName)}</div>
                 <div>Time: {formatAsDate(tooltip.block.startTime, startDayOfWeek, startHour)} — {formatAsDate(tooltip.block.endTime, startDayOfWeek, startHour)}</div>
                 <div>Duration: {formatDurationGantt(tooltip.block.endTime - tooltip.block.startTime)}</div>
                 {tooltip.block.productId && (
-                  <div className="text-blue-300 font-medium">Job: {tooltip.block.productId}</div>
+                  <div className="text-blue-700 font-medium">Job: {tooltip.block.productId}</div>
                 )}
                 {tooltip.block.productType && (
-                  <div className="text-green-300">Product: {tooltip.block.productType}</div>
+                  <div className="text-emerald-700">Product: {tooltip.block.productType}</div>
                 )}
               </div>
               {tooltip.block.productId && (

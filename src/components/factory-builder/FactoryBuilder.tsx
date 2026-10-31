@@ -83,6 +83,7 @@ import { PickStationNode } from './nodes/PickStationNode';
 import { WeighingNode } from './nodes/WeighingNode';
 import { LabelerNode } from './nodes/LabelerNode';
 import { ZoneBackgroundNode } from './nodes/ZoneBackgroundNode';
+import { ConnectionProperties } from './ConnectionProperties';
 import { PropertyPanel } from './PropertyPanel';
 import { TemplateSelector } from './TemplateSelector';
 import { SimulationAnimationOverlay } from './SimulationAnimationOverlay';
@@ -93,6 +94,7 @@ import { useSimulationStore } from '../../stores/simulationStore';
 import { useLiveSimulationStore } from '../../stores/liveSimulationStore';
 import type { Station, Buffer, ExtraNodeData } from '../../types';
 
+import { t } from '../../i18n';
 const nodeTypes: NodeTypes = {
   station: StationNode,
   buffer: BufferNode,
@@ -260,11 +262,11 @@ function MoreElementsButton({ onAdd }: { onAdd: (type: string) => void }) {
     <div style={{ position: 'relative' }}>
       <RibbonButton
         icon={<Shapes size={26} color="#475569" />}
-        label="More"
+        label={t('More')}
         dropdown
         active={open}
         onClick={() => setOpen((v) => !v)}
-        title="All 47 element types"
+        title={t('All 47 element types')}
       />
       {open && (
         <>
@@ -321,6 +323,8 @@ export function FactoryBuilder() {
     removeExtraNode,
     selectedNodeId,
     setSelectedNode,
+    selectedEdgeId,
+    setSelectedEdge,
     undo,
     redo,
     history,
@@ -568,23 +572,33 @@ export function FactoryBuilder() {
       const isUpstream = selectedNodeId && conn.target === selectedNodeId;
       const isDownstream = selectedNodeId && conn.source === selectedNodeId;
       const highlighted = isUpstream || isDownstream;
-      const baseColor = isUpstream ? '#10b981' : isDownstream ? '#3b82f6' : selectedNodeId ? '#94a3b8' : '#64748b';
+      const selected = conn.id === selectedEdgeId;
+      const baseColor = selected ? '#1F5FAD' : isUpstream ? '#10b981' : isDownstream ? '#3b82f6' : selectedNodeId ? '#94a3b8' : '#64748b';
+      // Line style tells the transport: solid conveyor, dashed by hand, dash-dot vehicle, dotted direct
+      const mode = conn.transport ?? 'auto';
+      const dash = mode === 'manual' ? '6 4' : mode === 'forklift' || mode === 'agv' ? '10 3 2 3' : mode === 'direct' ? '2 3' : undefined;
+      const tag = mode === 'manual' ? t('by hand') : mode === 'forklift' ? t('forklift') : mode === 'agv' ? t('AGV') : mode === 'direct' ? t('direct') : undefined;
       return {
         id: conn.id,
         source: conn.source,
         target: conn.target,
         type: 'smoothstep',
-        animated: true,
+        animated: !dash,
+        selected,
+        label: tag,
+        labelStyle: { fontSize: 10, fill: '#475569', fontFamily: 'IBM Plex Mono, monospace' },
+        labelBgStyle: { fill: '#F4F6F8' },
         markerEnd: { type: MarkerType.ArrowClosed, color: baseColor },
         style: {
           stroke: baseColor,
-          strokeWidth: highlighted ? 2.5 : selectedNodeId ? 1.5 : 2,
+          strokeDasharray: dash,
+          strokeWidth: selected ? 3 : highlighted ? 2.5 : selectedNodeId ? 1.5 : 2,
           opacity: selectedNodeId && !highlighted ? 0.25 : 1,
         },
       };
     });
     setEdges(newEdges);
-  }, [model.connections, selectedNodeId, setEdges]);
+  }, [model.connections, selectedNodeId, selectedEdgeId, setEdges]);
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -605,7 +619,13 @@ export function FactoryBuilder() {
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
-  }, [setSelectedNode]);
+    setSelectedEdge(null);
+  }, [setSelectedNode, setSelectedEdge]);
+
+  const onEdgeClick = useCallback(
+    (_: React.MouseEvent, edge: Edge) => setSelectedEdge(edge.id),
+    [setSelectedEdge]
+  );
 
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -729,12 +749,12 @@ export function FactoryBuilder() {
       {/* Toolbar */}
       {/* Commands live in the app ribbon (engineering-desktop style) */}
       <RibbonContent>
-        <RibbonGroup label="Model">
-          <RibbonButton icon={<LayoutTemplate size={26} color="#1F5FAD" />} label="Load template" onClick={() => setShowTemplates(true)} />
+        <RibbonGroup label={t('Model')}>
+          <RibbonButton icon={<LayoutTemplate size={26} color="#1F5FAD" />} label={t('Load template')} onClick={() => setShowTemplates(true)} />
           <RibbonButton
             icon={<LayoutGrid size={26} color="#475569" />}
-            label="Auto layout"
-            title="Arrange elements left to right by flow"
+            label={t('Auto layout')}
+            title={t('Arrange elements left to right by flow')}
             onClick={() => {
               applyAutoLayout();
               setTimeout(() => {
@@ -744,7 +764,7 @@ export function FactoryBuilder() {
           />
         </RibbonGroup>
 
-        <RibbonGroup label="Add element">
+        <RibbonGroup label={t('Add element')}>
           {SIMPLE_PALETTE.map((item) => (
             <RibbonButton
               key={item.type}
@@ -761,25 +781,25 @@ export function FactoryBuilder() {
           )}
         </RibbonGroup>
 
-        <RibbonGroup label="View">
-          <RibbonButton icon={<Network size={26} color="#2563EB" />} label="2D layout" active={viewMode === '2d'} onClick={() => setViewMode('2d')} title="2D flow layout" />
-          <RibbonButton icon={<Box size={26} color={isSimulating ? '#059669' : '#475569'} />} label="3D view" active={viewMode === '3d'} onClick={() => setViewMode('3d')} title="3D view (works during simulation)" />
+        <RibbonGroup label={t('View')}>
+          <RibbonButton icon={<Network size={26} color="#2563EB" />} label={t('2D layout')} active={viewMode === '2d'} onClick={() => setViewMode('2d')} title={t('2D flow layout')} />
+          <RibbonButton icon={<Box size={26} color={isSimulating ? '#059669' : '#475569'} />} label={t('3D view')} active={viewMode === '3d'} onClick={() => setViewMode('3d')} title={t('3D view (works during simulation)')} />
           {(!simpleMode || lastResult) && (
             <RibbonStack>
               {!simpleMode && (
-                <RibbonSmallButton icon={<SquareDashed size={14} />} label="Zones" active={showZones} onClick={() => setShowZones(!showZones)} title="Toggle zone outlines" />
+                <RibbonSmallButton icon={<SquareDashed size={14} />} label={t('Zones')} active={showZones} onClick={() => setShowZones(!showZones)} title={t('Toggle zone outlines')} />
               )}
               {!simpleMode && (
-                <RibbonSmallButton icon={<Route size={14} />} label="Transport" active={!!model.transportNetwork?.enabled} onClick={() => setTransportNetworkEnabled(!model.transportNetwork?.enabled)} title="Toggle transport network (AGV/forklift paths)" />
+                <RibbonSmallButton icon={<Route size={14} />} label={t('Transport')} active={!!model.transportNetwork?.enabled} onClick={() => setTransportNetworkEnabled(!model.transportNetwork?.enabled)} title={t('Toggle transport network (AGV/forklift paths)')} />
               )}
               {lastResult && (
-                <label className="ribbon-field" title="Colour stations by simulation results">
+                <label className="ribbon-field" title={t('Colour stations by simulation results')}>
                   <Flame size={14} color="#EA580C" />
                   <select value={heatmapMode} onChange={(e) => setHeatmapMode(e.target.value as any)}>
-                    <option value="off">Heatmap: off</option>
-                    <option value="utilization">Utilization</option>
-                    <option value="blocked">Blocked</option>
-                    <option value="starved">Starved</option>
+                    <option value="off">{t('Heatmap: off')}</option>
+                    <option value="utilization">{t('Utilization')}</option>
+                    <option value="blocked">{t('Blocked')}</option>
+                    <option value="starved">{t('Starved')}</option>
                   </select>
                 </label>
               )}
@@ -787,17 +807,17 @@ export function FactoryBuilder() {
           )}
         </RibbonGroup>
 
-        <RibbonGroup label="Edit">
+        <RibbonGroup label={t('Edit')}>
           <RibbonStack>
-            <RibbonSmallButton icon={<Undo2 size={14} />} label="Undo" onClick={undo} disabled={historyIndex <= 0} title="Undo (Ctrl+Z)" />
-            <RibbonSmallButton icon={<Redo2 size={14} />} label="Redo" onClick={redo} disabled={historyIndex >= history.length - 1} title="Redo (Ctrl+Y)" />
+            <RibbonSmallButton icon={<Undo2 size={14} />} label={t('Undo')} onClick={undo} disabled={historyIndex <= 0} title={t('Undo (Ctrl+Z)')} />
+            <RibbonSmallButton icon={<Redo2 size={14} />} label={t('Redo')} onClick={redo} disabled={historyIndex >= history.length - 1} title={t('Redo (Ctrl+Y)')} />
             <div className="relative" ref={searchRef}>
               <RibbonSmallButton
                 icon={<Search size={14} />}
-                label="Find"
+                label={t('Find')}
                 active={searchOpen}
                 onClick={() => { setSearchOpen(!searchOpen); setTimeout(() => searchRef.current?.querySelector('input')?.focus(), 50); }}
-                title="Find element (Ctrl+F)"
+                title={t('Find element (Ctrl+F)')}
               />
               {searchOpen && (
                 <div className="absolute left-0 top-full mt-1 w-64 bg-white shadow-lg border border-gray-300 z-50">
@@ -805,14 +825,14 @@ export function FactoryBuilder() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Find element by name…"
+                    placeholder={t('Find element by name…')}
                     className="w-full px-2 py-1.5 text-sm border-b border-gray-200 outline-none"
                     autoFocus
                   />
                   {searchQuery.trim() && (
                     <div className="max-h-48 overflow-y-auto">
                       {searchResults.length === 0 ? (
-                        <div className="px-3 py-2 text-xs text-gray-400">No matches</div>
+                        <div className="px-3 py-2 text-xs text-gray-400">{t('No matches')}</div>
                       ) : (
                         searchResults.map(r => (
                           <button
@@ -833,39 +853,39 @@ export function FactoryBuilder() {
           </RibbonStack>
         </RibbonGroup>
 
-        <RibbonGroup label="Output">
-          <RibbonButton icon={<Camera size={26} color="#475569" />} label="Screenshot" onClick={handleScreenshot} title="Save the layout as PNG" />
+        <RibbonGroup label={t('Output')}>
+          <RibbonButton icon={<Camera size={26} color="#475569" />} label={t('Screenshot')} onClick={handleScreenshot} title={t('Save the layout as PNG')} />
         </RibbonGroup>
 
         {!simpleMode && (
           <RibbonGroup label="3D">
             <RibbonButton
               icon={<Wand2 size={26} color="#7C3AED" />}
-              label="Auto 3D models"
+              label={t('Auto 3D models')}
               onClick={onAutoAssignModels}
-              title="Auto-assign 3D library models to every station/buffer based on name + type"
+              title={t('Auto-assign 3D library models to every station/buffer based on name + type')}
               disabled={model.stations.length + model.buffers.length + model.extraNodes.length === 0}
             />
             <RibbonButton
               icon={<GlobeIcon size={26} color="#0891B2" />}
-              label="Open in 3D World"
+              label={t('Open in 3D World')}
               onClick={openInScenarioWorld}
-              title="Open the current model in the 3D World viewer with rigged robots and live animation"
+              title={t('Open the current model in the 3D World viewer with rigged robots and live animation')}
               disabled={model.stations.length + model.buffers.length + model.extraNodes.length === 0}
             />
           </RibbonGroup>
         )}
 
         {!simpleMode && (
-          <RibbonGroup label="Animation">
+          <RibbonGroup label={t('Animation')}>
             <RibbonStack>
-              <label className="ribbon-field" title="Maximum animated operators in the live view">
-                <span>Operators</span>
+              <label className="ribbon-field" title={t('Maximum animated operators in the live view')}>
+                <span>{t('Operators')}</span>
                 <input type="number" min={1} max={50} value={maxOperators} style={{ width: 48 }}
                   onChange={(e) => useLiveSimulationStore.getState().setMaxOperators(parseInt(e.target.value) || 1)} />
               </label>
-              <label className="ribbon-field" title="Maximum animated forklifts in the live view">
-                <span>Forklifts</span>
+              <label className="ribbon-field" title={t('Maximum animated forklifts in the live view')}>
+                <span>{t('Forklifts')}</span>
                 <input type="number" min={1} max={20} value={maxForklifts} style={{ width: 48 }}
                   onChange={(e) => useLiveSimulationStore.getState().setMaxForklifts(parseInt(e.target.value) || 1)} />
               </label>
@@ -889,7 +909,7 @@ export function FactoryBuilder() {
 
       {/* Workspace: outline (left) · graphics (centre) · properties (right) */}
       <div className="flex-1 flex min-h-0" style={{ gap: 0 }}>
-        <DockPanel title="Outline" style={{ width: 230, flexShrink: 0, borderTop: 'none', borderLeft: 'none', borderBottom: 'none' }}>
+        <DockPanel title={t('Outline')} style={{ width: 230, flexShrink: 0, borderTop: 'none', borderLeft: 'none', borderBottom: 'none' }}>
           <ModelOutline
             onSelect={(id) => {
               setSelectedNode(id);
@@ -899,8 +919,8 @@ export function FactoryBuilder() {
         </DockPanel>
         <div className="flex-1 flex flex-col min-w-0">
         <div className="graphics-title">
-          <span><b style={{ fontWeight: 600 }}>{viewMode === '3d' ? '3D view' : 'Layout'}</b>{' — '}{model.name || 'Untitled model'}</span>
-          <span style={{ color: '#64748B' }}>{nodes.length} elements · {edges.length} connections</span>
+          <span><b style={{ fontWeight: 600 }}>{viewMode === '3d' ? t('3D view') : t('Layout')}</b>{' — '}{model.name || t('Untitled Model')}</span>
+          <span style={{ color: '#64748B' }}>{t('{a} elements · {b} connections', { a: nodes.length, b: edges.length })}</span>
         </div>
         <div className="flex-1 relative">
           {viewMode === '3d' ? (
@@ -908,7 +928,7 @@ export function FactoryBuilder() {
               <div className="w-full h-full flex items-center justify-center" style={{ background: '#1c2333' }}>
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-10 w-10 border-2 border-blue-500 border-t-transparent mx-auto mb-4" style={{ boxShadow: '0 0 12px rgba(59,130,246,0.5)' }}></div>
-                  <p style={{ color: '#94a3b8', fontSize: 13, letterSpacing: '0.05em' }}>Initialising 3D Factory…</p>
+                  <p style={{ color: '#94a3b8', fontSize: 13, letterSpacing: '0.05em' }}>{t('Initialising 3D Factory…')}</p>
                 </div>
               </div>
             }>
@@ -922,6 +942,7 @@ export function FactoryBuilder() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeClick={onNodeClick}
+            onEdgeClick={onEdgeClick}
             onPaneClick={onPaneClick}
             onNodeDragStop={onNodeDragStop}
             onNodesDelete={onNodesDelete}
@@ -984,11 +1005,11 @@ export function FactoryBuilder() {
                   </>
                 ) : (
                   <>
-                    <span style={{ opacity: 0.5 }}>Drag handle to connect</span>
+                    <span style={{ opacity: 0.5 }}>{t('Drag handle to connect')}</span>
                     <span style={{ opacity: 0.25 }}>·</span>
-                    <span style={{ opacity: 0.5 }}>Del to remove</span>
+                    <span style={{ opacity: 0.5 }}>{t('Del to remove')}</span>
                     <span style={{ opacity: 0.25 }}>·</span>
-                    <span style={{ opacity: 0.5 }}>Ctrl+F to search</span>
+                    <span style={{ opacity: 0.5 }}>{t('Ctrl+F to search')}</span>
                   </>
                 )}
               </div>
@@ -1035,6 +1056,9 @@ export function FactoryBuilder() {
             }}
             onClose={() => setSelectedNode(null)}
           />
+        )}
+        {!selectedNode && selectedEdgeId && (
+          <ConnectionProperties connectionId={selectedEdgeId} onClose={() => setSelectedEdge(null)} />
         )}
       </div>
 
@@ -1143,7 +1167,7 @@ function AddNodeModal({
       case 'depalletize':
         return (
           <div>
-            <label className="input-label">Cycle Time (seconds)</label>
+            <label className="input-label">{t('Cycle Time (seconds)')}</label>
             <input
               type="number"
               value={cycleTime}
@@ -1158,7 +1182,7 @@ function AddNodeModal({
       case 'matchbuffer':
         return (
           <div>
-            <label className="input-label">Capacity</label>
+            <label className="input-label">{t('Capacity')}</label>
             <input
               type="number"
               value={capacity}
@@ -1171,7 +1195,7 @@ function AddNodeModal({
       case 'source':
         return (
           <div>
-            <label className="input-label">Arrival Interval (seconds)</label>
+            <label className="input-label">{t('Arrival Interval (seconds)')}</label>
             <input
               type="number"
               value={arrivalRate}
@@ -1184,7 +1208,7 @@ function AddNodeModal({
       case 'operator':
         return (
           <div>
-            <label className="input-label">Number of Operators</label>
+            <label className="input-label">{t('Number of Operators')}</label>
             <input
               type="number"
               value={count}
@@ -1237,7 +1261,7 @@ function AddNodeModal({
         </div>
 
         <div>
-          <label className="input-label">Name</label>
+          <label className="input-label">{t('Name')}</label>
           <input
             type="text"
             value={name}
@@ -1253,7 +1277,7 @@ function AddNodeModal({
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit">Add {nodeInfo?.label}</Button>
+          <Button type="submit">{t('Add')} {nodeInfo?.label}</Button>
         </div>
       </form>
     </Modal>

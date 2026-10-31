@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from './i18n';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
@@ -56,6 +57,7 @@ function PopoutAnimationView() {
 function App() {
   const { isInitialized, initialize, addToast } = useAppStore();
   const navigate = useNavigate();
+  const lang = useI18n((st) => st.lang);
 
   // P9 — Check for popout query param
   const isPopout = React.useMemo(() => {
@@ -105,8 +107,9 @@ function App() {
     return <PopoutAnimationView />;
   }
 
+  // Changing the language remounts the page tree, so every t() call re-reads it
   return (
-    <Layout>
+    <Layout key={lang}>
       <ErrorBoundary>
         <OnboardingTour />
         <KeyboardShortcutsPanel />

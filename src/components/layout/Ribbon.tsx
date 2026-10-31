@@ -7,6 +7,7 @@
  * the shell's default groups (see AppRibbon).
  */
 import React, { createContext, useContext, useState } from 'react';
+import { useT, t, tNode } from '../../i18n';
 import { createPortal } from 'react-dom';
 
 const RibbonSlotContext = createContext<{
@@ -32,10 +33,11 @@ export function RibbonContent({ children }: { children: React.ReactNode }) {
 }
 
 export function RibbonGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  const t = useT();
   return (
-    <div className="ribbon-group" role="group" aria-label={label}>
+    <div className="ribbon-group" role="group" aria-label={t(label)}>
       <div className="ribbon-group-body">{children}</div>
-      <div className="ribbon-group-label">{label}</div>
+      <div className="ribbon-group-label">{t(label)}</div>
     </div>
   );
 }
@@ -49,11 +51,13 @@ interface RibbonButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonEl
 
 /** Large button: 26px icon above a (max two-line) label. */
 export function RibbonButton({ icon, label, active, dropdown, className = '', ...props }: RibbonButtonProps) {
+  useT();
+  if (typeof props.title === 'string') props = { ...props, title: t(props.title) };
   return (
     <button type="button" className={`ribbon-btn ${active ? 'is-active' : ''} ${className}`} {...props}>
       <span className="ribbon-btn-icon">{icon}</span>
       <span className="ribbon-btn-label">
-        {label}
+        {tNode(label)}
         {dropdown && <span className="ribbon-caret" aria-hidden>▾</span>}
       </span>
     </button>
@@ -62,10 +66,12 @@ export function RibbonButton({ icon, label, active, dropdown, className = '', ..
 
 /** Small button: 16px icon left of a one-line label; stack up to three in a RibbonStack. */
 export function RibbonSmallButton({ icon, label, active, dropdown, className = '', ...props }: RibbonButtonProps) {
+  useT();
+  if (typeof props.title === 'string') props = { ...props, title: t(props.title) };
   return (
     <button type="button" className={`ribbon-sbtn ${active ? 'is-active' : ''} ${className}`} {...props}>
       <span className="ribbon-sbtn-icon">{icon}</span>
-      <span>{label}</span>
+      <span>{tNode(label)}</span>
       {dropdown && <span className="ribbon-caret" aria-hidden>▾</span>}
     </button>
   );
@@ -91,10 +97,11 @@ export function DockPanel({
   style?: React.CSSProperties;
   bodyStyle?: React.CSSProperties;
 }) {
+  useT();
   return (
     <section className={`dock-panel ${className}`} style={style}>
       <header className="dock-panel-title">
-        <span>{title}</span>
+        <span>{tNode(title)}</span>
         {actions && <span className="dock-panel-actions">{actions}</span>}
       </header>
       <div className="dock-panel-body" style={bodyStyle}>{children}</div>

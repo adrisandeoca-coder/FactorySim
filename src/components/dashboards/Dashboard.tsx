@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useT, t } from '../../i18n';
 import { useNavigate } from 'react-router-dom';
 
 // Strip distribution type: "CNC Mill (Weibull)" → "CNC Mill"
@@ -113,6 +114,7 @@ function WarningBanners({ warnings }: { warnings: Array<{ severity: string; mess
 }
 
 export function Dashboard() {
+  useT(); // re-render on language change
   const navigate = useNavigate();
   const { model } = useModelStore();
   const { setSelectedNode } = useModelStore();
@@ -576,36 +578,36 @@ export function Dashboard() {
     <div className="space-y-6" ref={dashboardRef}>
       {/* Commands live in the app ribbon (engineering-desktop style) */}
       <RibbonContent>
-        <RibbonGroup label="Simulation">
+        <RibbonGroup label={t('Simulation')}>
           {isSimRunning ? (
-            <RibbonButton icon={<Square size={26} color="#DC2626" fill="#DC2626" />} label="Stop" onClick={handleStopSimulation} title="Stop the running simulation" />
+            <RibbonButton icon={<Square size={26} color="#DC2626" fill="#DC2626" />} label={t('Stop')} onClick={handleStopSimulation} title={t('Stop the running simulation')} />
           ) : (
-            <RibbonButton icon={<Play size={26} color="#059669" fill="#059669" />} label="Run simulation" onClick={handleRunSimulation} title="Run the simulation with the settings shown" />
+            <RibbonButton icon={<Play size={26} color="#059669" fill="#059669" />} label={t('Run simulation')} onClick={handleRunSimulation} title={t('Run the simulation with the settings shown')} />
           )}
         </RibbonGroup>
 
-        <RibbonGroup label="Settings">
+        <RibbonGroup label={t('Settings')}>
           <RibbonStack>
-            <label className="ribbon-field" title="Simulated duration">
-              <span>Run length</span>
+            <label className="ribbon-field" title={t('Simulated duration')}>
+              <span>{t('Run length')}</span>
               <select value={duration} onChange={(e) => setDuration(Number(e.target.value))} disabled={isSimRunning}>
-                <option value={3600}>1 hour</option>
-                <option value={14400}>4 hours</option>
-                <option value={28800}>8 hours (1 shift)</option>
-                <option value={86400}>24 hours</option>
-                <option value={604800}>1 week</option>
+                <option value={3600}>{t('1 hour')}</option>
+                <option value={14400}>{t('4 hours')}</option>
+                <option value={28800}>{t('8 hours (1 shift)')}</option>
+                <option value={86400}>{t('24 hours')}</option>
+                <option value={604800}>{t('1 week')}</option>
               </select>
             </label>
-            <label className="ribbon-field" title="Simulated start day — affects shift calendars">
-              <span>Start day</span>
+            <label className="ribbon-field" title={t('Simulated start day — affects shift calendars')}>
+              <span>{t('Start day')}</span>
               <select value={startDayOfWeek} onChange={(e) => setStartDayOfWeek(Number(e.target.value))} disabled={isSimRunning}>
                 {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((d, i) => (
-                  <option key={d} value={i}>{d}</option>
+                  <option key={d} value={i}>{t(d)}</option>
                 ))}
               </select>
             </label>
-            <label className="ribbon-field" title="Simulated start hour — affects shift calendars">
-              <span>Start time</span>
+            <label className="ribbon-field" title={t('Simulated start hour — affects shift calendars')}>
+              <span>{t('Start time')}</span>
               <select value={startHour} onChange={(e) => setStartHour(Number(e.target.value))} disabled={isSimRunning}>
                 {Array.from({ length: 24 }, (_, i) => (
                   <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>
@@ -615,29 +617,29 @@ export function Dashboard() {
           </RibbonStack>
         </RibbonGroup>
 
-        <RibbonGroup label="Results">
+        <RibbonGroup label={t('Results')}>
           <RibbonStack>
             {isReplaying ? (
-              <RibbonSmallButton icon={<Square size={12} />} label="Stop replay" onClick={() => useLiveSimulationStore.getState().stopReplay()} title="Stop the replay and show the results" />
+              <RibbonSmallButton icon={<Square size={12} />} label={t('Stop replay')} onClick={() => useLiveSimulationStore.getState().stopReplay()} title={t('Stop the replay and show the results')} />
             ) : lastResult && !isSimRunning ? <ReplayController /> : (
-              <RibbonSmallButton icon={<RotateCcw size={14} />} label="Replay" disabled title={isSimRunning ? 'Available when the run finishes' : 'Run a simulation first'} />
+              <RibbonSmallButton icon={<RotateCcw size={14} />} label={t('Replay')} disabled title={isSimRunning ? 'Available when the run finishes' : 'Run a simulation first'} />
             )}
             <div className="relative">
               <RibbonSmallButton
                 icon={<History size={14} />}
-                label="Run history"
+                label={t('Run history')}
                 dropdown
                 active={showRunHistory}
                 onClick={() => { setShowRunHistory(!showRunHistory); setRunHistory([]); }}
-                title="View previous simulation runs"
+                title={t('View previous simulation runs')}
               />
             {showRunHistory && (
-              <div className="absolute top-full mt-1 left-0 z-50 bg-white border border-slate-300 shadow-xl w-80 max-h-64 overflow-y-auto">
+              <div className="absolute top-full mt-1 left-0 z-50 bg-white border border-slate-300 shadow-sm w-80 max-h-64 overflow-y-auto">
                 <div className="p-2 border-b border-slate-200">
-                  <span className="text-xs font-bold text-slate-500 uppercase">Recent Runs</span>
+                  <span className="text-xs font-bold text-slate-500 uppercase">{t('Recent Runs')}</span>
                 </div>
                 {runHistory.length === 0 ? (
-                  <div className="p-3 text-sm text-slate-400">Loading...</div>
+                  <div className="p-3 text-sm text-slate-400">{t('Loading...')}</div>
                 ) : (
                   runHistory.slice(0, 15).map(run => (
                     <button
@@ -664,7 +666,7 @@ export function Dashboard() {
                 size="sm"
                 onClick={() => exportTimelapse(frames, { filename: `${model.name || 'factory'}-timelapse` })}
                 icon={<FilmIcon className="w-4 h-4" />}
-                title="Export animation as WebM video"
+                title={t('Export animation as WebM video')}
               >
                 Timelapse
               </Button>
@@ -674,24 +676,24 @@ export function Dashboard() {
           </RibbonStack>
         </RibbonGroup>
 
-        <RibbonGroup label="Export">
+        <RibbonGroup label={t('Export')}>
           {/* Export — one menu for reports and data (was five separate buttons) */}
           {kpis && (
             <div className="relative">
               <RibbonButton
                 icon={<FileDown size={26} color="#1F5FAD" />}
-                label="Export"
+                label={t('Export')}
                 dropdown
                 active={showLogMenu}
                 onClick={() => setShowLogMenu(!showLogMenu)}
-                title="Export reports and data"
+                title={t('Export reports and data')}
               />
               {showLogMenu && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowLogMenu(false)} />
-                  <div className="absolute left-0 mt-1 w-60 bg-white border border-gray-300 shadow-lg z-50 py-1">
+                  <div className="absolute left-0 mt-1 w-60 bg-white border border-gray-300 shadow-sm z-50 py-1">
                     {lastResult && (<>
-                      <div className="px-3 pt-2 pb-1 text-label">Report</div>
+                      <div className="px-3 pt-2 pb-1 text-label">{t('Report')}</div>
                       {([
                         ['PDF report', 'Executive summary via print dialog', () => downloadPDFReport(lastResult, model)],
                         ['PowerPoint', 'Slides with KPIs and charts', () => downloadPPTXReport(lastResult, model)],
@@ -703,11 +705,11 @@ export function Dashboard() {
                         </button>
                       ))}
                     </>)}
-                    <div className="px-3 pt-2 pb-1 text-label border-t border-gray-100 mt-1">Data</div>
-                    <button onClick={() => { downloadKPICSV(kpis, model.stations); setShowLogMenu(false); }} className="w-full text-left px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50">KPIs (CSV)</button>
+                    <div className="px-3 pt-2 pb-1 text-label border-t border-gray-100 mt-1">{t('Data')}</div>
+                    <button onClick={() => { downloadKPICSV(kpis, model.stations); setShowLogMenu(false); }} className="w-full text-left px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50">{t('KPIs (CSV)')}</button>
                     {lastResult && (<>
-                      <button onClick={() => { handleDownloadLog('csv'); setShowLogMenu(false); }} className="w-full text-left px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50">Event log (CSV)</button>
-                      <button onClick={() => { handleDownloadLog('json'); setShowLogMenu(false); }} className="w-full text-left px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50">Event log (JSON)</button>
+                      <button onClick={() => { handleDownloadLog('csv'); setShowLogMenu(false); }} className="w-full text-left px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50">{t('Event log (CSV)')}</button>
+                      <button onClick={() => { handleDownloadLog('json'); setShowLogMenu(false); }} className="w-full text-left px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50">{t('Event log (JSON)')}</button>
                     </>)}
                   </div>
                 </>
@@ -715,11 +717,11 @@ export function Dashboard() {
             </div>
           )}
 
-          <RibbonButton icon={<Camera size={26} color="#475569" />} label="Screenshot" onClick={handleScreenshot} title="Capture the dashboard as PNG" />
+          <RibbonButton icon={<Camera size={26} color="#475569" />} label={t('Screenshot')} onClick={handleScreenshot} title={t('Capture the dashboard as PNG')} />
         </RibbonGroup>
 
-        <RibbonGroup label="View">
-          <RibbonButton icon={<SlidersHorizontal size={26} color="#475569" />} label="Customize" onClick={() => setShowConfigurator(true)} title="Choose which panels to show" />
+        <RibbonGroup label={t('View')}>
+          <RibbonButton icon={<SlidersHorizontal size={26} color="#475569" />} label={t('Customize')} onClick={() => setShowConfigurator(true)} title={t('Choose which panels to show')} />
         </RibbonGroup>
       </RibbonContent>
 
@@ -746,7 +748,7 @@ export function Dashboard() {
               onClick={() => setActiveSection(tab.id)}
               style={{
                 padding: '4px 11px',
-                borderRadius: 6,
+                borderRadius: 2,
                 fontSize: 12,
                 fontWeight: 500,
                 whiteSpace: 'nowrap' as const,
@@ -757,7 +759,7 @@ export function Dashboard() {
                 color: activeSection === tab.id ? 'var(--t1)' : 'var(--t3)',
               }}
             >
-              {tab.label}
+              {t(tab.label)}
             </button>
           ))}
         </div>
@@ -782,7 +784,7 @@ export function Dashboard() {
               onClick={() => setLayoutMode(mode)}
               style={{
                 padding: '4px 11px',
-                borderRadius: 6,
+                borderRadius: 2,
                 fontSize: 12,
                 fontWeight: 500,
                 transition: 'all 0.15s',
@@ -834,7 +836,7 @@ export function Dashboard() {
             <div className="flex-[3] min-w-[280px] max-w-[400px] overflow-y-auto space-y-3">
               <div className="flex items-center gap-2 px-1 pb-1 border-b border-gray-100">
                 <CheckCircleIcon className="w-3 h-3 text-emerald-500" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600">Final Results</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600">{t('Final Results')}</span>
               </div>
               {kpis && hasStations && statWidgets.length > 0 && (
                 <div className="grid grid-cols-1 gap-3">
@@ -864,7 +866,7 @@ export function Dashboard() {
             <div className="flex-[7] min-w-0 overflow-y-auto space-y-4">
               <div className="flex items-center gap-2 px-1 pb-1 border-b border-gray-100">
                 <CheckCircleIcon className="w-3 h-3 text-emerald-500" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600">Final Results</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600">{t('Final Results')}</span>
               </div>
               {kpis?.warehouses && !hasStations && (
                 <WarehouseResults warehouses={kpis.warehouses}
@@ -888,8 +890,8 @@ export function Dashboard() {
           <div className="dock-panel" style={{ padding: '22px 24px 20px' }}>
             {!hasSimulatableElements ? (
               <>
-                <div className="text-label" style={{ marginBottom: 6 }}>Get started</div>
-                <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--t1)', margin: 0, letterSpacing: '-0.3px' }}>Build your production line, then run it here</h2>
+                <div className="text-label" style={{ marginBottom: 6 }}>{t('Get started')}</div>
+                <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--t1)', margin: 0, letterSpacing: '-0.3px' }}>{t('Build your production line, then run it here')}</h2>
                 <ol className="grid gap-3 mt-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', listStyle: 'none', padding: 0, margin: '20px 0 0' }}>
                   {[
                     ['Build', 'Place a source, your stations and buffers, and a sink. Or start from a ready-made template.'],
@@ -906,23 +908,23 @@ export function Dashboard() {
                   ))}
                 </ol>
                 <div className="flex gap-2 mt-6">
-                  <Button onClick={() => navigate('/builder')}>Open the builder</Button>
+                  <Button onClick={() => navigate('/builder')}>{t('Open the builder')}</Button>
                 </div>
               </>
             ) : (
               <div className="flex items-center justify-between gap-6 flex-wrap">
                 <div>
-                  <div className="text-label" style={{ marginBottom: 6 }}>Ready to run</div>
+                  <div className="text-label" style={{ marginBottom: 6 }}>{t('Ready to run')}</div>
                   <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--t1)', margin: 0, letterSpacing: '-0.3px' }}>{model.name || 'Untitled model'}</h2>
                   <p style={{ fontSize: 13, color: 'var(--t2)', margin: '4px 0 0' }}>
                     {model.stations.length} station{model.stations.length === 1 ? '' : 's'} · {model.buffers.length} buffer{model.buffers.length === 1 ? '' : 's'} · {model.products.length} product{model.products.length === 1 ? '' : 's'}
                     {' — '}simulating {duration >= 86400 ? `${duration / 86400} day${duration === 86400 ? '' : 's'}` : `${duration / 3600} hour${duration === 3600 ? '' : 's'}`}. Change it under Settings in the ribbon.
                   </p>
                   {!simpleMode && (
-                    <p style={{ fontSize: 12, color: 'var(--t3)', margin: '6px 0 0' }}>Results include OEE, throughput, bottlenecks, WIP trends and a schedule Gantt.</p>
+                    <p style={{ fontSize: 12, color: 'var(--t3)', margin: '6px 0 0' }}>{t('Results include OEE, throughput, bottlenecks, WIP trends and a schedule Gantt.')}</p>
                   )}
                 </div>
-                <Button size="lg" onClick={handleRunSimulation} icon={<PlayIcon className="w-4 h-4" />}>Run simulation</Button>
+                <Button size="lg" onClick={handleRunSimulation} icon={<PlayIcon className="w-4 h-4" />}>{t('Run simulation')}</Button>
               </div>
             )}
           </div>
@@ -956,7 +958,7 @@ export function Dashboard() {
           {kpis.delivery && kpis.delivery.onTimeRate != null && kpis.delivery.onTimeRate < 1.0 && (
             <StatCard
               key="delivery-summary"
-              title="On-Time Delivery"
+              title={t('On-Time Delivery')}
               value={formatPercentage(kpis.delivery.onTimeRate)}
               status={kpis.delivery.onTimeRate >= 0.95 ? 'good' : kpis.delivery.onTimeRate >= 0.80 ? 'warning' : 'bad'}
               icon={<ClockIcon className="w-6 h-6 text-[#2563EB]" />}
@@ -1042,7 +1044,7 @@ function StationPerformanceTable({ kpis, model, onStationClick }: { kpis: KPIDat
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search stations..."
+          placeholder={t('Search stations...')}
           className="w-full max-w-xs px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
         />
       </div>
@@ -1085,10 +1087,10 @@ function StationPerformanceTable({ kpis, model, onStationClick }: { kpis: KPIDat
                         {shortName(row.name)}
                       </span>
                       {row.oee > 0 && row.oee < 0.1 && (
-                        <span className="chip chip-red" style={{ fontSize: 9 }}>LOW</span>
+                        <span className="chip chip-red" style={{ fontSize: 9 }}>{t('LOW')}</span>
                       )}
                       {row.utilization > 0.95 && (
-                        <span className="chip chip-red" style={{ fontSize: 9 }}>Bottleneck</span>
+                        <span className="chip chip-red" style={{ fontSize: 9 }}>{t('Bottleneck')}</span>
                       )}
                     </div>
                   </td>
@@ -1109,7 +1111,7 @@ function StationPerformanceTable({ kpis, model, onStationClick }: { kpis: KPIDat
                   <td className="tabular-nums" title={row.performanceNote === 'constant_ct' ? 'P = 100% is expected for constant cycle times (no speed variation)' : undefined}>
                     {formatPercentage(row.performance)}
                     {row.performanceNote === 'constant_ct' && (
-                      <span className="ml-1 text-[9px] cursor-help" style={{ color: 'var(--blue)' }} title="P = 100% expected for constant cycle time">*</span>
+                      <span className="ml-1 text-[9px] cursor-help" style={{ color: 'var(--blue)' }} title={t('P = 100% expected for constant cycle time')}>*</span>
                     )}
                   </td>
                   <td className="tabular-nums">{formatPercentage(row.quality)}</td>
@@ -1153,7 +1155,7 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
       return (
         <StatCard
           key={config.id}
-          title="Overall OEE"
+          title={t('Overall OEE')}
           value={formatPercentage(kpis.oee.overall)}
           status={kpis.oee.overall >= 0.85 ? 'good' : kpis.oee.overall >= 0.65 ? 'warning' : 'bad'}
           subtitle={batchSubtitle}
@@ -1166,8 +1168,8 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
       return (
         <StatCard
           key={config.id}
-          title="Throughput"
-          value={`${kpis.throughput.total} units`}
+          title={t('Throughput')}
+          value={t('{n} units', { n: kpis.throughput.total })}
           changeLabel={kpis.throughput.inProgress ? `+${kpis.throughput.inProgress} still in system` : undefined}
           icon={<TrendUpIcon className="w-6 h-6 text-[#17C964]" />}
         />
@@ -1176,7 +1178,7 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
       return (
         <StatCard
           key={config.id}
-          title="Avg Cycle Time"
+          title={t('Avg Cycle Time')}
           value={formatDuration(kpis.cycleTime.mean)}
           icon={<ClockIcon className="w-6 h-6 text-[#2563EB]" />}
         />
@@ -1185,8 +1187,8 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
       return (
         <StatCard
           key={config.id}
-          title="WIP at End"
-          value={`${kpis.wip.total} items`}
+          title={t('WIP at End')}
+          value={t('{n} items', { n: kpis.wip.total })}
           subtitle={kpis.wip.average != null ? `avg ${Number(kpis.wip.average).toFixed(1)} · peak ${kpis.wip.peak ?? '–'}` : undefined}
           status={kpis.wip.total < 50 ? 'good' : kpis.wip.total < 100 ? 'warning' : 'bad'}
           icon={<BoxIcon className="w-6 h-6 text-[#F5A524]" />}
@@ -1198,7 +1200,7 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
       return (
         <StatCard
           key={config.id}
-          title="Quality / Scrap"
+          title={t('Quality / Scrap')}
           value={formatPercentage(qualPct)}
           status={qualPct >= 0.98 ? 'good' : qualPct >= 0.95 ? 'warning' : 'bad'}
           changeLabel={`${totalScrapped} scrapped`}
@@ -1214,11 +1216,11 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
         : 0;
       return (
         <Card key={config.id}>
-          <CardHeader title="OEE Breakdown" subtitle="Availability x Performance x Quality" />
+          <CardHeader title={t('OEE Breakdown')} subtitle={t('Availability x Performance x Quality')} />
           <OEEChart data={kpis.oee} />
           {oeeHasBatch && oeeAvgBusy < 0.50 && (
             <div className="mx-4 mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">
-              <span className="font-semibold">Batch stations detected.</span>{' '}
+              <span className="font-semibold">{t('Batch stations detected.')}</span>{' '}
               OEE reflects processing speed (correct per standard). Average productive utilization is{' '}
               <span className="font-bold">{(oeeAvgBusy * 100).toFixed(0)}%</span> — the remaining time is batch accumulation wait.
               See Station Utilization chart for the full breakdown.
@@ -1230,7 +1232,7 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
     case 'throughput-chart':
       return (
         <Card key={config.id}>
-          <CardHeader title="Throughput by Hour" subtitle="Units produced per hour" />
+          <CardHeader title={t('Throughput by Hour')} subtitle={t('Units produced per hour')} />
           <ThroughputChart data={kpis.throughput} />
         </Card>
       );
@@ -1238,8 +1240,8 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
       return (
         <Card key={config.id}>
           <CardHeader
-            title="Bottleneck Analysis"
-            subtitle="Station utilization heatmap"
+            title={t('Bottleneck Analysis')}
+            subtitle={t('Time split per station and utilisation ranking')}
           />
           <BottleneckHeatmap stations={model.stations} kpis={kpis} connections={model.connections} />
         </Card>
@@ -1247,21 +1249,21 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
     case 'station-table':
       return (
         <Card key={config.id}>
-          <CardHeader title="Station Performance" />
+          <CardHeader title={t('Station Performance')} />
           <StationPerformanceTable kpis={kpis} model={model} onStationClick={onStationClick} />
         </Card>
       );
     case 'utilization-chart':
       return (
         <Card key={config.id}>
-          <CardHeader title="Station Utilization" subtitle="Busy / Idle / Blocked / Failed breakdown" />
+          <CardHeader title={t('Station Utilization')} subtitle={t('Busy / Idle / Blocked / Failed breakdown')} />
           <UtilizationChart data={kpis.utilization} />
         </Card>
       );
     case 'quality-chart':
       return (
         <Card key={config.id}>
-          <CardHeader title="Quality / Scrap by Station" subtitle="Sorted worst-first" />
+          <CardHeader title={t('Quality / Scrap by Station')} subtitle={t('Sorted worst-first')} />
           <QualityScrapChart data={kpis.oee} result={result} />
         </Card>
       );
@@ -1282,7 +1284,7 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
       }
       return (
         <Card key={config.id}>
-          <CardHeader title="WIP Over Time" subtitle="Work-in-progress trend" />
+          <CardHeader title={t('WIP Over Time')} subtitle={t('Work-in-progress trend')} />
           <WipTrendChart data={kpis.wip} events={wipEvents} warnings={kpis.warnings} />
         </Card>
       );
@@ -1290,7 +1292,7 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
     case 'gantt-schedule':
       return (
         <Card key={config.id}>
-          <CardHeader title="Schedule Gantt" subtitle="Swimlane timeline — click a job block to trace its route" />
+          <CardHeader title={t('Schedule Gantt')} subtitle={t('Swimlane timeline — click a job block to trace its route')} />
           <GanttScheduleView
             result={result!}
             stations={model.stations}
@@ -1303,56 +1305,56 @@ function renderWidget(config: DashboardWidgetConfig, kpis: KPIData, model: any, 
     case 'sankey-flow':
       return (
         <Card key={config.id}>
-          <CardHeader title="Material Flow" subtitle="Sankey diagram — link width proportional to throughput" />
+          <CardHeader title={t('Material Flow')} subtitle={t('Sankey diagram — link width proportional to throughput')} />
           <SankeyChart kpis={kpis} model={model} result={result ?? null} />
         </Card>
       );
     case 'cycle-time-pareto':
       return (
         <Card key={config.id}>
-          <CardHeader title="Cycle Time Pareto" subtitle="Stations ranked by processing time contribution" />
+          <CardHeader title={t('Cycle Time Pareto')} subtitle={t('Stations ranked by processing time contribution')} />
           <CycleTimePareto kpis={kpis} model={model} />
         </Card>
       );
     case 'throughput-waterfall':
       return (
         <Card key={config.id}>
-          <CardHeader title="Throughput Waterfall" subtitle="OEE loss cascade: Theoretical Max → Actual Output" />
+          <CardHeader title={t('Throughput Waterfall')} subtitle={t('OEE loss cascade: Theoretical Max → Actual Output')} />
           <ThroughputWaterfall kpis={kpis} model={model} />
         </Card>
       );
     case 'buffer-sparklines':
       return (
         <Card key={config.id}>
-          <CardHeader title="Buffer Fill Levels" subtitle="Sparklines showing buffer utilization over time" />
+          <CardHeader title={t('Buffer Fill Levels')} subtitle={t('Sparklines showing buffer utilization over time')} />
           <BufferSparklines kpis={kpis} model={model} result={result ?? null} />
         </Card>
       );
     case 'cost-summary':
       return (
         <Card key={config.id}>
-          <CardHeader title="Cost Summary" subtitle="Operating, variable, and scrap cost breakdown" />
+          <CardHeader title={t('Cost Summary')} subtitle={t('Operating, variable, and scrap cost breakdown')} />
           <CostSummary kpis={kpis} model={model} />
         </Card>
       );
     case 'energy-chart':
       return (
         <Card key={config.id}>
-          <CardHeader title="Energy Consumption" subtitle="Energy usage (kWh), cost, and CO2 by station" />
+          <CardHeader title={t('Energy Consumption')} subtitle={t('Energy usage (kWh), cost, and CO2 by station')} />
           <EnergyChart kpis={kpis} model={model} />
         </Card>
       );
     case 'maintenance-chart':
       return (
         <Card key={config.id}>
-          <CardHeader title="Maintenance Overview" subtitle="Planned vs unplanned downtime by station" />
+          <CardHeader title={t('Maintenance Overview')} subtitle={t('Planned vs unplanned downtime by station')} />
           <MaintenanceChart kpis={kpis} model={model} />
         </Card>
       );
     case 'value-stream-map':
       return (
         <Card key={config.id}>
-          <CardHeader title="Value Stream Map" subtitle="Process flow, cycle times, inventory, and lead time breakdown" />
+          <CardHeader title={t('Value Stream Map')} subtitle={t('Process flow, cycle times, inventory, and lead time breakdown')} />
           <ValueStreamMap kpis={kpis} model={model} />
         </Card>
       );

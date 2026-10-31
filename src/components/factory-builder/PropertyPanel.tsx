@@ -5,6 +5,7 @@ import { useModelStore } from '../../stores/modelStore';
 import { ModelSelectorInline } from './ModelLibraryPanel';
 import type { Station, Buffer, DistributionConfig, ShiftSchedule } from '../../types';
 
+import { t } from '../../i18n';
 // ── Validation helpers ──
 
 type ValidationErrors = Record<string, string>;
@@ -242,8 +243,8 @@ export function PropertyPanel({ node, nodeType, onUpdate, onClose }: PropertyPan
             </svg>
           </div>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            Details of “{localNode.name || label}”
-            <span style={{ fontWeight: 400, color: '#64748B' }}> · {label}</span>
+            {t('Details of “{name}”', { name: localNode.name || label })}
+            <span style={{ fontWeight: 400, color: '#64748B' }}> · {t(label)}</span>
           </span>
         </div>
         <button
@@ -269,7 +270,7 @@ export function PropertyPanel({ node, nodeType, onUpdate, onClose }: PropertyPan
       <div className="space-y-3">
         {/* Common Name field */}
         <div>
-          <label htmlFor="property-name" className="input-label">Name</label>
+          <label htmlFor="property-name" className="input-label">{t('Name')}</label>
           <input
             id="property-name"
             type="text"
@@ -429,7 +430,7 @@ export function PropertyPanel({ node, nodeType, onUpdate, onClose }: PropertyPan
 
         <div style={{ paddingTop: 14, borderTop: '1px solid #f1f5f9', marginTop: 4 }}>
           {validation.hasErrors && (
-            <p className="text-xs text-red-500 mb-2">Fix validation errors before saving.</p>
+            <p className="text-xs text-red-500 mb-2">{t('Fix validation errors before saving.')}</p>
           )}
           <Button onClick={handleSave} disabled={validation.hasErrors} className="w-full">
             Apply Changes
@@ -460,23 +461,23 @@ function StationProperties({
   return (
     <>
       <div>
-        <label htmlFor="station-cycleTimeType" className="input-label">Cycle Time Type</label>
+        <label htmlFor="station-cycleTimeType" className="input-label">{t('Cycle Time Type')}</label>
         <select
           id="station-cycleTimeType"
           value={cycleTime.type}
           onChange={(e) => handleCycleTimeChange({ type: e.target.value as DistributionConfig['type'] })}
           className="input"
         >
-          <option value="constant">Constant</option>
-          <option value="normal">Normal</option>
-          <option value="exponential">Exponential</option>
-          <option value="triangular">Triangular</option>
+          <option value="constant">{t('Constant')}</option>
+          <option value="normal">{t('Normal')}</option>
+          <option value="exponential">{t('Exponential')}</option>
+          <option value="triangular">{t('Triangular')}</option>
         </select>
       </div>
 
       {cycleTime.type === 'constant' && (
         <ValidatedNumberInput
-          label="Cycle Time (seconds)"
+          label={t('Cycle Time (seconds)')}
           value={Number(cycleTime.parameters?.value) || 60}
           onChange={(e) =>
             handleCycleTimeChange({
@@ -494,7 +495,7 @@ function StationProperties({
       {cycleTime.type === 'normal' && (
         <>
           <ValidatedNumberInput
-            label="Mean (seconds)"
+            label={t('Mean (seconds)')}
             value={Number(cycleTime.parameters?.mean) || 60}
             onChange={(e) =>
               handleCycleTimeChange({
@@ -508,7 +509,7 @@ function StationProperties({
             step={0.1}
           />
           <ValidatedNumberInput
-            label="Std Dev (seconds)"
+            label={t('Std Dev (seconds)')}
             value={Number(cycleTime.parameters?.std) || 5}
             onChange={(e) =>
               handleCycleTimeChange({
@@ -525,33 +526,33 @@ function StationProperties({
       )}
 
       <div className="border-t border-gray-200 pt-4">
-        <h4 className="text-sm font-medium text-gray-700 mb-3">Reliability</h4>
+        <h4 className="text-sm font-medium text-gray-700 mb-3">{t('Reliability')}</h4>
 
         <div className="space-y-3">
           <ValidatedNumberInput
-            label="MTBF (hours)"
+            label={t('MTBF (hours)')}
             value={station.mtbf || ''}
             onChange={(e) => onChange('mtbf', e.target.value ? Number(e.target.value) : undefined)}
             fieldId="station-mtbf"
             errors={validation.errors}
             setError={validation.setError}
-            placeholder="Mean Time Between Failures"
+            placeholder={t('Mean Time Between Failures')}
             min={0}
           />
 
           <ValidatedNumberInput
-            label="MTTR (hours)"
+            label={t('MTTR (hours)')}
             value={station.mttr || ''}
             onChange={(e) => onChange('mttr', e.target.value ? Number(e.target.value) : undefined)}
             fieldId="station-mttr"
             errors={validation.errors}
             setError={validation.setError}
-            placeholder="Mean Time To Repair"
+            placeholder={t('Mean Time To Repair')}
             min={0}
           />
 
           <ValidatedNumberInput
-            label="Scrap Rate (%)"
+            label={t('Scrap Rate (%)')}
             value={(station.scrapRate || 0) * 100}
             onChange={(e) => onChange('scrapRate', Number(e.target.value) / 100)}
             fieldId="station-scrapRate"
@@ -565,10 +566,10 @@ function StationProperties({
       </div>
 
       <div className="border-t border-gray-200 pt-4">
-        <h4 className="text-sm font-medium text-gray-700 mb-3">Batch Processing</h4>
+        <h4 className="text-sm font-medium text-gray-700 mb-3">{t('Batch Processing')}</h4>
 
         <ValidatedNumberInput
-          label="Batch Size"
+          label={t('Batch Size')}
           value={station.batchSize || 1}
           onChange={(e) => onChange('batchSize', Number(e.target.value))}
           fieldId="station-batchSize"
@@ -581,7 +582,7 @@ function StationProperties({
 
       {/* Cost Modeling */}
       <div className="border-t border-gray-200 pt-4">
-        <h4 className="text-sm font-medium text-gray-700 mb-3">Cost Modeling</h4>
+        <h4 className="text-sm font-medium text-gray-700 mb-3">{t('Cost Modeling')}</h4>
         <div className="grid grid-cols-3 gap-3">
           <ValidatedNumberInput
             label="$/hour"
@@ -621,10 +622,10 @@ function StationProperties({
 
       {/* Energy Modeling */}
       <div className="border-t border-gray-200 pt-4">
-        <h4 className="text-sm font-medium text-gray-700 mb-3">Energy Modeling</h4>
+        <h4 className="text-sm font-medium text-gray-700 mb-3">{t('Energy Modeling')}</h4>
         <div className="grid grid-cols-3 gap-2">
           <ValidatedNumberInput
-            label="kW Idle"
+            label={t('kW Idle')}
             value={station.energyIdleKw || ''}
             onChange={(e) => onChange('energyIdleKw', e.target.value ? Number(e.target.value) : undefined)}
             fieldId="station-energyIdleKw"
@@ -635,7 +636,7 @@ function StationProperties({
             placeholder="0"
           />
           <ValidatedNumberInput
-            label="kW Processing"
+            label={t('kW Processing')}
             value={station.energyProcessingKw || ''}
             onChange={(e) => onChange('energyProcessingKw', e.target.value ? Number(e.target.value) : undefined)}
             fieldId="station-energyProcessingKw"
@@ -646,7 +647,7 @@ function StationProperties({
             placeholder="0"
           />
           <ValidatedNumberInput
-            label="kW Setup"
+            label={t('kW Setup')}
             value={station.energySetupKw || ''}
             onChange={(e) => onChange('energySetupKw', e.target.value ? Number(e.target.value) : undefined)}
             fieldId="station-energySetupKw"
@@ -661,10 +662,10 @@ function StationProperties({
 
       {/* Preventive Maintenance */}
       <div className="border-t border-gray-200 pt-4">
-        <h4 className="text-sm font-medium text-gray-700 mb-3">Preventive Maintenance</h4>
+        <h4 className="text-sm font-medium text-gray-700 mb-3">{t('Preventive Maintenance')}</h4>
         <div className="grid grid-cols-3 gap-2">
           <ValidatedNumberInput
-            label="PM Interval (hrs)"
+            label={t('PM Interval (hrs)')}
             value={station.pmInterval || ''}
             onChange={(e) => onChange('pmInterval', e.target.value ? Number(e.target.value) : undefined)}
             fieldId="station-pmInterval"
@@ -675,7 +676,7 @@ function StationProperties({
             placeholder="0"
           />
           <ValidatedNumberInput
-            label="PM Duration (hrs)"
+            label={t('PM Duration (hrs)')}
             value={station.pmDuration || ''}
             onChange={(e) => onChange('pmDuration', e.target.value ? Number(e.target.value) : undefined)}
             fieldId="station-pmDuration"
@@ -686,7 +687,7 @@ function StationProperties({
             placeholder="0"
           />
           <ValidatedNumberInput
-            label="PM $/event"
+            label={t('PM $/event')}
             value={station.pmCostPerEvent || ''}
             onChange={(e) => onChange('pmCostPerEvent', e.target.value ? Number(e.target.value) : undefined)}
             fieldId="station-pmCostPerEvent"
@@ -702,16 +703,16 @@ function StationProperties({
       {/* Rework */}
       {(station.scrapRate ?? 0) > 0 && (
         <div className="border-t border-gray-200 pt-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Rework</h4>
+          <h4 className="text-sm font-medium text-gray-700 mb-3">{t('Rework')}</h4>
           <div className="space-y-3">
             <div>
-              <label className="input-label">Rework Target Station</label>
+              <label className="input-label">{t('Rework Target Station')}</label>
               <select
                 value={station.reworkTarget || ''}
                 onChange={(e) => onChange('reworkTarget', e.target.value || undefined)}
                 className="input"
               >
-                <option value="">None (scrap all defects)</option>
+                <option value="">{t('None (scrap all defects)')}</option>
                 {useModelStore.getState().model.stations
                   .filter(s => s.id !== station.id)
                   .map(s => (
@@ -722,7 +723,7 @@ function StationProperties({
             </div>
             {station.reworkTarget && (
               <ValidatedNumberInput
-                label="Rework Rate (% of defects sent to rework)"
+                label={t('Rework Rate (% of defects sent to rework)')}
                 value={((station.reworkRate || 0) * 100)}
                 onChange={(e) => onChange('reworkRate', Number(e.target.value) / 100)}
                 fieldId="station-reworkRate"
@@ -797,12 +798,12 @@ function ShiftConfiguration({
         onClick={() => setExpanded(!expanded)}
         className="flex items-center justify-between w-full text-sm font-medium text-gray-700 mb-2"
       >
-        <span>Shift Schedule</span>
+        <span>{t('Shift Schedule')}</span>
         <span className="text-xs text-gray-400">{expanded ? '▼' : '▶'}</span>
       </button>
       {expanded && (
         <>
-          <p className="text-xs text-gray-400 mb-3">No shifts = 24/7 operation</p>
+          <p className="text-xs text-gray-400 mb-3">{t('No shifts = 24/7 operation')}</p>
           <div className="space-y-3">
             {shiftList.map((shift, i) => (
               <div key={i} className="border border-gray-100 rounded p-2 space-y-2">
@@ -812,7 +813,7 @@ function ShiftConfiguration({
                     value={shift.name}
                     onChange={(e) => updateShift(i, { name: e.target.value })}
                     className="input text-xs flex-1 mr-2"
-                    placeholder="Shift name"
+                    placeholder={t('Shift name')}
                   />
                   <button
                     onClick={() => removeShift(i)}
@@ -823,7 +824,7 @@ function ShiftConfiguration({
                 </div>
                 <div className="flex space-x-2">
                   <div className="flex-1">
-                    <label className="text-xs text-gray-500">Start</label>
+                    <label className="text-xs text-gray-500">{t('Start')}</label>
                     <input
                       type="number"
                       value={shift.startHour}
@@ -835,7 +836,7 @@ function ShiftConfiguration({
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="text-xs text-gray-500">End</label>
+                    <label className="text-xs text-gray-500">{t('End')}</label>
                     <input
                       type="number"
                       value={shift.endHour}
@@ -848,7 +849,7 @@ function ShiftConfiguration({
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500">Days</label>
+                  <label className="text-xs text-gray-500">{t('Days')}</label>
                   <div className="flex space-x-1 mt-1">
                     {DAY_LABELS.map((label, day) => (
                       <button
@@ -902,12 +903,12 @@ function PerProductCycleTimes({
         onClick={() => setExpanded(!expanded)}
         className="flex items-center justify-between w-full text-sm font-medium text-gray-700 mb-2"
       >
-        <span>Per-Product Cycle Times</span>
+        <span>{t('Per-Product Cycle Times')}</span>
         <span className="text-xs text-gray-400">{expanded ? '▼' : '▶'}</span>
       </button>
       {expanded && (
         <>
-          <p className="text-xs text-gray-400 mb-3">Override cycle time for specific products (optional)</p>
+          <p className="text-xs text-gray-400 mb-3">{t('Override cycle time for specific products (optional)')}</p>
           <div className="space-y-3">
             {products.map(p => {
               const override = times[p.id];
@@ -932,7 +933,7 @@ function PerProductCycleTimes({
                         }}
                         className="rounded text-blue-600"
                       />
-                      <span className="text-xs text-gray-500">Override</span>
+                      <span className="text-xs text-gray-500">{t('Override')}</span>
                     </label>
                   </div>
                   {hasOverride && (
@@ -946,10 +947,10 @@ function PerProductCycleTimes({
                         }}
                         className="input text-xs flex-1"
                       >
-                        <option value="constant">Constant</option>
-                        <option value="normal">Normal</option>
-                        <option value="exponential">Exponential</option>
-                        <option value="triangular">Triangular</option>
+                        <option value="constant">{t('Constant')}</option>
+                        <option value="normal">{t('Normal')}</option>
+                        <option value="exponential">{t('Exponential')}</option>
+                        <option value="triangular">{t('Triangular')}</option>
                       </select>
                       <input
                         type="number"
@@ -993,7 +994,7 @@ function BufferProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Capacity"
+        label={t('Capacity')}
         value={buffer.capacity}
         onChange={(e) => onChange('capacity', Number(e.target.value))}
         fieldId="buffer-capacity"
@@ -1004,15 +1005,15 @@ function BufferProperties({
       />
 
       <div>
-        <label className="input-label">Queue Rule</label>
+        <label className="input-label">{t('Queue Rule')}</label>
         <select
           value={buffer.queueRule}
           onChange={(e) => onChange('queueRule', e.target.value)}
           className="input"
         >
-          <option value="FIFO">FIFO (First In First Out)</option>
-          <option value="LIFO">LIFO (Last In First Out)</option>
-          <option value="PRIORITY">Priority</option>
+          <option value="FIFO">{t('FIFO (First In First Out)')}</option>
+          <option value="LIFO">{t('LIFO (Last In First Out)')}</option>
+          <option value="PRIORITY">{t('Priority')}</option>
         </select>
       </div>
 
@@ -1032,7 +1033,7 @@ function BufferProperties({
         </div>
         {buffer.kanbanEnabled && (
           <ValidatedNumberInput
-            label="Kanban Cards"
+            label={t('Kanban Cards')}
             value={buffer.kanbanCards || buffer.capacity}
             onChange={(e) => onChange('kanbanCards', Number(e.target.value))}
             fieldId="buffer-kanbanCards"
@@ -1062,14 +1063,14 @@ function SourceProperties({
   return (
     <>
       <div>
-        <label className="input-label">Feed Mode</label>
+        <label className="input-label">{t('Feed Mode')}</label>
         <select
           value={feedMode}
           onChange={(e) => onChange('feedMode', e.target.value)}
           className="input"
         >
-          <option value="interval">Interval (fixed rate)</option>
-          <option value="orders">Orders (from order queue)</option>
+          <option value="interval">{t('Interval (fixed rate)')}</option>
+          <option value="orders">{t('Orders (from order queue)')}</option>
         </select>
         <p className="text-xs text-gray-400 mt-1">
           {feedMode === 'interval'
@@ -1079,7 +1080,7 @@ function SourceProperties({
       </div>
       {feedMode === 'interval' && (
         <ValidatedNumberInput
-          label="Arrival Rate (seconds between arrivals)"
+          label={t('Arrival Rate (seconds between arrivals)')}
           value={node.arrivalRate || 120}
           onChange={(e) => onChange('arrivalRate', Number(e.target.value))}
           fieldId="source-arrivalRate"
@@ -1091,13 +1092,13 @@ function SourceProperties({
         />
       )}
       <div>
-        <label className="input-label">Product Filter (optional)</label>
+        <label className="input-label">{t('Product Filter (optional)')}</label>
         <SourceProductFilter productFilter={node.productFilter} onChange={onChange} />
       </div>
       {!node.productFilter && (
         <div>
           <ValidatedNumberInput
-            label="Product Batch Size"
+            label={t('Product Batch Size')}
             value={node.productBatchSize || 1}
             onChange={(e) => onChange('productBatchSize', Math.max(1, Number(e.target.value)))}
             fieldId="source-productBatchSize"
@@ -1107,7 +1108,7 @@ function SourceProperties({
             step={1}
             integer
           />
-          <p className="text-xs text-gray-400 mt-1">Consecutive parts of same type before switching (1 = round-robin)</p>
+          <p className="text-xs text-gray-400 mt-1">{t('Consecutive parts of same type before switching (1 = round-robin)')}</p>
         </div>
       )}
     </>
@@ -1125,12 +1126,12 @@ function SourceProductFilter({ productFilter, onChange }: { productFilter?: stri
         onChange={(e) => onChange('productFilter', e.target.value || undefined)}
         className="input"
       >
-        <option value="">All products</option>
+        <option value="">{t('All products')}</option>
         {products.map(p => (
           <option key={p.id} value={p.id}>{p.name}</option>
         ))}
       </select>
-      <p className="text-xs text-gray-400 mt-1">Only spawn this product type (leave empty for all)</p>
+      <p className="text-xs text-gray-400 mt-1">{t('Only spawn this product type (leave empty for all)')}</p>
     </>
   );
 }
@@ -1157,7 +1158,7 @@ function ConveyorProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Length (meters)"
+        label={t('Length (meters)')}
         value={node.length || 10}
         onChange={(e) => onChange('length', Number(e.target.value))}
         fieldId="conveyor-length"
@@ -1167,7 +1168,7 @@ function ConveyorProperties({
         step={0.5}
       />
       <ValidatedNumberInput
-        label="Speed (m/s)"
+        label={t('Speed (m/s)')}
         value={node.speed || 1}
         onChange={(e) => onChange('speed', Number(e.target.value))}
         fieldId="conveyor-speed"
@@ -1177,7 +1178,7 @@ function ConveyorProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Capacity (items)"
+        label={t('Capacity (items)')}
         value={node.capacity || 10}
         onChange={(e) => onChange('capacity', Number(e.target.value))}
         fieldId="conveyor-capacity"
@@ -1187,15 +1188,15 @@ function ConveyorProperties({
         integer
       />
       <div>
-        <label htmlFor="conveyor-accumulationMode" className="input-label">Accumulation Mode</label>
+        <label htmlFor="conveyor-accumulationMode" className="input-label">{t('Accumulation Mode')}</label>
         <select
           id="conveyor-accumulationMode"
           value={node.accumulationMode || 'non-accumulating'}
           onChange={(e) => onChange('accumulationMode', e.target.value)}
           className="input"
         >
-          <option value="non-accumulating">Non-Accumulating</option>
-          <option value="accumulating">Accumulating</option>
+          <option value="non-accumulating">{t('Non-Accumulating')}</option>
+          <option value="accumulating">{t('Accumulating')}</option>
         </select>
       </div>
     </>
@@ -1215,7 +1216,7 @@ function OperatorProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Number of Operators"
+        label={t('Number of Operators')}
         value={node.count || 1}
         onChange={(e) => onChange('count', Number(e.target.value))}
         fieldId="operator-count"
@@ -1225,7 +1226,7 @@ function OperatorProperties({
         integer
       />
       <ValidatedNumberInput
-        label="Efficiency (%)"
+        label={t('Efficiency (%)')}
         value={node.efficiency || 100}
         onChange={(e) => onChange('efficiency', Number(e.target.value))}
         fieldId="operator-efficiency"
@@ -1236,13 +1237,13 @@ function OperatorProperties({
         step={1}
       />
       <div>
-        <label className="input-label">Skill</label>
+        <label className="input-label">{t('Skill')}</label>
         <input
           type="text"
           value={node.skill || 'General'}
           onChange={(e) => onChange('skill', e.target.value)}
           className="input"
-          placeholder="e.g., General, Welding, Assembly"
+          placeholder={t('e.g., General, Welding, Assembly')}
         />
       </div>
     </>
@@ -1262,7 +1263,7 @@ function InspectionProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Inspection Time (seconds)"
+        label={t('Inspection Time (seconds)')}
         value={node.inspectionTime || 30}
         onChange={(e) => onChange('inspectionTime', Number(e.target.value))}
         fieldId="inspection-time"
@@ -1272,7 +1273,7 @@ function InspectionProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Defect Rate (%)"
+        label={t('Defect Rate (%)')}
         value={node.defectRate || 2}
         onChange={(e) => onChange('defectRate', Number(e.target.value))}
         fieldId="inspection-defectRate"
@@ -1283,15 +1284,15 @@ function InspectionProperties({
         step={0.1}
       />
       <div>
-        <label className="input-label">Inspection Type</label>
+        <label className="input-label">{t('Inspection Type')}</label>
         <select
           value={node.inspectionType || 'visual'}
           onChange={(e) => onChange('inspectionType', e.target.value)}
           className="input"
         >
-          <option value="visual">Visual</option>
-          <option value="automated">Automated</option>
-          <option value="sampling">Sampling</option>
+          <option value="visual">{t('Visual')}</option>
+          <option value="automated">{t('Automated')}</option>
+          <option value="sampling">{t('Sampling')}</option>
         </select>
       </div>
     </>
@@ -1317,7 +1318,7 @@ function AssemblyProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Cycle Time (seconds)"
+        label={t('Cycle Time (seconds)')}
         value={node.cycleTime || 60}
         onChange={(e) => onChange('cycleTime', Number(e.target.value))}
         fieldId="assembly-cycleTime"
@@ -1327,7 +1328,7 @@ function AssemblyProperties({
         step={0.1}
       />
       <div>
-        <label className="input-label">Input Mode</label>
+        <label className="input-label">{t('Input Mode')}</label>
         <select
           value={perProductMode ? 'per-product' : 'simple'}
           onChange={(e) => {
@@ -1339,13 +1340,13 @@ function AssemblyProperties({
           }}
           className="input"
         >
-          <option value="simple">Simple (count)</option>
-          <option value="per-product">Per-product</option>
+          <option value="simple">{t('Simple (count)')}</option>
+          <option value="per-product">{t('Per-product')}</option>
         </select>
       </div>
       {!perProductMode ? (
         <div>
-          <label className="input-label">Input Parts Required</label>
+          <label className="input-label">{t('Input Parts Required')}</label>
           <input
             type="number"
             value={node.inputParts || 2}
@@ -1358,7 +1359,7 @@ function AssemblyProperties({
         </div>
       ) : (
         <div className="border-t border-gray-200 pt-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Required Parts by Product</h4>
+          <h4 className="text-sm font-medium text-gray-700 mb-2">{t('Required Parts by Product')}</h4>
           <div className="space-y-2">
             {inputPartsByProduct.map((part, i) => (
               <div key={i} className="flex items-center space-x-2">
@@ -1372,7 +1373,7 @@ function AssemblyProperties({
                   }}
                   className="input text-xs flex-1"
                 >
-                  <option value="">Select product...</option>
+                  <option value="">{t('Select product...')}</option>
                   {products.map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
@@ -1388,7 +1389,7 @@ function AssemblyProperties({
                   min={1}
                   step={1}
                   className="input text-xs w-16"
-                  placeholder="Qty"
+                  placeholder={t('Qty')}
                 />
                 <button
                   onClick={() => {
@@ -1437,7 +1438,7 @@ function SplitterProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Number of Outputs"
+        label={t('Number of Outputs')}
         value={node.outputs || 2}
         onChange={(e) => onChange('outputs', Number(e.target.value))}
         fieldId="splitter-outputs"
@@ -1448,24 +1449,24 @@ function SplitterProperties({
         integer
       />
       <div>
-        <label className="input-label">Split Type</label>
+        <label className="input-label">{t('Split Type')}</label>
         <select
           value={node.splitType || 'equal'}
           onChange={(e) => onChange('splitType', e.target.value)}
           className="input"
         >
-          <option value="equal">Equal</option>
-          <option value="percentage">Percentage</option>
-          <option value="conditional">Conditional</option>
-          <option value="product-based">Product-Based</option>
+          <option value="equal">{t('Equal')}</option>
+          <option value="percentage">{t('Percentage')}</option>
+          <option value="conditional">{t('Conditional')}</option>
+          <option value="product-based">{t('Product-Based')}</option>
         </select>
       </div>
       {isProductBased && (
         <div className="border-t border-gray-200 pt-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Product Routing</h4>
-          <p className="text-xs text-gray-400 mb-2">Map each product to an output port</p>
+          <h4 className="text-sm font-medium text-gray-700 mb-3">{t('Product Routing')}</h4>
+          <p className="text-xs text-gray-400 mb-2">{t('Map each product to an output port')}</p>
           {products.length === 0 ? (
-            <p className="text-xs text-amber-600">No products defined in model</p>
+            <p className="text-xs text-amber-600">{t('No products defined in model')}</p>
           ) : (
             <div className="space-y-2">
               {products.map(p => (
@@ -1480,7 +1481,7 @@ function SplitterProperties({
                     className="input w-24 text-xs"
                   >
                     {Array.from({ length: node.outputs || 2 }).map((_, i) => (
-                      <option key={i} value={i}>Output {i + 1}</option>
+                      <option key={i} value={i}>{t('Output')} {i + 1}</option>
                     ))}
                   </select>
                 </div>
@@ -1506,7 +1507,7 @@ function MergeProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Number of Inputs"
+        label={t('Number of Inputs')}
         value={node.inputs || 2}
         onChange={(e) => onChange('inputs', Number(e.target.value))}
         fieldId="merge-inputs"
@@ -1517,15 +1518,15 @@ function MergeProperties({
         integer
       />
       <div>
-        <label className="input-label">Merge Type</label>
+        <label className="input-label">{t('Merge Type')}</label>
         <select
           value={node.mergeType || 'fifo'}
           onChange={(e) => onChange('mergeType', e.target.value)}
           className="input"
         >
-          <option value="fifo">FIFO (First In First Out)</option>
-          <option value="priority">Priority</option>
-          <option value="alternating">Alternating</option>
+          <option value="fifo">{t('FIFO (First In First Out)')}</option>
+          <option value="priority">{t('Priority')}</option>
+          <option value="alternating">{t('Alternating')}</option>
         </select>
       </div>
     </>
@@ -1549,7 +1550,7 @@ function DisassemblyProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Cycle Time (seconds)"
+        label={t('Cycle Time (seconds)')}
         value={node.cycleTime || 30}
         onChange={(e) => onChange('cycleTime', Number(e.target.value))}
         fieldId="disassembly-cycleTime"
@@ -1559,7 +1560,7 @@ function DisassemblyProperties({
         step={0.1}
       />
       <div className="border-t border-gray-200 pt-4">
-        <h4 className="text-sm font-medium text-gray-700 mb-2">Output Parts</h4>
+        <h4 className="text-sm font-medium text-gray-700 mb-2">{t('Output Parts')}</h4>
         <div className="space-y-2">
           {outputParts.map((part, i) => (
             <div key={i} className="flex items-center space-x-2">
@@ -1573,7 +1574,7 @@ function DisassemblyProperties({
                 }}
                 className="input text-xs flex-1"
               >
-                <option value="">Select product...</option>
+                <option value="">{t('Select product...')}</option>
                 {products.map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
@@ -1589,7 +1590,7 @@ function DisassemblyProperties({
                 min={1}
                 step={1}
                 className="input text-xs w-16"
-                placeholder="Qty"
+                placeholder={t('Qty')}
               />
               <button
                 onClick={() => {
@@ -1633,7 +1634,7 @@ function PalletizeProperties({
     <>
       <div>
         <ValidatedNumberInput
-          label="Default Pallet Size (items per pallet)"
+          label={t('Default Pallet Size (items per pallet)')}
           value={node.defaultPalletSize || 10}
           onChange={(e) => onChange('defaultPalletSize', Number(e.target.value))}
           fieldId="palletize-defaultSize"
@@ -1642,10 +1643,10 @@ function PalletizeProperties({
           min={1}
           integer
         />
-        <p className="text-xs text-gray-400 mt-1">Used when no per-product size is set</p>
+        <p className="text-xs text-gray-400 mt-1">{t('Used when no per-product size is set')}</p>
       </div>
       <ValidatedNumberInput
-        label="Cycle Time (seconds)"
+        label={t('Cycle Time (seconds)')}
         value={node.cycleTime || 15}
         onChange={(e) => onChange('cycleTime', Number(e.target.value))}
         fieldId="palletize-cycleTime"
@@ -1656,8 +1657,8 @@ function PalletizeProperties({
       />
       {products.length > 0 && (
         <div className="border-t border-gray-200 pt-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Pallet Size by Product</h4>
-          <p className="text-xs text-gray-400 mb-3">Override pallet size for specific products</p>
+          <h4 className="text-sm font-medium text-gray-700 mb-2">{t('Pallet Size by Product')}</h4>
+          <p className="text-xs text-gray-400 mb-3">{t('Override pallet size for specific products')}</p>
           <div className="space-y-2">
             {products.map(p => {
               const hasOverride = palletSizeByProduct[p.id] !== undefined;
@@ -1716,14 +1717,14 @@ function DepalletizeProperties({
   return (
     <>
       <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-2">
-        <p className="text-xs text-yellow-800 font-medium">Unloads pallet until empty</p>
+        <p className="text-xs text-yellow-800 font-medium">{t('Unloads pallet until empty')}</p>
         <p className="text-xs text-yellow-600 mt-1">
           Automatically unpacks all items from incoming pallets. No pallet size needed.
         </p>
       </div>
       <div>
         <ValidatedNumberInput
-          label="Cycle Time per Item (seconds)"
+          label={t('Cycle Time per Item (seconds)')}
           value={node.cycleTime || 5}
           onChange={(e) => onChange('cycleTime', Number(e.target.value))}
           fieldId="depalletize-cycleTime"
@@ -1732,7 +1733,7 @@ function DepalletizeProperties({
           min={0.1}
           step={0.1}
         />
-        <p className="text-xs text-gray-400 mt-1">Time to unload each individual item from the pallet</p>
+        <p className="text-xs text-gray-400 mt-1">{t('Time to unload each individual item from the pallet')}</p>
       </div>
     </>
   );
@@ -1755,7 +1756,7 @@ function MatchBufferProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Capacity"
+        label={t('Capacity')}
         value={node.capacity || 20}
         onChange={(e) => onChange('capacity', Number(e.target.value))}
         fieldId="matchbuffer-capacity"
@@ -1765,28 +1766,28 @@ function MatchBufferProperties({
         integer
       />
       <div>
-        <label className="input-label">Match Key</label>
+        <label className="input-label">{t('Match Key')}</label>
         <select
           value={node.matchKey || 'order'}
           onChange={(e) => onChange('matchKey', e.target.value)}
           className="input"
         >
-          <option value="order">Order</option>
-          <option value="batch">Batch</option>
+          <option value="order">{t('Order')}</option>
+          <option value="batch">{t('Batch')}</option>
         </select>
       </div>
       <ValidatedNumberInput
-        label="Timeout (seconds, optional)"
+        label={t('Timeout (seconds, optional)')}
         value={node.timeout || ''}
         onChange={(e) => onChange('timeout', e.target.value ? Number(e.target.value) : undefined)}
         fieldId="matchbuffer-timeout"
         errors={validation.errors}
         setError={validation.setError}
-        placeholder="No timeout"
+        placeholder={t('No timeout')}
         min={0}
       />
       <div className="border-t border-gray-200 pt-4">
-        <h4 className="text-sm font-medium text-gray-700 mb-2">Required Parts</h4>
+        <h4 className="text-sm font-medium text-gray-700 mb-2">{t('Required Parts')}</h4>
         <div className="space-y-2">
           {requiredParts.map((part, i) => (
             <div key={i} className="flex items-center space-x-2">
@@ -1800,7 +1801,7 @@ function MatchBufferProperties({
                 }}
                 className="input text-xs flex-1"
               >
-                <option value="">Select product...</option>
+                <option value="">{t('Select product...')}</option>
                 {products.map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
@@ -1816,7 +1817,7 @@ function MatchBufferProperties({
                 min={1}
                 step={1}
                 className="input text-xs w-16"
-                placeholder="Qty"
+                placeholder={t('Qty')}
               />
               <button
                 onClick={() => {
@@ -1855,7 +1856,7 @@ function AGVProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Number of AGVs"
+        label={t('Number of AGVs')}
         value={node.count || 1}
         onChange={(e) => onChange('count', Number(e.target.value))}
         fieldId="agv-count"
@@ -1865,7 +1866,7 @@ function AGVProperties({
         integer
       />
       <ValidatedNumberInput
-        label="Speed (m/s)"
+        label={t('Speed (m/s)')}
         value={node.speed ?? 1.5}
         onChange={(e) => onChange('speed', Number(e.target.value))}
         fieldId="agv-speed"
@@ -1875,7 +1876,7 @@ function AGVProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Capacity (items)"
+        label={t('Capacity (items)')}
         value={node.capacity || 1}
         onChange={(e) => onChange('capacity', Number(e.target.value))}
         fieldId="agv-capacity"
@@ -1901,7 +1902,7 @@ function RoboticCellProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Cycle Time (s)"
+        label={t('Cycle Time (s)')}
         value={node.cycleTime || 30}
         onChange={(e) => onChange('cycleTime', Number(e.target.value))}
         fieldId="roboticcell-cycletime"
@@ -1911,13 +1912,13 @@ function RoboticCellProperties({
         step={0.1}
       />
       <div>
-        <label className="input-label">Program</label>
+        <label className="input-label">{t('Program')}</label>
         <input
           type="text"
           value={node.program || ''}
           onChange={(e) => onChange('program', e.target.value)}
           className="input"
-          placeholder="e.g., Weld-01, Pick-Place"
+          placeholder={t('e.g., Weld-01, Pick-Place')}
         />
       </div>
     </>
@@ -1937,7 +1938,7 @@ function HumanoidProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Number of Humanoids"
+        label={t('Number of Humanoids')}
         value={node.count || 1}
         onChange={(e) => onChange('count', Number(e.target.value))}
         fieldId="humanoid-count"
@@ -1947,7 +1948,7 @@ function HumanoidProperties({
         integer
       />
       <ValidatedNumberInput
-        label="Efficiency (%)"
+        label={t('Efficiency (%)')}
         value={node.efficiency || 100}
         onChange={(e) => onChange('efficiency', Number(e.target.value))}
         fieldId="humanoid-efficiency"
@@ -1958,13 +1959,13 @@ function HumanoidProperties({
         step={1}
       />
       <div>
-        <label className="input-label">Skill</label>
+        <label className="input-label">{t('Skill')}</label>
         <input
           type="text"
           value={node.skill || 'General'}
           onChange={(e) => onChange('skill', e.target.value)}
           className="input"
-          placeholder="e.g., General, Assembly, Inspection"
+          placeholder={t('e.g., General, Assembly, Inspection')}
         />
       </div>
     </>
@@ -1985,7 +1986,7 @@ function LoadingDockProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Dock Count"
+        label={t('Dock Count')}
         value={node.dockCount ?? 2}
         onChange={(e) => onChange('dockCount', Number(e.target.value))}
         fieldId="loadingdock-dockCount"
@@ -1995,7 +1996,7 @@ function LoadingDockProperties({
         integer
       />
       <ValidatedNumberInput
-        label="Load Time (s)"
+        label={t('Load Time (s)')}
         value={node.loadTime ?? 600}
         onChange={(e) => onChange('loadTime', Number(e.target.value))}
         fieldId="loadingdock-loadTime"
@@ -2004,7 +2005,7 @@ function LoadingDockProperties({
         min={1}
       />
       <ValidatedNumberInput
-        label="Unload Time (s)"
+        label={t('Unload Time (s)')}
         value={node.unloadTime ?? 600}
         onChange={(e) => onChange('unloadTime', Number(e.target.value))}
         fieldId="loadingdock-unloadTime"
@@ -2013,7 +2014,7 @@ function LoadingDockProperties({
         min={1}
       />
       <ValidatedNumberInput
-        label="Truck Arrival Rate (s)"
+        label={t('Truck Arrival Rate (s)')}
         value={node.truckArrivalRate ?? 3600}
         onChange={(e) => onChange('truckArrivalRate', Number(e.target.value))}
         fieldId="loadingdock-truckArrivalRate"
@@ -2022,11 +2023,11 @@ function LoadingDockProperties({
         min={1}
       />
       <div>
-        <label className="input-label">Mode</label>
+        <label className="input-label">{t('Mode')}</label>
         <select className="input" value={node.mode ?? 'both'} onChange={(e) => onChange('mode', e.target.value)}>
-          <option value="inbound">Inbound</option>
-          <option value="outbound">Outbound</option>
-          <option value="both">Both</option>
+          <option value="inbound">{t('Inbound')}</option>
+          <option value="outbound">{t('Outbound')}</option>
+          <option value="both">{t('Both')}</option>
         </select>
       </div>
     </>
@@ -2046,14 +2047,14 @@ function CraneProperties({
   return (
     <>
       <div>
-        <label className="input-label">Crane Type</label>
+        <label className="input-label">{t('Crane Type')}</label>
         <select className="input" value={node.craneType ?? 'gantry'} onChange={(e) => onChange('craneType', e.target.value)}>
-          <option value="gantry">Gantry</option>
-          <option value="bridge">Bridge</option>
+          <option value="gantry">{t('Gantry')}</option>
+          <option value="bridge">{t('Bridge')}</option>
         </select>
       </div>
       <ValidatedNumberInput
-        label="Lift Capacity (kg)"
+        label={t('Lift Capacity (kg)')}
         value={node.liftCapacity ?? 5000}
         onChange={(e) => onChange('liftCapacity', Number(e.target.value))}
         fieldId="crane-liftCapacity"
@@ -2062,7 +2063,7 @@ function CraneProperties({
         min={1}
       />
       <ValidatedNumberInput
-        label="Travel Speed (m/s)"
+        label={t('Travel Speed (m/s)')}
         value={node.travelSpeed ?? 1.0}
         onChange={(e) => onChange('travelSpeed', Number(e.target.value))}
         fieldId="crane-travelSpeed"
@@ -2072,7 +2073,7 @@ function CraneProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Lift Speed (m/s)"
+        label={t('Lift Speed (m/s)')}
         value={node.liftSpeed ?? 0.5}
         onChange={(e) => onChange('liftSpeed', Number(e.target.value))}
         fieldId="crane-liftSpeed"
@@ -2082,7 +2083,7 @@ function CraneProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Span Width (m)"
+        label={t('Span Width (m)')}
         value={node.spanWidth ?? 10}
         onChange={(e) => onChange('spanWidth', Number(e.target.value))}
         fieldId="crane-spanWidth"
@@ -2107,7 +2108,7 @@ function ForkliftProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Count"
+        label={t('Count')}
         value={node.count ?? 1}
         onChange={(e) => onChange('count', Number(e.target.value))}
         fieldId="forklift-count"
@@ -2117,7 +2118,7 @@ function ForkliftProperties({
         integer
       />
       <ValidatedNumberInput
-        label="Lift Capacity (kg)"
+        label={t('Lift Capacity (kg)')}
         value={node.liftCapacity ?? 2000}
         onChange={(e) => onChange('liftCapacity', Number(e.target.value))}
         fieldId="forklift-liftCapacity"
@@ -2126,7 +2127,7 @@ function ForkliftProperties({
         min={1}
       />
       <ValidatedNumberInput
-        label="Speed (m/s)"
+        label={t('Speed (m/s)')}
         value={node.speed ?? 2.0}
         onChange={(e) => onChange('speed', Number(e.target.value))}
         fieldId="forklift-speed"
@@ -2136,7 +2137,7 @@ function ForkliftProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Lift Height (m)"
+        label={t('Lift Height (m)')}
         value={node.liftHeight ?? 5}
         onChange={(e) => onChange('liftHeight', Number(e.target.value))}
         fieldId="forklift-liftHeight"
@@ -2161,7 +2162,7 @@ function ColdStorageProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Capacity"
+        label={t('Capacity')}
         value={node.capacity ?? 200}
         onChange={(e) => onChange('capacity', Number(e.target.value))}
         fieldId="coldstorage-capacity"
@@ -2171,7 +2172,7 @@ function ColdStorageProperties({
         integer
       />
       <ValidatedNumberInput
-        label="Temperature (\u00B0C)"
+        label={t('Temperature (°C)')}
         value={node.temperature ?? -20}
         onChange={(e) => onChange('temperature', Number(e.target.value))}
         fieldId="coldstorage-temperature"
@@ -2181,7 +2182,7 @@ function ColdStorageProperties({
         max={10}
       />
       <ValidatedNumberInput
-        label="Put Time (s)"
+        label={t('Put Time (s)')}
         value={node.putTime ?? 45}
         onChange={(e) => onChange('putTime', Number(e.target.value))}
         fieldId="coldstorage-putTime"
@@ -2190,7 +2191,7 @@ function ColdStorageProperties({
         min={1}
       />
       <ValidatedNumberInput
-        label="Pick Time (s)"
+        label={t('Pick Time (s)')}
         value={node.pickTime ?? 30}
         onChange={(e) => onChange('pickTime', Number(e.target.value))}
         fieldId="coldstorage-pickTime"
@@ -2215,7 +2216,7 @@ function PressProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Cycle Time (s)"
+        label={t('Cycle Time (s)')}
         value={node.cycleTime ?? 15}
         onChange={(e) => onChange('cycleTime', Number(e.target.value))}
         fieldId="press-cycleTime"
@@ -2224,7 +2225,7 @@ function PressProperties({
         min={1}
       />
       <ValidatedNumberInput
-        label="Tonnage (tons)"
+        label={t('Tonnage (tons)')}
         value={node.tonnage ?? 200}
         onChange={(e) => onChange('tonnage', Number(e.target.value))}
         fieldId="press-tonnage"
@@ -2233,7 +2234,7 @@ function PressProperties({
         min={1}
       />
       <ValidatedNumberInput
-        label="Setup Time (s)"
+        label={t('Setup Time (s)')}
         value={node.setupTime ?? 300}
         onChange={(e) => onChange('setupTime', Number(e.target.value))}
         fieldId="press-setupTime"
@@ -2242,7 +2243,7 @@ function PressProperties({
         min={0}
       />
       <ValidatedNumberInput
-        label="Scrap Rate"
+        label={t('Scrap Rate')}
         value={node.scrapRate ?? 0.02}
         onChange={(e) => onChange('scrapRate', Number(e.target.value))}
         fieldId="press-scrapRate"
@@ -2269,7 +2270,7 @@ function LaserCutterProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Cycle Time (s)"
+        label={t('Cycle Time (s)')}
         value={node.cycleTime ?? 60}
         onChange={(e) => onChange('cycleTime', Number(e.target.value))}
         fieldId="lasercutter-cycleTime"
@@ -2278,7 +2279,7 @@ function LaserCutterProperties({
         min={1}
       />
       <div>
-        <label className="input-label">Sheet Size</label>
+        <label className="input-label">{t('Sheet Size')}</label>
         <input
           type="text"
           className="input"
@@ -2287,7 +2288,7 @@ function LaserCutterProperties({
         />
       </div>
       <ValidatedNumberInput
-        label="Laser Power (W)"
+        label={t('Laser Power (W)')}
         value={node.laserPower ?? 4000}
         onChange={(e) => onChange('laserPower', Number(e.target.value))}
         fieldId="lasercutter-laserPower"
@@ -2296,7 +2297,7 @@ function LaserCutterProperties({
         min={100}
       />
       <ValidatedNumberInput
-        label="Setup Time (s)"
+        label={t('Setup Time (s)')}
         value={node.setupTime ?? 120}
         onChange={(e) => onChange('setupTime', Number(e.target.value))}
         fieldId="lasercutter-setupTime"
@@ -2321,7 +2322,7 @@ function WeldingCellProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Cycle Time (s)"
+        label={t('Cycle Time (s)')}
         value={node.cycleTime ?? 45}
         onChange={(e) => onChange('cycleTime', Number(e.target.value))}
         fieldId="weldingcell-cycleTime"
@@ -2330,16 +2331,16 @@ function WeldingCellProperties({
         min={1}
       />
       <div>
-        <label className="input-label">Weld Type</label>
+        <label className="input-label">{t('Weld Type')}</label>
         <select className="input" value={node.weldType ?? 'MIG'} onChange={(e) => onChange('weldType', e.target.value)}>
-          <option value="MIG">MIG</option>
-          <option value="TIG">TIG</option>
-          <option value="spot">Spot</option>
-          <option value="laser">Laser</option>
+          <option value="MIG">{t('MIG')}</option>
+          <option value="TIG">{t('TIG')}</option>
+          <option value="spot">{t('Spot')}</option>
+          <option value="laser">{t('Laser')}</option>
         </select>
       </div>
       <ValidatedNumberInput
-        label="Fixture Count"
+        label={t('Fixture Count')}
         value={node.fixtureCount ?? 2}
         onChange={(e) => onChange('fixtureCount', Number(e.target.value))}
         fieldId="weldingcell-fixtureCount"
@@ -2349,7 +2350,7 @@ function WeldingCellProperties({
         integer
       />
       <ValidatedNumberInput
-        label="Setup Time (s)"
+        label={t('Setup Time (s)')}
         value={node.setupTime ?? 180}
         onChange={(e) => onChange('setupTime', Number(e.target.value))}
         fieldId="weldingcell-setupTime"
@@ -2374,7 +2375,7 @@ function PaintBoothProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Cycle Time (s spray)"
+        label={t('Cycle Time (s spray)')}
         value={node.cycleTime ?? 120}
         onChange={(e) => onChange('cycleTime', Number(e.target.value))}
         fieldId="paintbooth-cycleTime"
@@ -2383,7 +2384,7 @@ function PaintBoothProperties({
         min={1}
       />
       <ValidatedNumberInput
-        label="Cure Time (s)"
+        label={t('Cure Time (s)')}
         value={node.cureTime ?? 600}
         onChange={(e) => onChange('cureTime', Number(e.target.value))}
         fieldId="paintbooth-cureTime"
@@ -2392,15 +2393,15 @@ function PaintBoothProperties({
         min={1}
       />
       <div>
-        <label className="input-label">Booth Type</label>
+        <label className="input-label">{t('Booth Type')}</label>
         <select className="input" value={node.boothType ?? 'spray'} onChange={(e) => onChange('boothType', e.target.value)}>
-          <option value="spray">Spray</option>
-          <option value="powder">Powder</option>
-          <option value="dip">Dip</option>
+          <option value="spray">{t('Spray')}</option>
+          <option value="powder">{t('Powder')}</option>
+          <option value="dip">{t('Dip')}</option>
         </select>
       </div>
       <ValidatedNumberInput
-        label="Batch Size"
+        label={t('Batch Size')}
         value={node.batchSize ?? 1}
         onChange={(e) => onChange('batchSize', Number(e.target.value))}
         fieldId="paintbooth-batchSize"
@@ -2426,7 +2427,7 @@ function PackagerProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Cycle Time (s)"
+        label={t('Cycle Time (s)')}
         value={node.cycleTime ?? 10}
         onChange={(e) => onChange('cycleTime', Number(e.target.value))}
         fieldId="packager-cycleTime"
@@ -2435,16 +2436,16 @@ function PackagerProperties({
         min={1}
       />
       <div>
-        <label className="input-label">Pack Type</label>
+        <label className="input-label">{t('Pack Type')}</label>
         <select className="input" value={node.packType ?? 'boxing'} onChange={(e) => onChange('packType', e.target.value)}>
-          <option value="shrinkwrap">Shrinkwrap</option>
-          <option value="stretchwrap">Stretchwrap</option>
-          <option value="boxing">Boxing</option>
-          <option value="banding">Banding</option>
+          <option value="shrinkwrap">{t('Shrinkwrap')}</option>
+          <option value="stretchwrap">{t('Stretchwrap')}</option>
+          <option value="boxing">{t('Boxing')}</option>
+          <option value="banding">{t('Banding')}</option>
         </select>
       </div>
       <ValidatedNumberInput
-        label="Units Per Pack"
+        label={t('Units Per Pack')}
         value={node.unitsPerPack ?? 1}
         onChange={(e) => onChange('unitsPerPack', Number(e.target.value))}
         fieldId="packager-unitsPerPack"
@@ -2470,7 +2471,7 @@ function WasherProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Cycle Time (s batch)"
+        label={t('Cycle Time (s batch)')}
         value={node.cycleTime ?? 300}
         onChange={(e) => onChange('cycleTime', Number(e.target.value))}
         fieldId="washer-cycleTime"
@@ -2479,7 +2480,7 @@ function WasherProperties({
         min={1}
       />
       <ValidatedNumberInput
-        label="Batch Size"
+        label={t('Batch Size')}
         value={node.batchSize ?? 20}
         onChange={(e) => onChange('batchSize', Number(e.target.value))}
         fieldId="washer-batchSize"
@@ -2489,15 +2490,15 @@ function WasherProperties({
         integer
       />
       <div>
-        <label className="input-label">Wash Type</label>
+        <label className="input-label">{t('Wash Type')}</label>
         <select className="input" value={node.washType ?? 'aqueous'} onChange={(e) => onChange('washType', e.target.value)}>
-          <option value="aqueous">Aqueous</option>
-          <option value="solvent">Solvent</option>
-          <option value="ultrasonic">Ultrasonic</option>
+          <option value="aqueous">{t('Aqueous')}</option>
+          <option value="solvent">{t('Solvent')}</option>
+          <option value="ultrasonic">{t('Ultrasonic')}</option>
         </select>
       </div>
       <ValidatedNumberInput
-        label="Temperature (\u00B0C)"
+        label={t('Temperature (°C)')}
         value={node.temperature ?? 60}
         onChange={(e) => onChange('temperature', Number(e.target.value))}
         fieldId="washer-temperature"
@@ -2523,15 +2524,15 @@ function CNCMachineProperties({
   return (
     <>
       <div>
-        <label className="input-label">Machine Type</label>
+        <label className="input-label">{t('Machine Type')}</label>
         <select className="input" value={node.machineType ?? 'mill'} onChange={(e) => onChange('machineType', e.target.value)}>
-          <option value="lathe">Lathe</option>
-          <option value="mill">Mill</option>
-          <option value="grinder">Grinder</option>
+          <option value="lathe">{t('Lathe')}</option>
+          <option value="mill">{t('Mill')}</option>
+          <option value="grinder">{t('Grinder')}</option>
         </select>
       </div>
       <ValidatedNumberInput
-        label="Cycle Time (s)"
+        label={t('Cycle Time (s)')}
         value={node.cycleTime ?? 45}
         onChange={(e) => onChange('cycleTime', Number(e.target.value))}
         fieldId="cncmachine-cycleTime"
@@ -2540,7 +2541,7 @@ function CNCMachineProperties({
         min={1}
       />
       <ValidatedNumberInput
-        label="Tool Change Time (s)"
+        label={t('Tool Change Time (s)')}
         value={node.toolChangeTime ?? 12}
         onChange={(e) => onChange('toolChangeTime', Number(e.target.value))}
         fieldId="cncmachine-toolChangeTime"
@@ -2549,7 +2550,7 @@ function CNCMachineProperties({
         min={0}
       />
       <ValidatedNumberInput
-        label="Spindle Speed (RPM)"
+        label={t('Spindle Speed (RPM)')}
         value={node.spindleSpeed ?? 8000}
         onChange={(e) => onChange('spindleSpeed', Number(e.target.value))}
         fieldId="cncmachine-spindleSpeed"
@@ -2574,7 +2575,7 @@ function OvenProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Ramp-Up Time (s)"
+        label={t('Ramp-Up Time (s)')}
         value={node.rampUpTime ?? 300}
         onChange={(e) => onChange('rampUpTime', Number(e.target.value))}
         fieldId="oven-rampUpTime"
@@ -2583,7 +2584,7 @@ function OvenProperties({
         min={1}
       />
       <ValidatedNumberInput
-        label="Hold Time (s)"
+        label={t('Hold Time (s)')}
         value={node.holdTime ?? 1800}
         onChange={(e) => onChange('holdTime', Number(e.target.value))}
         fieldId="oven-holdTime"
@@ -2592,7 +2593,7 @@ function OvenProperties({
         min={1}
       />
       <ValidatedNumberInput
-        label="Cool-Down Time (s)"
+        label={t('Cool-Down Time (s)')}
         value={node.coolDownTime ?? 600}
         onChange={(e) => onChange('coolDownTime', Number(e.target.value))}
         fieldId="oven-coolDownTime"
@@ -2601,7 +2602,7 @@ function OvenProperties({
         min={1}
       />
       <ValidatedNumberInput
-        label="Batch Size"
+        label={t('Batch Size')}
         value={node.batchSize ?? 20}
         onChange={(e) => onChange('batchSize', Number(e.target.value))}
         fieldId="oven-batchSize"
@@ -2611,7 +2612,7 @@ function OvenProperties({
         integer
       />
       <ValidatedNumberInput
-        label="Temperature (&deg;C)"
+        label={t('Temperature (°C)')}
         value={node.temperature ?? 200}
         onChange={(e) => onChange('temperature', Number(e.target.value))}
         fieldId="oven-temperature"
@@ -2637,7 +2638,7 @@ function InjectionMolderProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Cycle Time (s)"
+        label={t('Cycle Time (s)')}
         value={node.cycleTime ?? 30}
         onChange={(e) => onChange('cycleTime', Number(e.target.value))}
         fieldId="injectionmolder-cycleTime"
@@ -2646,7 +2647,7 @@ function InjectionMolderProperties({
         min={1}
       />
       <ValidatedNumberInput
-        label="Cavity Count"
+        label={t('Cavity Count')}
         value={node.cavityCount ?? 4}
         onChange={(e) => onChange('cavityCount', Number(e.target.value))}
         fieldId="injectionmolder-cavityCount"
@@ -2657,7 +2658,7 @@ function InjectionMolderProperties({
         integer
       />
       <ValidatedNumberInput
-        label="Cooling Time (s)"
+        label={t('Cooling Time (s)')}
         value={node.coolingTime ?? 15}
         onChange={(e) => onChange('coolingTime', Number(e.target.value))}
         fieldId="injectionmolder-coolingTime"
@@ -2666,7 +2667,7 @@ function InjectionMolderProperties({
         min={1}
       />
       <ValidatedNumberInput
-        label="Clamp Force (tons)"
+        label={t('Clamp Force (tons)')}
         value={node.clampForce ?? 250}
         onChange={(e) => onChange('clampForce', Number(e.target.value))}
         fieldId="injectionmolder-clampForce"
@@ -2691,7 +2692,7 @@ function SortingStationProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Output Lanes"
+        label={t('Output Lanes')}
         value={node.outputs ?? 3}
         onChange={(e) => onChange('outputs', Number(e.target.value))}
         fieldId="sortingstation-outputs"
@@ -2702,16 +2703,16 @@ function SortingStationProperties({
         integer
       />
       <div>
-        <label className="input-label">Sort Mode</label>
+        <label className="input-label">{t('Sort Mode')}</label>
         <select className="input" value={node.sortMode ?? 'barcode'} onChange={(e) => onChange('sortMode', e.target.value)}>
-          <option value="barcode">Barcode</option>
-          <option value="weight">Weight</option>
-          <option value="vision">Vision</option>
-          <option value="manual">Manual</option>
+          <option value="barcode">{t('Barcode')}</option>
+          <option value="weight">{t('Weight')}</option>
+          <option value="vision">{t('Vision')}</option>
+          <option value="manual">{t('Manual')}</option>
         </select>
       </div>
       <ValidatedNumberInput
-        label="Scan Time (s)"
+        label={t('Scan Time (s)')}
         value={node.scanTime ?? 0.5}
         onChange={(e) => onChange('scanTime', Number(e.target.value))}
         fieldId="sortingstation-scanTime"
@@ -2720,7 +2721,7 @@ function SortingStationProperties({
         min={0.1}
       />
       <ValidatedNumberInput
-        label="Divert Speed (items/min)"
+        label={t('Divert Speed (items/min)')}
         value={node.divertSpeed ?? 60}
         onChange={(e) => onChange('divertSpeed', Number(e.target.value))}
         fieldId="sortingstation-divertSpeed"
@@ -2745,14 +2746,14 @@ function AccumulatorProperties({
   return (
     <>
       <div>
-        <label className="input-label">Mode</label>
+        <label className="input-label">{t('Mode')}</label>
         <select className="input" value={node.mode ?? 'batch'} onChange={(e) => onChange('mode', e.target.value)}>
-          <option value="fifo">FIFO (continuous)</option>
-          <option value="batch">Batch (burst release)</option>
+          <option value="fifo">{t('FIFO (continuous)')}</option>
+          <option value="batch">{t('Batch (burst release)')}</option>
         </select>
       </div>
       <ValidatedNumberInput
-        label="Capacity (items)"
+        label={t('Capacity (items)')}
         value={node.capacity ?? 50}
         onChange={(e) => onChange('capacity', Number(e.target.value))}
         fieldId="accumulator-capacity"
@@ -2762,7 +2763,7 @@ function AccumulatorProperties({
         integer
       />
       <ValidatedNumberInput
-        label="Release Size"
+        label={t('Release Size')}
         value={node.releaseSize ?? 10}
         onChange={(e) => onChange('releaseSize', Number(e.target.value))}
         fieldId="accumulator-releaseSize"
@@ -2772,7 +2773,7 @@ function AccumulatorProperties({
         integer
       />
       <ValidatedNumberInput
-        label="Release Interval (s)"
+        label={t('Release Interval (s)')}
         value={node.releaseInterval ?? 60}
         onChange={(e) => onChange('releaseInterval', Number(e.target.value))}
         fieldId="accumulator-releaseInterval"
@@ -2797,7 +2798,7 @@ function TurntableProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Rotation Time (s)"
+        label={t('Rotation Time (s)')}
         value={node.rotationTime ?? 3}
         onChange={(e) => onChange('rotationTime', Number(e.target.value))}
         fieldId="turntable-rotationTime"
@@ -2807,7 +2808,7 @@ function TurntableProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Transfer Time (s)"
+        label={t('Transfer Time (s)')}
         value={node.transferTime ?? 2}
         onChange={(e) => onChange('transferTime', Number(e.target.value))}
         fieldId="turntable-transferTime"
@@ -2817,7 +2818,7 @@ function TurntableProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Positions"
+        label={t('Positions')}
         value={node.positions ?? 4}
         onChange={(e) => onChange('positions', Number(e.target.value))}
         fieldId="turntable-positions"
@@ -2844,7 +2845,7 @@ function ElevatorProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Load Time (s)"
+        label={t('Load Time (s)')}
         value={node.loadTime ?? 5}
         onChange={(e) => onChange('loadTime', Number(e.target.value))}
         fieldId="elevator-loadTime"
@@ -2854,7 +2855,7 @@ function ElevatorProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Unload Time (s)"
+        label={t('Unload Time (s)')}
         value={node.unloadTime ?? 5}
         onChange={(e) => onChange('unloadTime', Number(e.target.value))}
         fieldId="elevator-unloadTime"
@@ -2864,7 +2865,7 @@ function ElevatorProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Travel Speed (m/s)"
+        label={t('Travel Speed (m/s)')}
         value={node.travelSpeed ?? 1.0}
         onChange={(e) => onChange('travelSpeed', Number(e.target.value))}
         fieldId="elevator-travelSpeed"
@@ -2874,7 +2875,7 @@ function ElevatorProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Floors"
+        label={t('Floors')}
         value={node.floors ?? 2}
         onChange={(e) => onChange('floors', Number(e.target.value))}
         fieldId="elevator-floors"
@@ -2884,7 +2885,7 @@ function ElevatorProperties({
         integer
       />
       <ValidatedNumberInput
-        label="Floor Height (m)"
+        label={t('Floor Height (m)')}
         value={node.floorHeight ?? 3}
         onChange={(e) => onChange('floorHeight', Number(e.target.value))}
         fieldId="elevator-floorHeight"
@@ -2910,7 +2911,7 @@ function OverheadConveyorProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Carrier Count"
+        label={t('Carrier Count')}
         value={node.carrierCount ?? 10}
         onChange={(e) => onChange('carrierCount', Number(e.target.value))}
         fieldId="overheadconveyor-carrierCount"
@@ -2920,7 +2921,7 @@ function OverheadConveyorProperties({
         integer
       />
       <ValidatedNumberInput
-        label="Carrier Speed (m/s)"
+        label={t('Carrier Speed (m/s)')}
         value={node.carrierSpeed ?? 0.5}
         onChange={(e) => onChange('carrierSpeed', Number(e.target.value))}
         fieldId="overheadconveyor-carrierSpeed"
@@ -2930,7 +2931,7 @@ function OverheadConveyorProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Load Time (s)"
+        label={t('Load Time (s)')}
         value={node.loadTime ?? 5}
         onChange={(e) => onChange('loadTime', Number(e.target.value))}
         fieldId="overheadconveyor-loadTime"
@@ -2940,7 +2941,7 @@ function OverheadConveyorProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Unload Time (s)"
+        label={t('Unload Time (s)')}
         value={node.unloadTime ?? 5}
         onChange={(e) => onChange('unloadTime', Number(e.target.value))}
         fieldId="overheadconveyor-unloadTime"
@@ -2950,7 +2951,7 @@ function OverheadConveyorProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Track Length (m)"
+        label={t('Track Length (m)')}
         value={node.trackLength ?? 50}
         onChange={(e) => onChange('trackLength', Number(e.target.value))}
         fieldId="overheadconveyor-trackLength"
@@ -2975,7 +2976,7 @@ function SorterProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Sort Delay (s)"
+        label={t('Sort Delay (s)')}
         value={node.sortDelay ?? 1}
         onChange={(e) => onChange('sortDelay', Number(e.target.value))}
         fieldId="sorter-sortDelay"
@@ -2985,7 +2986,7 @@ function SorterProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Error Rate (0–1)"
+        label={t('Error Rate (0–1)')}
         value={node.errorRate ?? 0.01}
         onChange={(e) => onChange('errorRate', Number(e.target.value))}
         fieldId="sorter-errorRate"
@@ -2996,7 +2997,7 @@ function SorterProperties({
         step={0.01}
       />
       <ValidatedNumberInput
-        label="Outputs"
+        label={t('Outputs')}
         value={node.outputs ?? 3}
         onChange={(e) => onChange('outputs', Number(e.target.value))}
         fieldId="sorter-outputs"
@@ -3022,7 +3023,7 @@ function ShuttleProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Travel Speed (m/s)"
+        label={t('Travel Speed (m/s)')}
         value={node.travelSpeed ?? 2.0}
         onChange={(e) => onChange('travelSpeed', Number(e.target.value))}
         fieldId="shuttle-travelSpeed"
@@ -3032,7 +3033,7 @@ function ShuttleProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Lane Count"
+        label={t('Lane Count')}
         value={node.laneCount ?? 4}
         onChange={(e) => onChange('laneCount', Number(e.target.value))}
         fieldId="shuttle-laneCount"
@@ -3042,7 +3043,7 @@ function ShuttleProperties({
         integer
       />
       <ValidatedNumberInput
-        label="Load Time (s)"
+        label={t('Load Time (s)')}
         value={node.loadTime ?? 3}
         onChange={(e) => onChange('loadTime', Number(e.target.value))}
         fieldId="shuttle-loadTime"
@@ -3052,7 +3053,7 @@ function ShuttleProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Unload Time (s)"
+        label={t('Unload Time (s)')}
         value={node.unloadTime ?? 3}
         onChange={(e) => onChange('unloadTime', Number(e.target.value))}
         fieldId="shuttle-unloadTime"
@@ -3078,7 +3079,7 @@ function RollerConveyorProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Length (m)"
+        label={t('Length (m)')}
         value={node.length ?? 10}
         onChange={(e) => onChange('length', Number(e.target.value))}
         fieldId="rollerconveyor-length"
@@ -3088,7 +3089,7 @@ function RollerConveyorProperties({
         step={0.5}
       />
       <ValidatedNumberInput
-        label="Speed (m/s)"
+        label={t('Speed (m/s)')}
         value={node.speed ?? 0.5}
         onChange={(e) => onChange('speed', Number(e.target.value))}
         fieldId="rollerconveyor-speed"
@@ -3098,7 +3099,7 @@ function RollerConveyorProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Capacity (items)"
+        label={t('Capacity (items)')}
         value={node.capacity ?? 20}
         onChange={(e) => onChange('capacity', Number(e.target.value))}
         fieldId="rollerconveyor-capacity"
@@ -3124,7 +3125,7 @@ function TrackGuidedVehicleProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Count"
+        label={t('Count')}
         value={node.count ?? 3}
         onChange={(e) => onChange('count', Number(e.target.value))}
         fieldId="trackguidedvehicle-count"
@@ -3134,7 +3135,7 @@ function TrackGuidedVehicleProperties({
         integer
       />
       <ValidatedNumberInput
-        label="Speed (m/s)"
+        label={t('Speed (m/s)')}
         value={node.speed ?? 1.5}
         onChange={(e) => onChange('speed', Number(e.target.value))}
         fieldId="trackguidedvehicle-speed"
@@ -3144,7 +3145,7 @@ function TrackGuidedVehicleProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Capacity (items)"
+        label={t('Capacity (items)')}
         value={node.capacity ?? 1}
         onChange={(e) => onChange('capacity', Number(e.target.value))}
         fieldId="trackguidedvehicle-capacity"
@@ -3154,7 +3155,7 @@ function TrackGuidedVehicleProperties({
         integer
       />
       <ValidatedNumberInput
-        label="Track Length (m)"
+        label={t('Track Length (m)')}
         value={node.trackLength ?? 100}
         onChange={(e) => onChange('trackLength', Number(e.target.value))}
         fieldId="trackguidedvehicle-trackLength"
@@ -3179,7 +3180,7 @@ function CrossoverProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Transfer Time (s)"
+        label={t('Transfer Time (s)')}
         value={node.transferTime ?? 2}
         onChange={(e) => onChange('transferTime', Number(e.target.value))}
         fieldId="crossover-transferTime"
@@ -3189,7 +3190,7 @@ function CrossoverProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Lane Count"
+        label={t('Lane Count')}
         value={node.laneCount ?? 2}
         onChange={(e) => onChange('laneCount', Number(e.target.value))}
         fieldId="crossover-laneCount"
@@ -3215,7 +3216,7 @@ function PickStationProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Picker Count"
+        label={t('Picker Count')}
         value={node.pickerCount ?? 1}
         onChange={(e) => onChange('pickerCount', Number(e.target.value))}
         fieldId="pickstation-pickerCount"
@@ -3225,7 +3226,7 @@ function PickStationProperties({
         integer
       />
       <ValidatedNumberInput
-        label="Pick Time (s)"
+        label={t('Pick Time (s)')}
         value={node.pickTime ?? 5}
         onChange={(e) => onChange('pickTime', Number(e.target.value))}
         fieldId="pickstation-pickTime"
@@ -3235,7 +3236,7 @@ function PickStationProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Error Rate (0–1)"
+        label={t('Error Rate (0–1)')}
         value={node.errorRate ?? 0.02}
         onChange={(e) => onChange('errorRate', Number(e.target.value))}
         fieldId="pickstation-errorRate"
@@ -3262,7 +3263,7 @@ function WeighingProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Measure Time (s)"
+        label={t('Measure Time (s)')}
         value={node.measureTime ?? 3}
         onChange={(e) => onChange('measureTime', Number(e.target.value))}
         fieldId="weighing-measureTime"
@@ -3272,7 +3273,7 @@ function WeighingProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Reject Rate (0–1)"
+        label={t('Reject Rate (0–1)')}
         value={node.rejectRate ?? 0.05}
         onChange={(e) => onChange('rejectRate', Number(e.target.value))}
         fieldId="weighing-rejectRate"
@@ -3299,7 +3300,7 @@ function LabelerProperties({
   return (
     <>
       <ValidatedNumberInput
-        label="Label Time (s)"
+        label={t('Label Time (s)')}
         value={node.labelTime ?? 2}
         onChange={(e) => onChange('labelTime', Number(e.target.value))}
         fieldId="labeler-labelTime"
@@ -3309,7 +3310,7 @@ function LabelerProperties({
         step={0.1}
       />
       <ValidatedNumberInput
-        label="Error Rate (0–1)"
+        label={t('Error Rate (0–1)')}
         value={node.errorRate ?? 0.01}
         onChange={(e) => onChange('errorRate', Number(e.target.value))}
         fieldId="labeler-errorRate"

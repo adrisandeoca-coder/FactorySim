@@ -1,5 +1,13 @@
 import type { KPIData, FactoryModel } from '../../types';
 import { formatDuration } from '../../stores/simulationStore';
+import { t, useT } from '../../i18n';
+import React from 'react';
+
+/** Translated sentence with bold values: placeholders {x} are filled with <b> parts. */
+function Rich({ text, vars }: { text: string; vars: Record<string, React.ReactNode> }) {
+  const parts = t(text).split(/\{(\w+)\}/);
+  return <>{parts.map((p, i) => (i % 2 ? <b key={i} style={{ fontWeight: 600 }}>{vars[p]}</b> : <React.Fragment key={i}>{p}</React.Fragment>))}</>;
+}
 
 /**
  * Plain-language summary of a simulation run, written for production
@@ -28,11 +36,12 @@ const pct = (v: number) => `${Math.round(v * 100)}%`;
 
 function hoursLabel(seconds: number): string {
   const h = seconds / 3600;
-  if (h >= 24 * 7 - 0.01 && h % (24 * 7) === 0) return `${h / (24 * 7)} week${h === 168 ? '' : 's'}`;
-  return `${Number.isInteger(h) ? h : h.toFixed(1)} hour${h === 1 ? '' : 's'}`;
+  if (h >= 24 * 7 - 0.01 && h % (24 * 7) === 0) return t(h === 168 ? '{n} week' : '{n} weeks', { n: h / (24 * 7) });
+  return t(h === 1 ? '{n} hour' : '{n} hours', { n: Number.isInteger(h) ? h : h.toFixed(1) });
 }
 
 export function ResultsSummary({ kpis, model, durationSeconds, onStationClick }: ResultsSummaryProps) {
+  useT();
   const nameOf = (id: string) => model.stations.find((s) => s.id === id)?.name || id;
   const stations = Object.entries(kpis.utilization.byStation || {})
     .filter(([id]) => model.stations.some((s) => s.id === id));
@@ -46,15 +55,15 @@ export function ResultsSummary({ kpis, model, durationSeconds, onStationClick }:
     if (busy >= 0.75) {
       findings.push({
         tone: busy >= 0.9 ? 'bad' : 'warn',
-        title: `${nameOf(bnId)} is the bottleneck`,
-        body: `It is working ${pct(busy)} of the time and sets the pace of the whole line. A shorter cycle time or extra capacity here raises output; improving other stations will not.`,
+        title: t('{name} is the bottleneck', { name: nameOf(bnId) }),
+        body: t('It is working {p} of the time and sets the pace of the whole line. A shorter cycle time or extra capacity here raises output; improving other stations will not.', { p: pct(busy) }),
         stationId: bnId,
       });
     } else {
       findings.push({
         tone: 'info',
-        title: 'No station is overloaded',
-        body: `The busiest station (${nameOf(bnId)}) works ${pct(busy)} of the time. Output is limited by how fast parts arrive, not by machine capacity.`,
+        title: t('No station is overloaded'),
+        body: t('The busiest station ({name}) works {p} of the time. Output is limited by how fast parts arrive, not by machine capacity.', { name: nameOf(bnId), p: pct(busy) }),
         stationId: bnId,
       });
     }
@@ -65,22 +74,22 @@ export function ResultsSummary({ kpis, model, durationSeconds, onStationClick }:
     if ((fail.failed || 0) >= 0.05 && (fail.failed || 0) >= (blk.blocked || 0)) {
       findings.push({
         tone: 'warn',
-        title: `${nameOf(failId)} loses ${pct(fail.failed || 0)} to breakdowns`,
-        body: 'Shorter repair times or preventive maintenance here recover capacity directly.',
+        title: t('{name} loses {p} to breakdowns', { name: nameOf(failId), p: pct(fail.failed || 0) }),
+        body: t('Shorter repair times or preventive maintenance here recover capacity directly.'),
         stationId: failId,
       });
     } else if ((blk.blocked || 0) >= 0.05) {
       findings.push({
         tone: 'warn',
-        title: `${nameOf(blkId)} is blocked ${pct(blk.blocked || 0)} of the time`,
-        body: 'It has finished parts but nowhere to put them. A larger buffer after it, or a faster next step, frees this time.',
+        title: t('{name} is blocked {p} of the time', { name: nameOf(blkId), p: pct(blk.blocked || 0) }),
+        body: t('It has finished parts but nowhere to put them. A larger buffer after it, or a faster next step, frees this time.'),
         stationId: blkId,
       });
     } else {
       findings.push({
         tone: 'good',
-        title: 'Parts flow without blocking',
-        body: 'No station spends more than 5% of the time waiting for space downstream.',
+        title: t('Parts flow without blocking'),
+        body: t('No station spends more than 5% of the time waiting for space downstream.'),
       });
     }
   }
@@ -97,20 +106,22 @@ export function ResultsSummary({ kpis, model, durationSeconds, onStationClick }:
       const fl = asrs ? Math.max(0, ...byAisle) : g(w.forklifts, 'utilization', 'utilization') ?? 0;
       const pk = g(w.pickers, 'utilization', 'utilization') ?? 0;
       const fr = g(w.orders, 'fillRate', 'fill_rate');
-      const equip = asrs ? 'stacker cranes' : 'forklifts';
-      const busiest = fl >= pk ? { what: equip, u: fl } : { what: 'pickers', u: pk };
+      const equip = asrs ? t('stacker cranes') : t('forklifts');
+      const busiest = fl >= pk ? { what: equip, u: fl } : { what: t('pickers'), u: pk };
+      const isPickers = busiest.u === pk && pk > fl;
       const remedy = asrs
-        ? (busiest.what === 'pickers' ? 'More pickers or pick stations raise capacity.' : 'More aisles (cranes), faster cranes or fewer levels raise capacity.')
-        : `More ${busiest.what} or shorter travel (ABC slotting, fewer aisles) raises capacity.`;
+        ? (isPickers ? t('More pickers or pick stations raise capacity.') : t('More aisles (cranes), faster cranes or fewer levels raise capacity.'))
+        : t('More {what} or shorter travel (ABC slotting, fewer aisles) raises capacity.', { what: busiest.what });
       findings.push(busiest.u >= 0.8
-        ? { tone: busiest.u >= 0.9 ? 'bad' : 'warn', title: `The ${busiest.what} are the constraint`, body: `${asrs && busiest.what !== 'pickers' ? 'The busiest crane is' : 'They are'} busy ${pct(busiest.u)} of the time. ${remedy}` }
-        : { tone: 'info', title: 'Handling capacity is sufficient', body: asrs
-          ? `The busiest stacker crane is busy ${pct(fl)} and pickers ${pct(pk)} of the time.`
-          : `Forklifts are busy ${pct(fl)} and pickers ${pct(pk)} of the time.` });
+        ? { tone: busiest.u >= 0.9 ? 'bad' : 'warn', title: t('The {what} are the constraint', { what: busiest.what }),
+            body: (asrs && !isPickers ? t('The busiest crane is busy {p} of the time.', { p: pct(busiest.u) }) : t('They are busy {p} of the time.', { p: pct(busiest.u) })) + ' ' + remedy }
+        : { tone: 'info', title: t('Handling capacity is sufficient'), body: asrs
+          ? t('The busiest stacker crane is busy {a} and pickers {b} of the time.', { a: pct(fl), b: pct(pk) })
+          : t('Forklifts are busy {a} and pickers {b} of the time.', { a: pct(fl), b: pct(pk) }) });
       if (fr != null) {
         findings.push(fr >= 0.95
-          ? { tone: 'good', title: `${pct(fr)} of order lines were in stock`, body: 'Reorder points cover demand during the lead time.' }
-          : { tone: fr < 0.85 ? 'bad' : 'warn', title: `Only ${pct(fr)} of order lines were in stock`, body: 'Raise reorder points for the SKUs that run out (see the SKU table), or shorten lead times.' });
+          ? { tone: 'good', title: t('{p} of order lines were in stock', { p: pct(fr) }), body: t('Reorder points cover demand during the lead time.') }
+          : { tone: fr < 0.85 ? 'bad' : 'warn', title: t('Only {p} of order lines were in stock', { p: pct(fr) }), body: t('Raise reorder points for the SKUs that run out (see the SKU table), or shorten lead times.') });
       }
     }
   }
@@ -127,10 +138,10 @@ export function ResultsSummary({ kpis, model, durationSeconds, onStationClick }:
 
   return (
     <section
-      aria-label="Results summary"
+      aria-label={t('Results summary')}
       className="dock-panel"
     >
-      <div className="dock-panel-title">Results summary</div>
+      <div className="dock-panel-title">{t('Results summary')}</div>
       <div style={{ padding: '14px 16px' }}>
       {warehouseOnly ? (() => {
         const o = whList.reduce((acc: any, w: any) => {
@@ -141,17 +152,19 @@ export function ResultsSummary({ kpis, model, durationSeconds, onStationClick }:
         }, { shipped: 0, cycle: 0 });
         return (
           <p style={{ fontSize: 17, lineHeight: 1.45, color: 'var(--t1)', margin: 0, maxWidth: 900 }}>
-            Your warehouse shipped <b style={{ fontWeight: 600 }}>{o.shipped.toLocaleString()} orders</b> in {hoursLabel(durationSeconds)} — about{' '}
-            <b style={{ fontWeight: 600 }}>{(o.shipped / (durationSeconds / 3600)).toFixed(0)} per hour</b>.
-            {o.cycle > 0 && <> An order takes <b style={{ fontWeight: 600 }}>{formatDuration(o.cycle)}</b> on average from arrival to shipping.</>}
+            <Rich text="Your warehouse shipped {orders} in {time} — about {rate}." vars={{
+              orders: t('{n} orders', { n: o.shipped.toLocaleString() }), time: hoursLabel(durationSeconds),
+              rate: t('{n} per hour', { n: (o.shipped / (durationSeconds / 3600)).toFixed(0) }) }} />
+            {o.cycle > 0 && <>{' '}<Rich text="An order takes {time} on average from arrival to shipping." vars={{ time: formatDuration(o.cycle) }} /></>}
           </p>
         );
       })() : (
       <p style={{ fontSize: 17, lineHeight: 1.45, color: 'var(--t1)', margin: 0, maxWidth: 900 }}>
-        Your line produced <b style={{ fontWeight: 600 }}>{kpis.throughput.total.toLocaleString()} parts</b> in{' '}
-        {hoursLabel(durationSeconds)} — about <b style={{ fontWeight: 600 }}>{rate.toFixed(rate >= 10 ? 0 : 1)} per hour</b>.
+        <Rich text="Your line produced {parts} in {time} — about {rate}." vars={{
+          parts: t('{n} parts', { n: kpis.throughput.total.toLocaleString() }), time: hoursLabel(durationSeconds),
+          rate: t('{n} per hour', { n: rate.toFixed(rate >= 10 ? 0 : 1) }) }} />
         {kpis.cycleTime.mean > 0 && (
-          <> A part takes <b style={{ fontWeight: 600 }}>{formatDuration(kpis.cycleTime.mean)}</b> on average from start to finish.</>
+          <>{' '}<Rich text="A part takes {time} on average from start to finish." vars={{ time: formatDuration(kpis.cycleTime.mean) }} /></>
         )}
       </p>
       )}
@@ -170,7 +183,7 @@ export function ResultsSummary({ kpis, model, durationSeconds, onStationClick }:
                     onClick={() => onStationClick(f.stationId!)}
                     style={{ marginTop: 6, fontSize: 12, fontWeight: 600, color: 'var(--blue)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
                   >
-                    Open {nameOf(f.stationId)} in the builder →
+                    {t('Open {name} in the builder →', { name: nameOf(f.stationId) })}
                   </button>
                 )}
               </div>
@@ -181,7 +194,7 @@ export function ResultsSummary({ kpis, model, durationSeconds, onStationClick }:
 
       {warnings > 0 && (
         <p style={{ fontSize: 12, color: 'var(--amber)', marginTop: 12, marginBottom: 0, fontWeight: 600 }}>
-          {warnings} model check{warnings === 1 ? '' : 's'} need{warnings === 1 ? 's' : ''} your attention — see below.
+          {t(warnings === 1 ? '{n} model check needs your attention — see below.' : '{n} model checks need your attention — see below.', { n: warnings })}
         </p>
       )}
       </div>

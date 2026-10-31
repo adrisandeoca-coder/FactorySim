@@ -94,11 +94,18 @@ export interface Buffer {
   libraryModelId?: string;    // Override 3D model from the model library
 }
 
+/**
+ * How material moves along a connection. 'auto' (or unset) keeps the default:
+ * a conveyor, except forklift/AGV for pallet and vehicle elements.
+ */
+export type TransportMode = 'auto' | 'conveyor' | 'manual' | 'forklift' | 'agv' | 'direct';
+
 export interface Connection {
   id: string;
   source: string;
   target: string;
   probability?: number;
+  transport?: TransportMode;
 }
 
 export interface Product {

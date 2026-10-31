@@ -20,6 +20,7 @@ import { LiveAnimationOverlay } from './LiveAnimationOverlay';
 import { formatDuration, useSimulationStore } from '../../stores/simulationStore';
 import { registerElement } from '../../services/elementRegistry';
 
+import { t } from '../../i18n';
 const Factory3DView = lazy(() =>
   import('../factory-builder/3d/Factory3DView').then(m => ({ default: m.Factory3DView }))
 );
@@ -89,8 +90,8 @@ function InlineReplayControls() {
             });
           }}
           className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors"
-          title="Restart from beginning"
-          aria-label="Restart from beginning"
+          title={t('Restart from beginning')}
+          aria-label={t('Restart from beginning')}
         >
           <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6V6zm3.5 6l8.5 6V6l-8.5 6z" /></svg>
         </button>
@@ -99,8 +100,8 @@ function InlineReplayControls() {
         <button
           onClick={() => useLiveSimulationStore.getState().stopReplay()}
           className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 text-red-400 hover:bg-red-900/50 hover:text-red-300 transition-colors"
-          title="Stop & exit replay"
-          aria-label="Stop & exit replay"
+          title={t('Stop & exit replay')}
+          aria-label={t('Stop & exit replay')}
         >
           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6V6z" /></svg>
         </button>
@@ -708,7 +709,7 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
         <div className="absolute top-10 left-1/2 -translate-x-1/2 z-20 bg-slate-800/95 backdrop-blur-sm rounded-lg border border-blue-500/50 shadow-xl px-4 py-2 text-center">
           <div className="flex items-center space-x-2">
             <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-            <span className="text-[12px] font-bold text-blue-300 uppercase tracking-wider">Computing at max speed</span>
+            <span className="text-[12px] font-bold text-blue-300 uppercase tracking-wider">{t('Computing at max speed')}</span>
           </div>
           <span className="text-[10px] text-slate-400 block mt-0.5">3D replay will start automatically when done</span>
         </div>
@@ -716,7 +717,7 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
 
       {/* 3D view — kept mounted (hidden via CSS) to prevent Three.js disposal bugs */}
       <div style={{ display: viewMode === '3d' ? 'contents' : 'none' }}>
-        <Suspense fallback={<div className="flex items-center justify-center h-full text-slate-400">Loading 3D view...</div>}>
+        <Suspense fallback={<div className="flex items-center justify-center h-full text-slate-400">{t('Loading 3D view...')}</div>}>
           <Factory3DView />
         </Suspense>
       </div>
@@ -867,7 +868,7 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
           <div className="px-3 py-3">
             {/* Section: Station States */}
             <div className="mb-3">
-              <div className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-2">Station States</div>
+              <div className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-2">{t('Station States')}</div>
               <div className="flex flex-wrap gap-1">
                 <button
                   onClick={() => setStateFilter(null)}
@@ -907,7 +908,7 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
             {/* Section: Products */}
             {productLegend.length > 0 && (
               <div>
-                <div className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-2">Products</div>
+                <div className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-2">{t('Products')}</div>
                 <div className="flex flex-col gap-1.5">
                   {productLegend.map((item) => (
                     <div key={item.name} className="flex items-center gap-2">
@@ -970,21 +971,21 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
               </svg>
             </div>
             <div>
-              <div className="text-[9px] text-slate-400 font-bold uppercase">Util</div>
+              <div className="text-[9px] text-slate-400 font-bold uppercase">{t('Util')}</div>
               <div className="text-sm font-black text-white font-mono">{currentTime > 0 ? `${(approxUtilization * 100).toFixed(1)}%` : '0.0%'}</div>
             </div>
           </div>
 
           {/* Throughput rate — always shown */}
           <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-700/50">
-            <span className="text-[10px] text-slate-400 font-bold uppercase">Throughput</span>
+            <span className="text-[10px] text-slate-400 font-bold uppercase">{t('Throughput')}</span>
             <span className="text-[16px] font-black text-emerald-400 font-mono">{throughputRate > 0 ? throughputRate.toFixed(0) : '—'}<span className="text-[10px] text-emerald-500">/hr</span></span>
           </div>
 
           {/* Top utilized station — always shown */}
           <div className="mb-2 pb-1.5 border-b border-slate-700/50">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-slate-400 font-bold uppercase">Highest</span>
+              <span className="text-[10px] text-slate-400 font-bold uppercase">{t('Highest')}</span>
               {topBnEntry ? (
                 <span className={`text-[10px] font-mono font-bold ${topBnEntry[1] >= 0.70 ? 'text-red-300' : 'text-amber-300/70'}`}>{(topBnEntry[1] * 100).toFixed(0)}%</span>
               ) : (
@@ -1003,7 +1004,7 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
 
           {/* WIP count — use max of activeProducts and sum of buffer levels + processing stations */}
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[9px] text-slate-400 font-bold uppercase">WIP</span>
+            <span className="text-[9px] text-slate-400 font-bold uppercase">{t('WIP')}</span>
             <span className="text-[12px] font-black text-amber-400 font-mono">
               {(() => {
                 const bufferWip = Object.values(bufferLevels).reduce((sum, bl) => sum + bl.level, 0);
@@ -1016,7 +1017,7 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
 
           {/* Time remaining — always rendered */}
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[9px] text-slate-400 font-bold uppercase">Remaining</span>
+            <span className="text-[9px] text-slate-400 font-bold uppercase">{t('Remaining')}</span>
             <span className="text-[10px] text-slate-300 font-mono">
               {simDuration > 0 && currentTime > 0 ? (() => {
                 const rem = Math.max(0, simDuration - currentTime);
@@ -1054,7 +1055,7 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
           {/* Active failures — always visible */}
           <div className="mb-1">
             <div className="flex items-center justify-between">
-              <span className="text-[9px] text-slate-400 font-bold uppercase">Failures</span>
+              <span className="text-[9px] text-slate-400 font-bold uppercase">{t('Failures')}</span>
               {(stateCounts.failed ?? 0) > 0 ? (
                 <span className="text-[10px] font-bold text-red-400 animate-pulse">
                   {stateCounts.failed} station{(stateCounts.failed ?? 0) > 1 ? 's' : ''}
@@ -1230,9 +1231,9 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
         <div
           className="absolute left-0 right-0 bg-slate-800/90 backdrop-blur-sm border-t border-slate-700/40 flex items-center px-2 z-10"
           style={{ bottom: 44, height: 20 }}
-          title="Buffer fill levels — Green: <50%, Yellow: 50-80%, Orange: 80-95%, Red: >95%"
+          title={t('Buffer fill levels — Green: <50%, Yellow: 50-80%, Orange: 80-95%, Red: >95%')}
         >
-          <span className="text-[8px] text-slate-500 font-bold uppercase mr-1 flex-shrink-0">Buffers</span>
+          <span className="text-[8px] text-slate-500 font-bold uppercase mr-1 flex-shrink-0">{t('Buffers')}</span>
           {criticalCount > 0 && (
             <span className="text-[8px] font-bold text-red-400 bg-red-900/50 rounded px-1 mr-1.5 flex-shrink-0">{criticalCount}</span>
           )}
@@ -1271,7 +1272,7 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
             </span>
             {/* Simulation date/time clock */}
             {currentTime > 0 && (
-              <span className="text-[11px] text-blue-300 font-mono font-medium" title="Simulated date & time">
+              <span className="text-[11px] text-blue-300 font-mono font-medium" title={t('Simulated date & time')}>
                 {simDateTime}
               </span>
             )}
@@ -1284,9 +1285,9 @@ function LiveSimulationViewInner({ progress, elapsedSeconds, simDuration, height
 
           {/* Right: metrics + OEE gauge */}
           <div className="flex items-center space-x-3 text-sm">
-            <Metric label="WIP" value={activeProducts} warn={activeProducts > 50} />
-            <Metric label="Buffers" value={totalBufferItems} />
-            <Metric label="Done" value={totalSinkExited} accent />
+            <Metric label={t('WIP')} value={activeProducts} warn={activeProducts > 50} />
+            <Metric label={t('Buffers')} value={totalBufferItems} />
+            <Metric label={t('Done')} value={totalSinkExited} accent />
             {throughputRate > 0 && (
               <span className="text-[10px] text-slate-400 font-mono">{throughputRate.toFixed(0)}/hr</span>
             )}

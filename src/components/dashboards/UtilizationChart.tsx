@@ -235,7 +235,7 @@ const UtilizationChart = React.memo(function UtilizationChart({ data }: Utilizat
       {hoveredData && (
         <div
           ref={tooltipRef}
-          className="fixed z-50 bg-gray-900 text-white rounded-lg shadow-xl px-3 py-2 text-xs pointer-events-none"
+          className="fixed z-50 eng-tooltip pointer-events-none"
           style={{
             left: tooltipPos.x + 12,
             top: tooltipPos.y - 10,
@@ -251,7 +251,7 @@ const UtilizationChart = React.memo(function UtilizationChart({ data }: Utilizat
                 <div key={cat.key} className="flex items-center justify-between space-x-4">
                   <div className="flex items-center space-x-1.5">
                     <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: cat.color }} />
-                    <span className="text-gray-300">{cat.label}</span>
+                    <span className="text-slate-600">{cat.label}</span>
                   </div>
                   <span className="font-mono font-bold">{val.toFixed(1)}%</span>
                 </div>

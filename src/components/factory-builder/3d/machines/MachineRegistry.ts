@@ -8,7 +8,6 @@ import { buildOperator } from './Operator';
 import { buildSplitter } from './Splitter';
 import { buildMerge } from './Merge';
 import { buildDisassembly } from './Disassembly';
-import { buildPalletize } from './Palletize';
 import { buildDepalletize } from './Depalletize';
 import { buildMatchBuffer } from './MatchBuffer';
 import { buildLIFOBuffer } from './LIFOBuffer';
@@ -16,7 +15,7 @@ import { buildPalletConveyor } from './PalletConveyor';
 import { buildPriorityMerge } from './PriorityMerge';
 // New component types
 import { buildAGV } from './AGV';
-import { buildRoboticCell } from './RoboticCell';
+import { buildRobotCell } from './RobotCell';
 import { buildHumanoid } from './Humanoid';
 // Model library imports
 import { buildWarehouseBay } from '../model-library/warehousing/WarehouseBay';
@@ -27,7 +26,6 @@ import { buildForklift as buildForkliftModel } from '../model-library/material-h
 import { buildColdStorage } from '../model-library/warehousing/ColdStorage';
 import { buildPress } from '../model-library/processing/Press';
 import { buildLaserCutter } from '../model-library/processing/LaserCutter';
-import { buildWeldingStation } from '../model-library/processing/WeldingStation';
 import { buildPaintBooth } from '../model-library/processing/PaintBooth';
 import { buildPackagingMachine } from '../model-library/processing/PackagingMachine';
 import { buildWasher } from '../model-library/processing/Washer';
@@ -56,11 +54,11 @@ export const MODEL_BUILDERS: Record<string, () => THREE.Group> = {
   splitter: buildSplitter,
   merge: buildMerge,
   disassembly: buildDisassembly,
-  palletize: buildPalletize,
+  palletize: () => buildRobotCell('pallet'),
   depalletize: buildDepalletize,
   matchbuffer: buildMatchBuffer,
   agv: buildAGV,
-  roboticcell: buildRoboticCell,
+  roboticcell: () => buildRobotCell('handling'),
   humanoid: buildHumanoid,
   lifobuffer: buildLIFOBuffer,
   palletconveyor: buildPalletConveyor,
@@ -73,7 +71,7 @@ export const MODEL_BUILDERS: Record<string, () => THREE.Group> = {
   coldstorage: buildColdStorage,
   press: buildPress,
   lasercutter: buildLaserCutter,
-  weldingcell: buildWeldingStation,
+  weldingcell: () => buildRobotCell('weld'),
   paintbooth: buildPaintBooth,
   packager: buildPackagingMachine,
   washer: buildWasher,

@@ -13,6 +13,7 @@ import { useModelStore } from '../../stores/modelStore';
 
 import { WAREHOUSE_DEFAULTS, type Dist, type Sku } from '../../utils/warehouseDefaults';
 
+import { t } from '../../i18n';
 const DIST_PARAMS: Record<string, string[]> = {
   constant: ['value'],
   exponential: ['mean'],
@@ -81,11 +82,11 @@ function DistInput({ label, value, onChange, unit, id }: { label: string; value:
             onChange({ type, parameters: p });
           }}
         >
-          <option value="constant">Fixed</option>
-          <option value="exponential">Exponential</option>
-          <option value="normal">Normal</option>
-          <option value="triangular">Triangular</option>
-          <option value="uniform">Uniform</option>
+          <option value="constant">{t('Fixed')}</option>
+          <option value="exponential">{t('Exponential')}</option>
+          <option value="normal">{t('Normal')}</option>
+          <option value="triangular">{t('Triangular')}</option>
+          <option value="uniform">{t('Uniform')}</option>
         </select>
         {params.map((p) => (
           <input
@@ -133,19 +134,19 @@ function Shifts({ pickers, onChange }: { pickers: { shifts?: Shift[]; breaks?: B
       </div>
       {shifts.map((w, i) => (
         <div key={`s${i}`} style={row}>
-          <div><label htmlFor={`wh-sh-${i}-a`} className="input-label">Start</label>
+          <div><label htmlFor={`wh-sh-${i}-a`} className="input-label">{t('Start')}</label>
             <input id={`wh-sh-${i}-a`} type="time" className="input" value={w.start} onChange={(e) => onChange({ shifts: shifts.map((x, k) => (k === i ? { ...x, start: e.target.value } : x)) })} /></div>
-          <div><label htmlFor={`wh-sh-${i}-b`} className="input-label">End</label>
+          <div><label htmlFor={`wh-sh-${i}-b`} className="input-label">{t('End')}</label>
             <input id={`wh-sh-${i}-b`} type="time" className="input" value={w.end} onChange={(e) => onChange({ shifts: shifts.map((x, k) => (k === i ? { ...x, end: e.target.value } : x)) })} /></div>
-          <button type="button" aria-label="Remove shift" title="Remove shift" style={del} onClick={() => onChange({ shifts: shifts.filter((_, k) => k !== i) })}>×</button>
+          <button type="button" aria-label={t('Remove shift')} title={t('Remove shift')} style={del} onClick={() => onChange({ shifts: shifts.filter((_, k) => k !== i) })}>×</button>
         </div>
       ))}
       {breaks.map((b, i) => (
         <div key={`b${i}`} style={row}>
-          <div><label htmlFor={`wh-br-${i}-a`} className="input-label">Break at</label>
+          <div><label htmlFor={`wh-br-${i}-a`} className="input-label">{t('Break at')}</label>
             <input id={`wh-br-${i}-a`} type="time" className="input" value={b.start} onChange={(e) => onChange({ breaks: breaks.map((x, k) => (k === i ? { ...x, start: e.target.value } : x)) })} /></div>
-          <Num id={`wh-br-${i}-m`} label="Minutes" value={b.minutes} min={1} onChange={(v) => onChange({ breaks: breaks.map((x, k) => (k === i ? { ...x, minutes: Math.round(v) } : x)) })} />
-          <button type="button" aria-label="Remove break" title="Remove break" style={del} onClick={() => onChange({ breaks: breaks.filter((_, k) => k !== i) })}>×</button>
+          <Num id={`wh-br-${i}-m`} label={t('Minutes')} value={b.minutes} min={1} onChange={(v) => onChange({ breaks: breaks.map((x, k) => (k === i ? { ...x, minutes: Math.round(v) } : x)) })} />
+          <button type="button" aria-label={t('Remove break')} title={t('Remove break')} style={del} onClick={() => onChange({ breaks: breaks.filter((_, k) => k !== i) })}>×</button>
         </div>
       ))}
       <div style={{ display: 'flex', gap: 6 }}>
@@ -193,90 +194,90 @@ export function WarehouseProperties({ node, onChange }: { node: any; onChange: (
         <b> between</b> stations as a WIP store. On its own it runs as a distribution centre (enable inbound and orders).
       </p>
 
-      <Section title="Racks" hint={asrs
+      <Section title={t('Racks')} hint={asrs
         ? `${locations.toLocaleString()} pallet locations in a high-bay store. Each aisle has a stacker crane; pallets reach the pick stations by conveyor.`
         : `${locations.toLocaleString()} pallet locations. Level 0 is for pick faces, upper levels are reserve.`}>
         <div>
-          <label htmlFor="wh-type" className="input-label">Storage type</label>
+          <label htmlFor="wh-type" className="input-label">{t('Storage type')}</label>
           <select id="wh-type" className="input" value={asrs ? 'asrs' : 'racks'} onChange={(e) => onChange('storageType', e.target.value)}>
-            <option value="racks">Pallet racking with forklifts</option>
-            <option value="asrs">Automated high-bay (AS/RS, stacker cranes)</option>
+            <option value="racks">{t('Pallet racking with forklifts')}</option>
+            <option value="asrs">{t('Automated high-bay (AS/RS, stacker cranes)')}</option>
           </select>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <Num id="wh-aisles" label="Aisles" value={layout.aisles} min={1} onChange={(v) => set('layout', layout, { aisles: Math.round(v) })} />
-          <Num id="wh-bays" label="Bays per aisle" value={layout.baysPerAisle} min={1} onChange={(v) => set('layout', layout, { baysPerAisle: Math.round(v) })} />
-          <Num id="wh-levels" label="Levels" value={layout.levels} min={1} onChange={(v) => set('layout', layout, { levels: Math.round(v) })} />
-          <Num id="wh-perbay" label="Pallets per bay" value={layout.palletsPerBay} min={1} onChange={(v) => set('layout', layout, { palletsPerBay: Math.round(v) })} />
-          <Num id="wh-bayw" label="Bay width" unit="m" step={0.1} value={layout.bayWidth} min={0.5} onChange={(v) => set('layout', layout, { bayWidth: v })} />
-          <Num id="wh-levelh" label="Level height" unit="m" step={0.1} value={layout.levelHeight} min={0.5} onChange={(v) => set('layout', layout, { levelHeight: v })} />
-          <Num id="wh-aislew" label="Aisle width" unit="m" step={0.1} value={layout.aisleWidth} min={1} onChange={(v) => set('layout', layout, { aisleWidth: v })} />
-          <Num id="wh-front" label="Dock to racks" unit="m" step={0.5} value={layout.frontClearance} min={0} onChange={(v) => set('layout', layout, { frontClearance: v })} />
+          <Num id="wh-aisles" label={t('Aisles')} value={layout.aisles} min={1} onChange={(v) => set('layout', layout, { aisles: Math.round(v) })} />
+          <Num id="wh-bays" label={t('Bays per aisle')} value={layout.baysPerAisle} min={1} onChange={(v) => set('layout', layout, { baysPerAisle: Math.round(v) })} />
+          <Num id="wh-levels" label={t('Levels')} value={layout.levels} min={1} onChange={(v) => set('layout', layout, { levels: Math.round(v) })} />
+          <Num id="wh-perbay" label={t('Pallets per bay')} value={layout.palletsPerBay} min={1} onChange={(v) => set('layout', layout, { palletsPerBay: Math.round(v) })} />
+          <Num id="wh-bayw" label={t('Bay width')} unit="m" step={0.1} value={layout.bayWidth} min={0.5} onChange={(v) => set('layout', layout, { bayWidth: v })} />
+          <Num id="wh-levelh" label={t('Level height')} unit="m" step={0.1} value={layout.levelHeight} min={0.5} onChange={(v) => set('layout', layout, { levelHeight: v })} />
+          <Num id="wh-aislew" label={t('Aisle width')} unit="m" step={0.1} value={layout.aisleWidth} min={1} onChange={(v) => set('layout', layout, { aisleWidth: v })} />
+          <Num id="wh-front" label={t('Dock to racks')} unit="m" step={0.5} value={layout.frontClearance} min={0} onChange={(v) => set('layout', layout, { frontClearance: v })} />
         </div>
         <div>
-          <label htmlFor="wh-slotting" className="input-label">Slotting (where pallets are put)</label>
+          <label htmlFor="wh-slotting" className="input-label">{t('Slotting (where pallets are put)')}</label>
           <select id="wh-slotting" className="input" value={node.slotting || 'closest'} disabled={asrs}
             title={asrs ? 'AS/RS spreads each SKU over the aisles, nearest location first' : undefined}
             onChange={(e) => onChange('slotting', e.target.value)}>
-            <option value="closest">Closest free location</option>
-            <option value="abc">ABC — fast movers nearest the dock</option>
-            <option value="random">Random</option>
+            <option value="closest">{t('Closest free location')}</option>
+            <option value="abc">{t('ABC — fast movers nearest the dock')}</option>
+            <option value="random">{t('Random')}</option>
           </select>
         </div>
       </Section>
 
       {asrs ? (
-        <Section title="Stacker cranes" hint={`${layout.aisles} crane${layout.aisles === 1 ? '' : 's'}, one per aisle. Travel and lift run at the same time (the slower one counts).`}>
+        <Section title={t('Stacker cranes')} hint={`${layout.aisles} crane${layout.aisles === 1 ? '' : 's'}, one per aisle. Travel and lift run at the same time (the slower one counts).`}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <Num id="wh-crs" label="Travel speed" unit="m/s" step={0.1} value={cranes.speed} min={0.1} onChange={(v) => set('cranes', cranes, { speed: v })} />
-            <Num id="wh-crl" label="Lift speed" unit="m/s" step={0.1} value={cranes.liftSpeed} min={0.05} onChange={(v) => set('cranes', cranes, { liftSpeed: v })} />
-            <Num id="wh-crh" label="Pick-up / set-down" unit="s" value={cranes.handlingTime} onChange={(v) => set('cranes', cranes, { handlingTime: v })} />
-            <Num id="wh-crc" label="Conveyor speed" unit="m/s" step={0.1} value={cranes.conveyorSpeed} min={0.05} onChange={(v) => set('cranes', cranes, { conveyorSpeed: v })} />
+            <Num id="wh-crs" label={t('Travel speed')} unit="m/s" step={0.1} value={cranes.speed} min={0.1} onChange={(v) => set('cranes', cranes, { speed: v })} />
+            <Num id="wh-crl" label={t('Lift speed')} unit="m/s" step={0.1} value={cranes.liftSpeed} min={0.05} onChange={(v) => set('cranes', cranes, { liftSpeed: v })} />
+            <Num id="wh-crh" label={t('Pick-up / set-down')} unit="s" value={cranes.handlingTime} onChange={(v) => set('cranes', cranes, { handlingTime: v })} />
+            <Num id="wh-crc" label={t('Conveyor speed')} unit="m/s" step={0.1} value={cranes.conveyorSpeed} min={0.05} onChange={(v) => set('cranes', cranes, { conveyorSpeed: v })} />
           </div>
         </Section>
       ) : (
-        <Section title="Forklifts">
+        <Section title={t('Forklifts')}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <Num id="wh-fl" label="Forklifts" value={forklifts.count} min={1} onChange={(v) => set('forklifts', forklifts, { count: Math.round(v) })} />
-            <Num id="wh-fls" label="Speed" unit="m/s" step={0.1} value={forklifts.speed} min={0.1} onChange={(v) => set('forklifts', forklifts, { speed: v })} />
-            <Num id="wh-fll" label="Lift speed" unit="m/s" step={0.05} value={forklifts.liftSpeed} min={0.05} onChange={(v) => set('forklifts', forklifts, { liftSpeed: v })} />
-            <Num id="wh-flh" label="Pick-up / set-down" unit="s" value={forklifts.handlingTime} onChange={(v) => set('forklifts', forklifts, { handlingTime: v })} />
-            <Num id="wh-flma" label="Max per aisle (0 = no limit)" value={forklifts.maxPerAisle ?? 0} onChange={(v) => set('forklifts', forklifts, { maxPerAisle: Math.round(v) })} />
+            <Num id="wh-fl" label={t('Forklifts')} value={forklifts.count} min={1} onChange={(v) => set('forklifts', forklifts, { count: Math.round(v) })} />
+            <Num id="wh-fls" label={t('Speed')} unit="m/s" step={0.1} value={forklifts.speed} min={0.1} onChange={(v) => set('forklifts', forklifts, { speed: v })} />
+            <Num id="wh-fll" label={t('Lift speed')} unit="m/s" step={0.05} value={forklifts.liftSpeed} min={0.05} onChange={(v) => set('forklifts', forklifts, { liftSpeed: v })} />
+            <Num id="wh-flh" label={t('Pick-up / set-down')} unit="s" value={forklifts.handlingTime} onChange={(v) => set('forklifts', forklifts, { handlingTime: v })} />
+            <Num id="wh-flma" label={t('Max per aisle (0 = no limit)')} value={forklifts.maxPerAisle ?? 0} onChange={(v) => set('forklifts', forklifts, { maxPerAisle: Math.round(v) })} />
           </div>
         </Section>
       )}
 
-      <Section title={`Stock (SKUs) · ${skus.length}`} hint="Pallets are stored per SKU. Reorder point and order quantity are in pallets; −1 disables reordering. Linked products without a SKU get one automatically.">
+      <Section title={`Stock (SKUs) · ${skus.length}`} hint={t('Pallets are stored per SKU. Reorder point and order quantity are in pallets; −1 disables reordering. Linked products without a SKU get one automatically.')}>
         {skus.map((s, i) => (
           <div key={s.id} style={{ border: '1px solid var(--border, #d6dbe1)', borderRadius: 3, padding: 8, display: 'grid', gap: 6 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 52px 24px', gap: 4, alignItems: 'end' }}>
               <div>
-                <label htmlFor={`sku-${i}-name`} className="input-label">Name</label>
+                <label htmlFor={`sku-${i}-name`} className="input-label">{t('Name')}</label>
                 <input id={`sku-${i}-name`} className="input" value={s.name} onChange={(e) => setSku(i, { name: e.target.value })} />
               </div>
               <div>
-                <label htmlFor={`sku-${i}-class`} className="input-label">Class</label>
+                <label htmlFor={`sku-${i}-class`} className="input-label">{t('Class')}</label>
                 <select id={`sku-${i}-class`} className="input" value={s.class || 'B'} onChange={(e) => setSku(i, { class: e.target.value })}>
                   <option>A</option><option>B</option><option>C</option>
                 </select>
               </div>
-              <button type="button" aria-label={`Remove ${s.name}`} title="Remove SKU" onClick={() => onChange('skus', skus.filter((_, k) => k !== i))}
+              <button type="button" aria-label={`Remove ${s.name}`} title={t('Remove SKU')} onClick={() => onChange('skus', skus.filter((_, k) => k !== i))}
                 style={{ height: 30, border: 'none', background: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16 }}>×</button>
             </div>
             <div>
-              <label htmlFor={`sku-${i}-prod`} className="input-label">Linked product (for line supply / finished goods)</label>
+              <label htmlFor={`sku-${i}-prod`} className="input-label">{t('Linked product (for line supply / finished goods)')}</label>
               <select id={`sku-${i}-prod`} className="input" value={s.productId || ''} onChange={(e) => setSku(i, { productId: e.target.value || undefined })}>
                 <option value="">— none (warehouse-only SKU) —</option>
                 {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-              <Num id={`sku-${i}-upp`} label="Units / pallet" value={s.unitsPerPallet ?? 40} min={1} onChange={(v) => setSku(i, { unitsPerPallet: Math.round(v) })} />
-              <Num id={`sku-${i}-init`} label="Start pallets" value={s.initialPallets ?? 0} onChange={(v) => setSku(i, { initialPallets: Math.round(v) })} />
-              <Num id={`sku-${i}-share`} label="Demand share" value={s.demandShare ?? 1} onChange={(v) => setSku(i, { demandShare: v })} />
-              <Num id={`sku-${i}-rop`} label="Reorder at" value={s.reorderPoint ?? -1} min={-1} onChange={(v) => setSku(i, { reorderPoint: Math.round(v) })} />
-              <Num id={`sku-${i}-q`} label="Order qty" value={s.orderQuantity ?? 4} min={1} onChange={(v) => setSku(i, { orderQuantity: Math.round(v) })} />
-              <Num id={`sku-${i}-lt`} label="Lead time (h)" step={0.5}
+              <Num id={`sku-${i}-upp`} label={t('Units / pallet')} value={s.unitsPerPallet ?? 40} min={1} onChange={(v) => setSku(i, { unitsPerPallet: Math.round(v) })} />
+              <Num id={`sku-${i}-init`} label={t('Start pallets')} value={s.initialPallets ?? 0} onChange={(v) => setSku(i, { initialPallets: Math.round(v) })} />
+              <Num id={`sku-${i}-share`} label={t('Demand share')} value={s.demandShare ?? 1} onChange={(v) => setSku(i, { demandShare: v })} />
+              <Num id={`sku-${i}-rop`} label={t('Reorder at')} value={s.reorderPoint ?? -1} min={-1} onChange={(v) => setSku(i, { reorderPoint: Math.round(v) })} />
+              <Num id={`sku-${i}-q`} label={t('Order qty')} value={s.orderQuantity ?? 4} min={1} onChange={(v) => setSku(i, { orderQuantity: Math.round(v) })} />
+              <Num id={`sku-${i}-lt`} label={t('Lead time (h)')} step={0.5}
                 value={Math.round(((s.leadTime?.parameters.value ?? s.leadTime?.parameters.mean ?? 7200) / 3600) * 10) / 10}
                 onChange={(v) => setSku(i, { leadTime: { type: 'constant', parameters: { value: v * 3600 } } })} />
             </div>
@@ -285,44 +286,44 @@ export function WarehouseProperties({ node, onChange }: { node: any; onChange: (
         <button type="button" className="ribbon-sbtn" onClick={addSku} style={{ justifySelf: 'start' }}>+ Add SKU</button>
       </Section>
 
-      <Section title="Inbound trucks" defaultOpen={!!inbound.enabled} hint="Scheduled deliveries, in addition to the reorder deliveries above.">
-        <Toggle id="wh-in-on" label="Scheduled inbound trucks" checked={!!inbound.enabled} onChange={(v) => set('inbound', inbound, { enabled: v })} />
-        <DistInput id="wh-in-iat" label="Time between trucks" unit="s" value={inbound.interarrival} onChange={(d) => set('inbound', inbound, { interarrival: d })} />
-        <DistInput id="wh-in-ppt" label="Pallets per truck" value={inbound.palletsPerTruck} onChange={(d) => set('inbound', inbound, { palletsPerTruck: d })} />
+      <Section title={t('Inbound trucks')} defaultOpen={!!inbound.enabled} hint={t('Scheduled deliveries, in addition to the reorder deliveries above.')}>
+        <Toggle id="wh-in-on" label={t('Scheduled inbound trucks')} checked={!!inbound.enabled} onChange={(v) => set('inbound', inbound, { enabled: v })} />
+        <DistInput id="wh-in-iat" label={t('Time between trucks')} unit="s" value={inbound.interarrival} onChange={(d) => set('inbound', inbound, { interarrival: d })} />
+        <DistInput id="wh-in-ppt" label={t('Pallets per truck')} value={inbound.palletsPerTruck} onChange={(d) => set('inbound', inbound, { palletsPerTruck: d })} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
-          <Num id="wh-doors" label="Dock doors" value={inbound.doors} min={1} onChange={(v) => set('inbound', inbound, { doors: Math.round(v) })} />
+          <Num id="wh-doors" label={t('Dock doors')} value={inbound.doors} min={1} onChange={(v) => set('inbound', inbound, { doors: Math.round(v) })} />
         </div>
-        <DistInput id="wh-unload" label="Unload time per pallet" unit="s" value={inbound.unloadTimePerPallet} onChange={(d) => set('inbound', inbound, { unloadTimePerPallet: d })} />
-        <Toggle id="wh-xdock" label="Cross-dock: pallets for SKUs with open orders go straight to picking" checked={!!node.crossDock} onChange={(v) => onChange('crossDock', v)} />
+        <DistInput id="wh-unload" label={t('Unload time per pallet')} unit="s" value={inbound.unloadTimePerPallet} onChange={(d) => set('inbound', inbound, { unloadTimePerPallet: d })} />
+        <Toggle id="wh-xdock" label={t('Cross-dock: pallets for SKUs with open orders go straight to picking')} checked={!!node.crossDock} onChange={(v) => onChange('crossDock', v)} />
       </Section>
 
-      <Section title="Customer orders & picking" defaultOpen={!!orders.enabled} hint={asrs
+      <Section title={t('Customer orders & picking')} defaultOpen={!!orders.enabled} hint={asrs
         ? 'Goods-to-person: cranes bring pallets to the pick stations, pickers pick, the pallet goes back.'
         : 'Pickers walk the aisles (S-shape route) and pick from level-0 pick faces; forklifts refill faces from reserve.'}>
-        <Toggle id="wh-ord-on" label="Generate customer orders" checked={!!orders.enabled} onChange={(v) => set('orders', orders, { enabled: v })} />
-        <DistInput id="wh-ord-iat" label="Time between orders" unit="s" value={orders.interarrival} onChange={(d) => set('orders', orders, { interarrival: d })} />
-        <DistInput id="wh-ord-lines" label="Lines per order" value={orders.linesPerOrder} onChange={(d) => set('orders', orders, { linesPerOrder: d })} />
-        <DistInput id="wh-ord-units" label="Units per line" value={orders.unitsPerLine} onChange={(d) => set('orders', orders, { unitsPerLine: d })} />
+        <Toggle id="wh-ord-on" label={t('Generate customer orders')} checked={!!orders.enabled} onChange={(v) => set('orders', orders, { enabled: v })} />
+        <DistInput id="wh-ord-iat" label={t('Time between orders')} unit="s" value={orders.interarrival} onChange={(d) => set('orders', orders, { interarrival: d })} />
+        <DistInput id="wh-ord-lines" label={t('Lines per order')} value={orders.linesPerOrder} onChange={(d) => set('orders', orders, { linesPerOrder: d })} />
+        <DistInput id="wh-ord-units" label={t('Units per line')} value={orders.unitsPerLine} onChange={(d) => set('orders', orders, { unitsPerLine: d })} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <Num id="wh-pk" label="Pickers" value={pickers.count} min={1} onChange={(v) => set('pickers', pickers, { count: Math.round(v) })} />
-          <Num id="wh-pkw" label="Walk speed" unit="m/s" step={0.1} value={pickers.walkSpeed} min={0.1} onChange={(v) => set('pickers', pickers, { walkSpeed: v })} />
-          <Num id="wh-pkl" label="Time per line" unit="s" value={pickers.timePerLine} onChange={(v) => set('pickers', pickers, { timePerLine: v })} />
-          <Num id="wh-pku" label="Time per unit" unit="s" step={0.5} value={pickers.timePerUnit} onChange={(v) => set('pickers', pickers, { timePerUnit: v })} />
-          <Num id="wh-pks" label="Order setup" unit="s" value={pickers.setupTime} onChange={(v) => set('pickers', pickers, { setupTime: v })} />
-          <Num id="wh-pack" label="Pack stations" value={orders.packStations} min={1} onChange={(v) => set('orders', orders, { packStations: Math.round(v) })} />
+          <Num id="wh-pk" label={t('Pickers')} value={pickers.count} min={1} onChange={(v) => set('pickers', pickers, { count: Math.round(v) })} />
+          <Num id="wh-pkw" label={t('Walk speed')} unit="m/s" step={0.1} value={pickers.walkSpeed} min={0.1} onChange={(v) => set('pickers', pickers, { walkSpeed: v })} />
+          <Num id="wh-pkl" label={t('Time per line')} unit="s" value={pickers.timePerLine} onChange={(v) => set('pickers', pickers, { timePerLine: v })} />
+          <Num id="wh-pku" label={t('Time per unit')} unit="s" step={0.5} value={pickers.timePerUnit} onChange={(v) => set('pickers', pickers, { timePerUnit: v })} />
+          <Num id="wh-pks" label={t('Order setup')} unit="s" value={pickers.setupTime} onChange={(v) => set('pickers', pickers, { setupTime: v })} />
+          <Num id="wh-pack" label={t('Pack stations')} value={orders.packStations} min={1} onChange={(v) => set('orders', orders, { packStations: Math.round(v) })} />
         </div>
-        <DistInput id="wh-packt" label="Pack time per order" unit="s" value={orders.packTime} onChange={(d) => set('orders', orders, { packTime: d })} />
-        <Num id="wh-dep" label="Outbound truck every (0 = ship at once)" unit="min" value={Math.round(orders.departureInterval / 60)} onChange={(v) => set('orders', orders, { departureInterval: v * 60 })} />
+        <DistInput id="wh-packt" label={t('Pack time per order')} unit="s" value={orders.packTime} onChange={(d) => set('orders', orders, { packTime: d })} />
+        <Num id="wh-dep" label={t('Outbound truck every (0 = ship at once)')} unit="min" value={Math.round(orders.departureInterval / 60)} onChange={(v) => set('orders', orders, { departureInterval: v * 60 })} />
         {orders.departureInterval > 0 && (
-          <DistInput id="wh-loadt" label="Truck loading time per order" unit="s" value={outbound.loadTimePerOrder} onChange={(d) => set('outbound', outbound, { loadTimePerOrder: d })} />
+          <DistInput id="wh-loadt" label={t('Truck loading time per order')} unit="s" value={outbound.loadTimePerOrder} onChange={(d) => set('outbound', outbound, { loadTimePerOrder: d })} />
         )}
         <Shifts pickers={pickers} onChange={(patch) => set('pickers', pickers, patch)} />
       </Section>
 
-      <Section title="Line links" defaultOpen={false} hint="Used when the warehouse is connected to stations.">
-        <Num id="wh-calloff" label="Call off next pallet when line-side stock is below" unit="% of pallet" value={Math.round(lineSupply.callOffShare * 100)}
+      <Section title={t('Line links')} defaultOpen={false} hint={t('Used when the warehouse is connected to stations.')}>
+        <Num id="wh-calloff" label={t('Call off next pallet when line-side stock is below')} unit="% of pallet" value={Math.round(lineSupply.callOffShare * 100)}
           onChange={(v) => set('lineSupply', lineSupply, { callOffShare: Math.min(100, v) / 100 })} />
-        <DistInput id="wh-dwell" label="WIP store: dwell time" unit="s" value={store.dwellTime} onChange={(d) => set('store', store, { dwellTime: d })} />
+        <DistInput id="wh-dwell" label={t('WIP store: dwell time')} unit="s" value={store.dwellTime} onChange={(d) => set('store', store, { dwellTime: d })} />
       </Section>
     </div>
   );

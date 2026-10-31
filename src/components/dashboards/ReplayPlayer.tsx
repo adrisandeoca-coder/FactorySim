@@ -316,7 +316,7 @@ export function ReplayPlayer({ runPath, onClose }: ReplayPlayerProps) {
           })}
           {/* Playhead */}
           <div
-            className="absolute top-1 w-3.5 h-3.5 rounded-full bg-white shadow-lg border-2 border-blue-400 group-hover:scale-125 transition-transform"
+            className="absolute top-1 w-3.5 h-3.5 rounded-full bg-white shadow-sm border-2 border-blue-400 group-hover:scale-125 transition-transform"
             style={{
               left: `${progress * 100}%`,
               transform: 'translateX(-50%)',
@@ -345,7 +345,7 @@ export function ReplayPlayer({ runPath, onClose }: ReplayPlayerProps) {
           {/* Play/Pause */}
           <button
             onClick={togglePlay}
-            className="p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-full transition-colors shadow-lg"
+            className="p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-full transition-colors shadow-sm"
             title="Play/Pause (Space)"
           >
             {isPlaying ? (

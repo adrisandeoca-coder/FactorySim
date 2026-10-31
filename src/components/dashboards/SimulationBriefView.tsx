@@ -59,7 +59,7 @@ function ProgressBar({ progress, elapsedSeconds, simDuration }: {
         <div className="absolute inset-y-0 left-0 bg-amber-100/60 border-r border-amber-300"
           style={{ width: `${warmupPct}%` }} />
       )}
-      <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-300"
+      <div className="absolute inset-y-0 left-0 bg-blue-600 transition-all duration-300"
         style={{ width: `${pct}%` }} />
       <div className="absolute inset-0 flex items-center justify-between px-3 text-[11px] font-semibold">
         <span className="text-slate-700 drop-shadow-sm">{pct.toFixed(0)}%</span>
@@ -360,8 +360,8 @@ function LiveCounters() {
   if (currentTime === 0) return null;
 
   return (
-    <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg border border-indigo-200 p-4">
-      <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-3">Live Counters</h3>
+    <div className="bg-white rounded-sm border border-slate-300 p-4">
+      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Live Counters</h3>
       <div className="grid grid-cols-3 gap-3">
         <Metric label="Sim Time" value={fmtTime(Math.round(currentTime))} />
         <Metric label="WIP" value={activeProducts} />
@@ -383,7 +383,7 @@ interface SimulationBriefViewProps {
 export function SimulationBriefView({ progress, elapsedSeconds, simDuration, height }: SimulationBriefViewProps) {
   return (
     <div
-      className="flex flex-col bg-slate-50 rounded-xl border border-slate-200 overflow-hidden"
+      className="flex flex-col bg-slate-50 rounded-sm border border-slate-200 overflow-hidden"
       style={{ height: height || 'calc(100vh - 180px)' }}
     >
       {/* Progress bar */}

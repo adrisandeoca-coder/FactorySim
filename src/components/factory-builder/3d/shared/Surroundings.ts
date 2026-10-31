@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { buildOperator } from '../machines/Operator';
+import { HumanRig, lookFor } from './HumanRig';
+import { StationWorker } from './HumanBehaviour';
 import { buildWarehouseBay } from '../model-library/warehousing/WarehouseBay';
 import { buildForklift as buildForkliftModel } from '../model-library/material-handling/Forklift';
 
@@ -25,6 +26,10 @@ export interface LayoutNode {
   z: number;
   hx: number;
   hz: number;
+  /** Operator position: 'outside' a safety fence (loads through the gate), or 'none' (automatic cell). */
+  staff?: 'outside' | 'none';
+  /** Height of the machine top (m), for the operator's work height. */
+  top?: number;
   /** Extra footprint (world rect), e.g. a warehouse's rack block behind its dock. */
   block?: { x0: number; x1: number; z0: number; z1: number };
   /** Truck apron outside a dock wall (world rect): the building opens there. */
@@ -67,7 +72,7 @@ const hmiMat = new THREE.MeshStandardMaterial({ color: 0x2b3038, roughness: 0.5,
 const screenMat = new THREE.MeshStandardMaterial({ color: 0x2a5d8f, roughness: 0.3, emissive: 0x1d4f80, emissiveIntensity: 0.6 });
 const officeMat = new THREE.MeshStandardMaterial({ color: 0xf1f3f5, roughness: 0.8 });
 const cartonMat = new THREE.MeshStandardMaterial({ color: 0xc4934a, roughness: 0.95 });
-const vestColors = [0xff7a1a, 0xe6f22e, 0xff7a1a, 0xffd21f];
+const binMat = new THREE.MeshStandardMaterial({ color: 0x2f62d0, roughness: 0.6 });
 
 /** Materials shared across rebuilds (never disposed). */
 export const SURROUNDINGS_SHARED_MATS: THREE.Material[] = [
@@ -193,6 +198,13 @@ function workstation(x: number, z: number, faceX: number, faceZ: number) {
   screen.position.set(0.42, 1.42, -0.128);
   screen.rotation.x = -0.25;
   g.add(post, arm, head, screen);
+  // Parts bin on a stand at the operator's left
+  const stand = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.85, 0.04), hmiMat);
+  stand.position.set(-0.55, 0.425, 0.3);
+  const bin = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.16, 0.24), binMat);
+  bin.position.set(-0.55, 0.93, 0.3);
+  bin.castShadow = true;
+  g.add(stand, bin);
   g.position.set(x, 0, z);
   // Local +Z points to the machine
   g.rotation.y = Math.atan2(faceX - x, faceZ - z);
@@ -216,20 +228,36 @@ function office(x: number, z: number, w: number, d: number) {
   return g;
 }
 
-function worker(x: number, z: number, faceX: number, faceZ: number, vest: number) {
-  const op = buildOperator();
-  const fig = op.getObjectByName('figure') ?? op;
-  const g = new THREE.Group();
-  g.add(fig);
-  g.scale.setScalar(1.85);
+/**
+ * Operator at a staffed machine: an articulated person on the mat, facing the
+ * machine, whose work cycle follows the station's state (see HumanBehaviour).
+ * Work point = the machine's edge in front of the mat, at bench height or the
+ * machine's top, whichever is lower; bin and HMI match the workstation.
+ */
+function worker(x: number, z: number, n: LayoutNode, k: number) {
+  const rig = new HumanRig(lookFor(k));
+  const g = rig.group;
   g.position.set(x, 0, z);
-  g.rotation.y = Math.atan2(faceX - x, faceZ - z);
-  const vestMat = new THREE.MeshStandardMaterial({ color: vest, roughness: 0.7 });
-  g.traverse((o) => {
-    const m = o as THREE.Mesh;
-    if (m.isMesh && (m.material as THREE.MeshStandardMaterial)?.color?.getHex() === 0xffe033) m.material = vestMat;
-    if (m.isMesh) m.castShadow = true;
-  });
+  g.rotation.y = Math.atan2(n.x - x, n.z - z);
+  g.updateMatrixWorld(true);
+  // Distance from the mat centre to the machine edge along the facing direction
+  const dx = n.x - x, dz = n.z - z;
+  const dist = Math.hypot(dx, dz);
+  const edge = Math.abs(dx) > Math.abs(dz) ? dist - n.hx : dist - n.hz;
+  const workY = Math.min(1.05, Math.max(0.8, (n.top ?? 1.0) * 0.9));
+  const at = (lx: number, ly: number, lz: number) => g.localToWorld(new THREE.Vector3(lx, ly, lz));
+  // Bin and HMI belong to the mat; the person steps up to ~0.3 m from the machine edge
+  const bin = at(-0.55, 0.98, 0.3), hmi = at(0.42, 1.38, -0.05);
+  const step = Math.max(0, Math.min(0.35, edge - 0.3));
+  g.position.add(new THREE.Vector3(dx / dist, 0, dz / dist).multiplyScalar(step));
+  g.updateMatrixWorld(true);
+  const sw = new StationWorker(rig, {
+    // Outside a fence the work is at the loading station on the fence line
+    part: at(0, workY, n.staff === 'outside' ? 0.5 : Math.max(0.35, edge - step + 0.2)),
+    bin, hmi,
+  }, 6 + (k % 3));
+  g.userData.worker = sw;
+  g.userData.stationId = n.id;
   return g;
 }
 
@@ -292,9 +320,11 @@ export function buildSurroundings(info: LayoutInfo, opts: { scenery: boolean }):
   // ── Operator positions at staffed machines: mat + HMI (equipment, always shown) ──
   const workSpots: { x: number; z: number; n: LayoutNode }[] = [];
   for (const n of info.nodes) {
-    if (!STAFFED.has(n.type) || n.block) continue;
+    if (!STAFFED.has(n.type) || n.block || n.staff === 'none') continue;
+    // Fenced machines: the mat goes outside the fence (fence = footprint + 0.5 m)
+    const off = n.staff === 'outside' ? 1.05 : 0.6;
     const cands: [number, number][] = [
-      [n.x, n.z + n.hz + 0.6], [n.x + n.hx + 0.6, n.z], [n.x - n.hx - 0.6, n.z], [n.x, n.z - n.hz - 0.6],
+      [n.x, n.z + n.hz + off], [n.x + n.hx + off, n.z], [n.x - n.hx - off, n.z], [n.x, n.z - n.hz - off],
     ];
     for (const [x, z] of cands) {
       const r = { x0: x - 0.6, x1: x + 0.6, z0: z - 0.45, z1: z + 0.45 };
@@ -307,6 +337,13 @@ export function buildSurroundings(info: LayoutInfo, opts: { scenery: boolean }):
       break;
     }
   }
+  // Operators on the mats (equipment, always shown), animated by the 3D view from station states
+  const workers: THREE.Group[] = [];
+  workSpots.forEach((w, k) => {
+    const wg = worker(w.x, w.z, w.n, k);
+    root.add(wg);
+    workers.push(wg);
+  });
 
   if (opts.scenery) {
     const free = (r: Rect) => !rects.some((o) => overlaps(r, o));
@@ -349,10 +386,6 @@ export function buildSurroundings(info: LayoutInfo, opts: { scenery: boolean }):
       root.add(fl);
     }
 
-    // Workers on the operator mats, facing the machine
-    workSpots.slice(0, 10).forEach((w, k) => {
-      root.add(worker(w.x, w.z, w.n.x, w.n.z, vestColors[k % vestColors.length]));
-    });
 
     // Office block in the back-left corner when the floor there is free
     {
@@ -363,7 +396,12 @@ export function buildSurroundings(info: LayoutInfo, opts: { scenery: boolean }):
     }
   }
 
-  return mergeStatic(root);
+  // People move: keep them out of the static merge (and their shared geometry out of its dispose)
+  workers.forEach((w) => root.remove(w));
+  const out = mergeStatic(root);
+  workers.forEach((w) => out.add(w));
+  out.userData.workers = workers;
+  return out;
 }
 
 const NO_SHADOW = new Set<THREE.Material>([zoneMat, yellowMat, aisleMat, whiteMat]);

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useModelStore } from '../../stores/modelStore';
 
+import { t } from '../../i18n';
 /**
  * Model tree ("Outline") — the left-docked tree familiar from ANSYS /
  * COMSOL model builders. Lists every element by category; clicking a row
@@ -40,7 +41,7 @@ export function ModelOutline({ onSelect }: { onSelect: (id: string) => void }) {
   ];
 
   return (
-    <div className="model-outline" role="tree" aria-label="Model outline">
+    <div className="model-outline" role="tree" aria-label={t('Model outline')}>
       <div className="outline-row" style={{ paddingLeft: 4, fontWeight: 600 }}>
         <span className="outline-swatch" style={{ background: '#1F5FAD' }} />
         {model.name || 'Untitled model'}
@@ -60,7 +61,7 @@ export function ModelOutline({ onSelect }: { onSelect: (id: string) => void }) {
                 {g.rows.length === 0 ? '' : isCollapsed ? '▸' : '▾'}
               </button>
               <span className="outline-swatch" style={{ background: g.color }} />
-              <span>{g.label}</span>
+              <span>{t(g.label)}</span>
               <span className="outline-count">({g.rows.length})</span>
             </div>
             {!isCollapsed && g.rows.map((r) => (

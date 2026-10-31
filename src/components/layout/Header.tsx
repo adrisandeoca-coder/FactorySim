@@ -5,6 +5,7 @@ import { useModelStore } from '../../stores/modelStore';
 import { useLiveSimulationStore } from '../../stores/liveSimulationStore';
 import { ModelManager } from './ModelManager';
 import { RibbonSlot, RibbonGroup, RibbonButton } from './Ribbon';
+import { useT } from '../../i18n';
 import {
   Save, FolderOpen, HelpCircle, FilePlus2, Settings as SettingsIcon, Boxes, Play, BarChart3,
   RefreshCw, Clock, Terminal, Zap, FlaskConical, GitBranch,
@@ -99,6 +100,7 @@ export function Header() {
     addToast({ type: 'info', message: 'New model created' });
   };
 
+  const tr = useT();
   const tabs = TABS.filter((t) => !simpleMode || !t.expertOnly);
   const activeTab = TABS.find((t) => t.match.some((m) => location.pathname.startsWith(m)));
 
@@ -108,8 +110,8 @@ export function Header() {
       <div className="app-titlebar">
         <div className="app-titlebar-left">
           <BrandMark />
-          <button className="qa-btn" onClick={handleSave} title="Save model (Ctrl+S)" aria-label="Save model"><Save size={14} /></button>
-          <button className="qa-btn" onClick={() => setShowModelManager(true)} title="Open saved models" aria-label="Open model"><FolderOpen size={14} /></button>
+          <button className="qa-btn" onClick={handleSave} title={tr('Save model (Ctrl+S)')} aria-label={tr('Save model')}><Save size={14} /></button>
+          <button className="qa-btn" onClick={() => setShowModelManager(true)} title={tr('Open saved models')} aria-label={tr('Open model')}><FolderOpen size={14} /></button>
           <span className="app-titlebar-sep" />
           {isEditing ? (
             <input
@@ -122,8 +124,8 @@ export function Header() {
               className="app-titlebar-input"
             />
           ) : (
-            <button className="app-titlebar-title" onClick={handleStartEdit} title="Click to rename model">
-              {model.name || 'Untitled Model'}
+            <button className="app-titlebar-title" onClick={handleStartEdit} title={tr('Click to rename model')}>
+              {model.name || tr('Untitled Model')}
             </button>
           )}
           <span className="app-titlebar-app">— FactorySim</span>
@@ -132,22 +134,22 @@ export function Header() {
           {isSimulating && (
             <span className="app-titlebar-status">
               <span className="status-dot status-dot-good" style={{ background: '#3B82F6' }} />
-              Simulating {Math.round(simulationProgress * 100)}%
+              {tr('Simulating {p}%', { p: Math.round(simulationProgress * 100) })}
             </span>
           )}
-          {isReplaying && !isSimulating && <span className="app-titlebar-status">Replay</span>}
-          <label className="titlebar-switch" title="Simple mode shows the essential workflow. Switch off for all expert tools.">
-            <span>Simple mode</span>
+          {isReplaying && !isSimulating && <span className="app-titlebar-status">{tr('Replay')}</span>}
+          <label className="titlebar-switch" title={tr('Simple mode shows the essential workflow. Switch off for all expert tools.')}>
+            <span>{tr('Simple mode')}</span>
             <input type="checkbox" role="switch" checked={simpleMode} onChange={(e) => setSimpleMode(e.target.checked)} />
           </label>
-          <button className="qa-btn" onClick={() => setShowHelp(true)} title="Help (F1)" aria-label="Help"><HelpCircle size={15} /></button>
+          <button className="qa-btn" onClick={() => setShowHelp(true)} title={tr('Help (F1)')} aria-label={tr('Help')}><HelpCircle size={15} /></button>
         </div>
       </div>
 
       {/* ── Tab row ── */}
       <nav className="ribbon-tabs" aria-label="Main">
         <div style={{ position: 'relative' }}>
-          <button className="ribbon-file-tab" onClick={() => setFileMenuOpen((v) => !v)} aria-expanded={fileMenuOpen}>File</button>
+          <button className="ribbon-file-tab" onClick={() => setFileMenuOpen((v) => !v)} aria-expanded={fileMenuOpen}>{tr('File')}</button>
           {fileMenuOpen && (
             <>
               <div style={{ position: 'fixed', inset: 0, zIndex: 60 }} onClick={() => setFileMenuOpen(false)} />
@@ -160,7 +162,7 @@ export function Header() {
                   { label: 'Help', icon: <HelpCircle size={15} />, fn: () => setShowHelp(true) },
                 ].map((item) => (
                   <button key={item.label} role="menuitem" className="file-menu-item" onClick={() => { setFileMenuOpen(false); item.fn(); }}>
-                    {item.icon}{item.label}
+                    {item.icon}{tr(item.label)}
                   </button>
                 ))}
               </div>
@@ -174,7 +176,7 @@ export function Header() {
             onClick={() => navigate(t.path)}
             aria-current={activeTab?.id === t.id ? 'page' : undefined}
           >
-            {t.label}
+            {tr(t.label)}
           </button>
         ))}
         {/* Simulation progress runs along the bottom of the tab row */}
@@ -222,34 +224,34 @@ export function Header() {
         <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }} onClick={() => setShowHelp(false)}>
           <div className="card" style={{ width: 440, maxHeight: '70vh', overflowY: 'auto', padding: 0, boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-              <span className="text-title">Quick Help</span>
+              <span className="text-title">{tr('Quick Help')}</span>
               <button onClick={() => setShowHelp(false)} style={{ background: 'none', border: 'none', fontSize: 18, color: 'var(--text-tertiary)', cursor: 'pointer', lineHeight: 1 }}>&times;</button>
             </div>
             <div style={{ padding: 16, fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
               {location.pathname.includes('dashboard') && (
                 <div style={{ marginBottom: 12 }}>
-                  <div className="text-title" style={{ marginBottom: 4 }}>Dashboard</div>
+                  <div className="text-title" style={{ marginBottom: 4 }}>{tr('Dashboard')}</div>
                   <ul style={{ paddingLeft: 16, margin: 0 }}>
-                    <li>Set the run length under Settings in the ribbon, then press Run simulation</li>
-                    <li>The Results summary names the bottleneck and what to try</li>
-                    <li>Click a station name to open it in the builder</li>
-                    <li>Customize (ribbon, View group) adds or removes panels</li>
+                    <li>{tr('Set the run length under Settings in the ribbon, then press Run simulation')}</li>
+                    <li>{tr('The Results summary names the bottleneck and what to try')}</li>
+                    <li>{tr('Click a station name to open it in the builder')}</li>
+                    <li>{tr('Customize (ribbon, View group) adds or removes panels')}</li>
                   </ul>
                 </div>
               )}
               {location.pathname.includes('builder') && (
                 <div style={{ marginBottom: 12 }}>
-                  <div className="text-title" style={{ marginBottom: 4 }}>Factory Builder</div>
+                  <div className="text-title" style={{ marginBottom: 4 }}>{tr('Factory Builder')}</div>
                   <ul style={{ paddingLeft: 16, margin: 0 }}>
-                    <li>Add elements from the ribbon (Add element group)</li>
-                    <li>Drag from a handle to connect two elements</li>
-                    <li>Select an element in the Outline or on the canvas to edit its details</li>
-                    <li>Press Delete to remove the selected element</li>
+                    <li>{tr('Add elements from the ribbon (Add element group)')}</li>
+                    <li>{tr('Drag from a handle to connect two elements')}</li>
+                    <li>{tr('Select an element in the Outline or on the canvas to edit its details')}</li>
+                    <li>{tr('Press Delete to remove the selected element')}</li>
                   </ul>
                 </div>
               )}
               <div>
-                <div className="text-title" style={{ marginBottom: 4 }}>Shortcuts</div>
+                <div className="text-title" style={{ marginBottom: 4 }}>{tr('Shortcuts')}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 11 }}>
                   {[
                     ['Ctrl+Z', 'Undo'],
@@ -261,7 +263,7 @@ export function Header() {
                   ].map(([key, label]) => (
                     <span key={key}>
                       <kbd style={{ padding: '1px 5px', background: 'var(--gray-100)', borderRadius: 4, fontSize: 10, fontFamily: 'monospace', border: '1px solid var(--border)' }}>{key}</kbd>
-                      {' '}{label}
+                      {' '}{tr(label)}
                     </span>
                   ))}
                 </div>

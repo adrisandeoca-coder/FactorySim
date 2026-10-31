@@ -196,7 +196,7 @@ const QualityScrapChart = React.memo(function QualityScrapChart({ data, result }
       {hoveredData && (
         <div
           ref={tooltipRef}
-          className="fixed z-50 bg-gray-900 text-white rounded-lg shadow-xl px-3 py-2 text-xs pointer-events-none"
+          className="fixed z-50 eng-tooltip pointer-events-none"
           style={{
             left: tooltipPos.x + 12,
             top: tooltipPos.y - 10,

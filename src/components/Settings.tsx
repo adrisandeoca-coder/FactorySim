@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useT, useI18n, LANGUAGES, type Lang } from '../i18n';
 import { Card, CardHeader } from './common/Card';
 import { Button } from './common/Button';
 import { ConfirmDialog } from './common/ConfirmDialog';
@@ -12,6 +13,9 @@ export function Settings() {
   const { currentUser, addToast } = useAppStore();
   const { defaultOptions, setDefaultOptions } = useSimulationStore();
   const settingsRef = useElementScreenshot('settings-tab');
+  const t = useT();
+  const lang = useI18n((st) => st.lang);
+  const setLang = useI18n((st) => st.setLang);
 
   const [duration, setDuration] = useState(defaultOptions.duration);
   const [seed, setSeed] = useState(defaultOptions.seed || '');
@@ -88,16 +92,16 @@ export function Settings() {
     <div className="space-y-6 max-w-4xl" ref={settingsRef}>
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-500">Configure application preferences</p>
+        <h1 className="text-2xl font-bold text-gray-900">{t('Settings')}</h1>
+        <p className="text-gray-500">{t('Configure application preferences')}</p>
       </div>
 
       {/* User Profile */}
       <Card>
-        <CardHeader title="User Profile" subtitle="Your account information" />
+        <CardHeader title={t('User Profile')} subtitle={t('Your account information')} />
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="input-label">Username</label>
+            <label className="input-label">{t('Username')}</label>
             <input
               type="text"
               value={currentUser?.username || ''}
@@ -106,7 +110,7 @@ export function Settings() {
             />
           </div>
           <div>
-            <label className="input-label">Role</label>
+            <label className="input-label">{t('Role')}</label>
             <input
               type="text"
               value={currentUser?.role || 'Engineer'}
@@ -115,12 +119,12 @@ export function Settings() {
             />
           </div>
           <div className="col-span-2">
-            <label className="input-label">Display Name</label>
+            <label className="input-label">{t('Display Name')}</label>
             <input
               type="text"
               value={currentUser?.displayName || ''}
               className="input"
-              placeholder="Your display name"
+              placeholder={t('Your display name')}
             />
           </div>
         </div>
@@ -129,13 +133,13 @@ export function Settings() {
       {/* Simulation Defaults */}
       <Card>
         <CardHeader
-          title="Simulation Defaults"
-          subtitle="Default settings for new simulation runs"
+          title={t('Simulation Defaults')}
+          subtitle={t('Default settings for new simulation runs')}
         />
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="input-label">Default Duration</label>
+              <label className="input-label">{t('Default Duration')}</label>
               <select
                 value={duration}
                 onChange={(e) => setDuration(Number(e.target.value))}
@@ -149,7 +153,7 @@ export function Settings() {
               </select>
             </div>
             <div>
-              <label className="input-label">Replications</label>
+              <label className="input-label">{t('Replications')}</label>
               <input
                 type="number"
                 value={replications}
@@ -167,7 +171,7 @@ export function Settings() {
           </div>
 
           <div>
-            <label className="input-label">Simulation Start Date & Time</label>
+            <label className="input-label">{t('Simulation Start Date & Time')}</label>
             <input
               type="datetime-local"
               value={simStartDate}
@@ -180,12 +184,12 @@ export function Settings() {
           </div>
 
           <div>
-            <label className="input-label">Random Seed (optional)</label>
+            <label className="input-label">{t('Random Seed (optional)')}</label>
             <input
               type="number"
               value={seed}
               onChange={(e) => setSeed(e.target.value)}
-              placeholder="e.g., 42 — for reproducible results"
+              placeholder={t('e.g., 42 — for reproducible results')}
               className="input"
             />
             <p className="text-xs text-gray-500 mt-1">
@@ -193,55 +197,55 @@ export function Settings() {
             </p>
           </div>
 
-          <Button onClick={handleSaveSimSettings}>Save Settings</Button>
+          <Button onClick={handleSaveSimSettings}>{t('Save Settings')}</Button>
         </div>
       </Card>
 
       {/* Appearance */}
       <Card>
-        <CardHeader title="Appearance" subtitle="Customize the look and feel" />
+        <CardHeader title={t('Appearance')} subtitle={t('Customize the look and feel')} />
         <div className="space-y-4">
           <div>
-            <label className="input-label">Theme</label>
+            <label className="input-label">{t('Theme')}</label>
             <select
               className="input"
               value={theme}
               onChange={(e) => setTheme(e.target.value as 'light' | 'dark' | 'system')}
             >
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-              <option value="system">System</option>
+              <option value="light">{t('Light')}</option>
+              <option value="dark">{t('Dark')}</option>
+              <option value="system">{t('System')}</option>
             </select>
           </div>
 
           <div>
-            <label className="input-label">Language</label>
-            <select className="input" defaultValue="en">
-              <option value="en">English</option>
-              <option value="de">Deutsch</option>
-              <option value="es">Español</option>
-              <option value="sv">Svenska</option>
+            <label className="input-label" htmlFor="settings-language">{t('Language')}</label>
+            <select id="settings-language" className="input" value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
+              {LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
             </select>
+            <p style={{ fontSize: 11, color: 'var(--text-tertiary)', margin: '4px 0 0' }}>
+              {t('Menus, ribbons, panels and results switch at once. Model names and your own text stay as you typed them.')}
+            </p>
           </div>
         </div>
       </Card>
 
       {/* Data & Storage */}
       <Card>
-        <CardHeader title="Data & Storage" subtitle="Manage local data" />
+        <CardHeader title={t('Data & Storage')} subtitle={t('Manage local data')} />
         <div className="space-y-4">
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
             <div>
-              <div className="font-medium">Local Database</div>
-              <div className="text-sm text-gray-500">Models, scenarios, and results</div>
+              <div className="font-medium">{t('Local Database')}</div>
+              <div className="text-sm text-gray-500">{t('Models, scenarios, and results')}</div>
             </div>
             <div className="text-sm text-gray-600">~2.4 MB</div>
           </div>
 
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
             <div>
-              <div className="font-medium">Simulation Results</div>
-              <div className="text-sm text-gray-500">Historical run data</div>
+              <div className="font-medium">{t('Simulation Results')}</div>
+              <div className="text-sm text-gray-500">{t('Historical run data')}</div>
             </div>
             <div className="text-sm text-gray-600">~15.2 MB</div>
           </div>
@@ -278,7 +282,7 @@ export function Settings() {
           setShowClearConfirm(false);
         }}
         onCancel={() => setShowClearConfirm(false)}
-        title="Clear Cache"
+        title={t('Clear Cache')}
         message="Clear all cached data? This will remove all simulation results and cannot be undone."
         confirmLabel="Clear Cache"
         variant="danger"
@@ -286,59 +290,59 @@ export function Settings() {
 
       {/* Role Permissions */}
       <Card>
-        <CardHeader title="Role Permissions" subtitle="Access levels by user role" />
+        <CardHeader title={t('Role Permissions')} subtitle={t('Access levels by user role')} />
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-700">
           These are the default permission levels for reference. Role assignments are managed at the organization level.
         </div>
-        <p className="text-xs text-gray-400 mb-3">Read-only — default permission levels</p>
+        <p className="text-xs text-gray-400 mb-3">{t('Read-only — default permission levels')}</p>
         <table className="table">
           <thead>
             <tr>
-              <th>Feature</th>
-              <th>Operator</th>
-              <th>Analyst</th>
-              <th>Engineer</th>
-              <th>Developer</th>
+              <th>{t('Feature')}</th>
+              <th>{t('Operator')}</th>
+              <th>{t('Analyst')}</th>
+              <th>{t('Engineer')}</th>
+              <th>{t('Developer')}</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td>View Dashboards</td>
+              <td>{t('View Dashboards')}</td>
               <td><CheckIcon className="w-5 h-5 text-green-500" /></td>
               <td><CheckIcon className="w-5 h-5 text-green-500" /></td>
               <td><CheckIcon className="w-5 h-5 text-green-500" /></td>
               <td><CheckIcon className="w-5 h-5 text-green-500" /></td>
             </tr>
             <tr>
-              <td>Run Guided Scenarios</td>
+              <td>{t('Run Guided Scenarios')}</td>
               <td><CheckIcon className="w-5 h-5 text-green-500" /></td>
               <td><CheckIcon className="w-5 h-5 text-green-500" /></td>
               <td><CheckIcon className="w-5 h-5 text-green-500" /></td>
               <td><CheckIcon className="w-5 h-5 text-green-500" /></td>
             </tr>
             <tr>
-              <td>Build Custom Scenarios</td>
+              <td>{t('Build Custom Scenarios')}</td>
               <td><XIcon className="w-5 h-5 text-gray-300" /></td>
               <td><CheckIcon className="w-5 h-5 text-green-500" /></td>
               <td><CheckIcon className="w-5 h-5 text-green-500" /></td>
               <td><CheckIcon className="w-5 h-5 text-green-500" /></td>
             </tr>
             <tr>
-              <td>Edit Model Parameters</td>
+              <td>{t('Edit Model Parameters')}</td>
               <td><XIcon className="w-5 h-5 text-gray-300" /></td>
               <td><XIcon className="w-5 h-5 text-gray-300" /></td>
               <td><CheckIcon className="w-5 h-5 text-green-500" /></td>
               <td><CheckIcon className="w-5 h-5 text-green-500" /></td>
             </tr>
             <tr>
-              <td>Access Code Editor</td>
+              <td>{t('Access Code Editor')}</td>
               <td><XIcon className="w-5 h-5 text-gray-300" /></td>
               <td><XIcon className="w-5 h-5 text-gray-300" /></td>
               <td><XIcon className="w-5 h-5 text-gray-300" /></td>
               <td><CheckIcon className="w-5 h-5 text-green-500" /></td>
             </tr>
             <tr>
-              <td>Configure Data Connectors</td>
+              <td>{t('Configure Data Connectors')}</td>
               <td><XIcon className="w-5 h-5 text-gray-300" /></td>
               <td><XIcon className="w-5 h-5 text-gray-300" /></td>
               <td><CheckIcon className="w-5 h-5 text-green-500" /></td>
@@ -350,11 +354,11 @@ export function Settings() {
 
       {/* About */}
       <Card>
-        <CardHeader title="About FactorySim" />
+        <CardHeader title={t('About FactorySim')} />
         <div className="space-y-2 text-sm text-gray-600">
-          <p><strong>Version:</strong> 1.0.0</p>
-          <p><strong>Build:</strong> 2026.02.13</p>
-          <p><strong>Engine:</strong> SimPy 4.1 &middot; Python 3.11+</p>
+          <p><strong>{t('Version:')}</strong> 1.0.0</p>
+          <p><strong>{t('Build:')}</strong> 2026.02.13</p>
+          <p><strong>{t('Engine:')}</strong> SimPy 4.1 &middot; Python 3.11+</p>
           <p className="pt-2">
             FactorySim is a desktop digital twin platform for manufacturing simulation.
           </p>
@@ -366,8 +370,8 @@ export function Settings() {
         <details className="group">
           <summary className="cursor-pointer list-none flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Third-Party Licenses</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Open-source software used by FactorySim</p>
+              <h3 className="text-lg font-semibold text-gray-900">{t('Third-Party Licenses')}</h3>
+              <p className="text-xs text-gray-500 mt-0.5">{t('Open-source software used by FactorySim')}</p>
             </div>
             <ChevronIcon className="w-5 h-5 text-gray-400 group-open:rotate-180 transition-transform" />
           </summary>
@@ -378,9 +382,9 @@ export function Settings() {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="py-1.5 pr-4 font-semibold text-gray-800 text-xs">Library</th>
-                  <th className="py-1.5 pr-4 font-semibold text-gray-800 text-xs">License</th>
-                  <th className="py-1.5 font-semibold text-gray-800 text-xs">Purpose</th>
+                  <th className="py-1.5 pr-4 font-semibold text-gray-800 text-xs">{t('Library')}</th>
+                  <th className="py-1.5 pr-4 font-semibold text-gray-800 text-xs">{t('License')}</th>
+                  <th className="py-1.5 font-semibold text-gray-800 text-xs">{t('Purpose')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -432,35 +436,35 @@ export function Settings() {
 
       {/* Documentation */}
       <Card>
-        <CardHeader title="Documentation" subtitle="How to use FactorySim" />
+        <CardHeader title={t('Documentation')} subtitle={t('How to use FactorySim')} />
         <div className="space-y-2 text-sm text-gray-600">
           <details className="group">
             <summary className="cursor-pointer font-semibold text-gray-800 py-2 hover:text-blue-600 list-none flex items-center justify-between">
               Factory Builder
               <ChevronIcon className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" />
             </summary>
-            <p className="pb-3 pl-1">Drag stations, buffers, sources, and sinks onto the canvas. Connect them with edges to define material flow. Click any node to edit its parameters (cycle time, capacity, shifts, failures, etc.).</p>
+            <p className="pb-3 pl-1">{t('Drag stations, buffers, sources, and sinks onto the canvas. Connect them with edges to define material flow. Click any node to edit its parameters (cycle time, capacity, shifts, failures, etc.).')}</p>
           </details>
           <details className="group">
             <summary className="cursor-pointer font-semibold text-gray-800 py-2 hover:text-blue-600 list-none flex items-center justify-between">
               Running Simulations
               <ChevronIcon className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" />
             </summary>
-            <p className="pb-3 pl-1">Go to the Dashboard tab and click <strong>Run Simulation</strong>. Configure duration, random seed, and start time. Results appear as KPI cards, utilization charts, and bottleneck analysis. All artifacts (logs, screenshots, code) are auto-saved to the <code className="bg-gray-100 px-1 rounded">runs/</code> folder.</p>
+            <p className="pb-3 pl-1">{t('Go to the Dashboard tab and click')} <strong>{t('Run Simulation')}</strong>. Configure duration, random seed, and start time. Results appear as KPI cards, utilization charts, and bottleneck analysis. All artifacts (logs, screenshots, code) are auto-saved to the <code className="bg-gray-100 px-1 rounded">runs/</code> folder.</p>
           </details>
           <details className="group">
             <summary className="cursor-pointer font-semibold text-gray-800 py-2 hover:text-blue-600 list-none flex items-center justify-between">
               Scenarios
               <ChevronIcon className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" />
             </summary>
-            <p className="pb-3 pl-1">Use the Scenarios tab to run what-if analyses. Quick scenarios test common situations (machine failure, demand increase, shift changes). Custom scenarios let you override any parameter and compare results side by side.</p>
+            <p className="pb-3 pl-1">{t('Use the Scenarios tab to run what-if analyses. Quick scenarios test common situations (machine failure, demand increase, shift changes). Custom scenarios let you override any parameter and compare results side by side.')}</p>
           </details>
           <details className="group">
             <summary className="cursor-pointer font-semibold text-gray-800 py-2 hover:text-blue-600 list-none flex items-center justify-between">
               Code Editor
               <ChevronIcon className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" />
             </summary>
-            <p className="pb-3 pl-1">Export your model as standalone Python/SimPy code. The generated script is fully runnable — install <code className="bg-gray-100 px-1 rounded">simpy</code> and <code className="bg-gray-100 px-1 rounded">numpy</code>, then run <code className="bg-gray-100 px-1 rounded">python simulation-code.py</code>.</p>
+            <p className="pb-3 pl-1">{t('Export your model as standalone Python/SimPy code. The generated script is fully runnable — install')} <code className="bg-gray-100 px-1 rounded">simpy</code> and <code className="bg-gray-100 px-1 rounded">numpy</code>, then run <code className="bg-gray-100 px-1 rounded">python simulation-code.py</code>.</p>
           </details>
           <details className="group">
             <summary className="cursor-pointer font-semibold text-gray-800 py-2 hover:text-blue-600 list-none flex items-center justify-between">
@@ -468,11 +472,11 @@ export function Settings() {
               <ChevronIcon className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" />
             </summary>
             <ul className="list-disc list-inside space-y-1 ml-2 pb-3">
-              <li><strong>Station</strong> — processes parts (cycle time, setup, failures, shifts, scrap)</li>
-              <li><strong>Buffer</strong> — queues between stations (FIFO/LIFO/priority, finite capacity)</li>
-              <li><strong>Source</strong> — generates parts at a fixed arrival rate</li>
-              <li><strong>Sink</strong> — collects finished parts and records throughput</li>
-              <li><strong>Conveyor / Inspection / Assembly / Splitter / Merge</strong> — special processing nodes</li>
+              <li><strong>{t('Station')}</strong> — processes parts (cycle time, setup, failures, shifts, scrap)</li>
+              <li><strong>{t('Buffer')}</strong> — queues between stations (FIFO/LIFO/priority, finite capacity)</li>
+              <li><strong>{t('Source')}</strong> — generates parts at a fixed arrival rate</li>
+              <li><strong>{t('Sink')}</strong> — collects finished parts and records throughput</li>
+              <li><strong>{t('Conveyor / Inspection / Assembly / Splitter / Merge')}</strong> — special processing nodes</li>
             </ul>
           </details>
           <details className="group">
@@ -481,11 +485,11 @@ export function Settings() {
               <ChevronIcon className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" />
             </summary>
             <ul className="list-disc list-inside space-y-1 ml-2 pb-3">
-              <li><strong>OEE</strong> — Availability x Performance x Quality (based on bottleneck station)</li>
-              <li><strong>Throughput</strong> — parts completed per hour</li>
-              <li><strong>Cycle Time</strong> — total time from entry to exit</li>
-              <li><strong>WIP</strong> — work-in-progress inventory levels</li>
-              <li><strong>Utilization</strong> — busy / idle / blocked / failed / off-shift breakdown per station</li>
+              <li><strong>{t('OEE')}</strong> — Availability x Performance x Quality (based on bottleneck station)</li>
+              <li><strong>{t('Throughput')}</strong> — parts completed per hour</li>
+              <li><strong>{t('Cycle Time')}</strong> — total time from entry to exit</li>
+              <li><strong>{t('WIP')}</strong> — work-in-progress inventory levels</li>
+              <li><strong>{t('Utilization')}</strong> — busy / idle / blocked / failed / off-shift breakdown per station</li>
             </ul>
           </details>
         </div>
@@ -501,9 +505,9 @@ export function Settings() {
         >
           <summary className="cursor-pointer list-none flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <h3 className="text-lg font-semibold text-gray-900">Release Notes — v1.0.0</h3>
+              <h3 className="text-lg font-semibold text-gray-900">{t('Release Notes — v1.0.0')}</h3>
               {isNewVersion && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">New</span>
+                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">{t('New')}</span>
               )}
             </div>
             <ChevronIcon className="w-5 h-5 text-gray-400 group-open:rotate-180 transition-transform" />
@@ -512,22 +516,22 @@ export function Settings() {
             <div>
               <div className="flex items-center space-x-2 mb-1">
                 <span className="font-semibold text-gray-800">v1.0.0</span>
-                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Current</span>
+                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{t('Current')}</span>
               </div>
               <ul className="list-disc list-inside space-y-1 ml-2">
-                <li>Full discrete-event simulation engine with SimPy backend</li>
-                <li>Visual factory builder with drag-and-drop node editor</li>
+                <li>{t('Full discrete-event simulation engine with SimPy backend')}</li>
+                <li>{t('Visual factory builder with drag-and-drop node editor')}</li>
                 <li>10 quick what-if scenarios with baseline comparison</li>
-                <li>Custom scenario builder with parameter overrides</li>
-                <li>Automatic artifact saving (logs, screenshots, Python code) after every run</li>
-                <li>Shift scheduling with day/hour configuration per station</li>
-                <li>OEE, throughput, cycle time, WIP, and utilization KPIs</li>
-                <li>Bottleneck detection with flow and grid visualizations</li>
-                <li>Standalone Python code export (SimPy/NumPy)</li>
-                <li>Source/Sink nodes, conveyors, inspection, assembly, splitter, merge</li>
-                <li>Operator resources with efficiency modeling</li>
-                <li>Multi-product routing with per-product arrival rates</li>
-                <li>CSV/Excel data import for model parameters</li>
+                <li>{t('Custom scenario builder with parameter overrides')}</li>
+                <li>{t('Automatic artifact saving (logs, screenshots, Python code) after every run')}</li>
+                <li>{t('Shift scheduling with day/hour configuration per station')}</li>
+                <li>{t('OEE, throughput, cycle time, WIP, and utilization KPIs')}</li>
+                <li>{t('Bottleneck detection with flow and grid visualizations')}</li>
+                <li>{t('Standalone Python code export (SimPy/NumPy)')}</li>
+                <li>{t('Source/Sink nodes, conveyors, inspection, assembly, splitter, merge')}</li>
+                <li>{t('Operator resources with efficiency modeling')}</li>
+                <li>{t('Multi-product routing with per-product arrival rates')}</li>
+                <li>{t('CSV/Excel data import for model parameters')}</li>
               </ul>
             </div>
           </div>

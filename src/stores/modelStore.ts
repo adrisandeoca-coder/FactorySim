@@ -63,6 +63,7 @@ interface ModelState {
   // Actions - Connections
   addConnection: (connection: Partial<Connection>) => void;
   removeConnection: (id: string) => void;
+  updateConnection: (id: string, updates: Partial<Connection>) => void;
 
   // Actions - Products
   addProduct: (product: Partial<Product>) => void;
@@ -533,6 +534,16 @@ export const useModelStore = create<ModelState>((set, get) => ({
         connections: state.model.connections.filter((c) => c.id !== id),
       },
       selectedEdgeId: state.selectedEdgeId === id ? null : state.selectedEdgeId,
+    }));
+    get().saveToHistory();
+  },
+
+  updateConnection: (id, updates) => {
+    set((state) => ({
+      model: {
+        ...state.model,
+        connections: state.model.connections.map((c) => (c.id === id ? { ...c, ...updates, id: c.id } : c)),
+      },
     }));
     get().saveToHistory();
   },

@@ -6,6 +6,7 @@ import type { Template } from '../../types';
 import { masterTestTemplate } from './masterTemplate';
 import { WAREHOUSE_DEFAULTS } from '../../utils/warehouseDefaults';
 
+import { t } from '../../i18n';
 const templates: Template[] = [
   {
     id: 'flow-line',
@@ -1317,7 +1318,7 @@ export function TemplateSelector({ isOpen, onClose }: TemplateSelectorProps) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Select Template" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('Select Template')} size="lg">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[32rem] overflow-y-auto">
         {templates.map((template) => (
           <button

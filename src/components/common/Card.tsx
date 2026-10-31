@@ -1,4 +1,5 @@
 import React from 'react';
+import { useT, tNode } from '../../i18n';
 
 interface CardProps {
   children: React.ReactNode;
@@ -22,11 +23,12 @@ interface CardHeaderProps {
 
 /** Panel title strip (engineering-desktop style): "Title — subtitle  [action]". */
 export function CardHeader({ title, subtitle, action }: CardHeaderProps) {
+  useT();
   return (
     <div className="panel-titlebar">
       <span style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
-        <span>{title}</span>
-        {subtitle && <span className="panel-subtitle">{subtitle}</span>}
+        <span>{tNode(title)}</span>
+        {subtitle && <span className="panel-subtitle">{tNode(subtitle)}</span>}
       </span>
       {action && <span style={{ display: 'flex', alignItems: 'center', fontWeight: 400 }}>{action}</span>}
     </div>
@@ -52,12 +54,13 @@ const dataColors = {
 };
 
 export function StatCard({ title, value, change, changeLabel, subtitle, subtitleStatus, status = 'neutral' }: StatCardProps) {
+  useT();
   const isDanger = status === 'bad';
 
   return (
     <div className="card" style={isDanger ? { borderColor: 'var(--red)' } : {}}>
       {/* Label */}
-      <div className="card-header">{title}</div>
+      <div className="card-header">{tNode(title)}</div>
 
       {/* Value */}
       <div className="card-value" style={isDanger ? { color: 'var(--red)' } : {}}>
