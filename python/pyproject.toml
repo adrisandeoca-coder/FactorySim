@@ -65,4 +65,5 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
-addopts = "-v --cov=factorysim --cov-report=term-missing"
+addopts = "-v --cov=factorysim --cov-report=term-missing -m 'not slow'"
+markers = ["slow: long statistical verification runs (pytest -m slow)"]

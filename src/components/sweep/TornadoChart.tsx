@@ -54,7 +54,7 @@ export function TornadoChart({ result, parameters, kpiPath, kpiLabel }: TornadoC
           x: lowValues,
           orientation: 'h',
           name: 'Low',
-          marker: { color: '#ef4444' },
+          marker: { color: '#F31260' },
         },
         {
           type: 'bar',
@@ -62,7 +62,7 @@ export function TornadoChart({ result, parameters, kpiPath, kpiLabel }: TornadoC
           x: highValues,
           orientation: 'h',
           name: 'High',
-          marker: { color: '#22c55e' },
+          marker: { color: '#17C964' },
         },
       ]}
       layout={{

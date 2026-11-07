@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { User, UserRole, Toast, FactoryModel, DashboardWidgetConfig } from '../types';
+import type { User, UserRole, Toast, FactoryModel, DashboardWidgetConfig, SimulationResult } from '../types';
+import { createLogger, setLogToastSink } from '../services/logger';
+
+const log = createLogger('AppStore');
 
 interface AppState {
   // Initialization
@@ -16,6 +19,9 @@ interface AppState {
 
   // UI state
   sidebarOpen: boolean;
+  /** Simple mode: guided Build → Run → Compare workflow for shop-floor users.
+   *  Hides expert tools (code, plugins, hierarchy, ...) — nothing is removed. */
+  simpleMode: boolean;
   toasts: Toast[];
 
   // Dashboard widgets
@@ -24,7 +30,7 @@ interface AppState {
   // Simulation state
   isSimulating: boolean;
   simulationProgress: number;
-  lastSimulationResult: unknown | null;
+  lastSimulationResult: SimulationResult | null;
 
   // Animation fullscreen (not persisted)
   isAnimationFullscreen: boolean;
@@ -36,11 +42,12 @@ interface AppState {
   setCurrentModel: (model: FactoryModel | null) => void;
   setModelDirty: (dirty: boolean) => void;
   toggleSidebar: () => void;
+  setSimpleMode: (on: boolean) => void;
   addToast: (toast: Omit<Toast, 'id'>) => void;
   removeToast: (id: string) => void;
   setSimulating: (simulating: boolean) => void;
   setSimulationProgress: (progress: number) => void;
-  setSimulationResult: (result: unknown) => void;
+  setSimulationResult: (result: SimulationResult | null) => void;
   setAnimationFullscreen: (fullscreen: boolean) => void;
 
   // Dashboard widget actions
@@ -60,6 +67,7 @@ export const useAppStore = create<AppState>()(
       currentModel: null,
       modelDirty: false,
       sidebarOpen: true,
+      simpleMode: true,
       toasts: [],
       dashboardWidgets: getDefaultDashboardWidgets(),
       isSimulating: false,
@@ -93,7 +101,7 @@ export const useAppStore = create<AppState>()(
             isLoading: false,
           });
         } catch (error) {
-          console.error('Failed to initialize app:', error);
+          log.error('Failed to initialize app', error);
           set({ isLoading: false });
         }
       },
@@ -105,6 +113,8 @@ export const useAppStore = create<AppState>()(
       setCurrentModel: (model) => set({ currentModel: model, modelDirty: false }),
 
       setModelDirty: (dirty) => set({ modelDirty: dirty }),
+
+      setSimpleMode: (on) => set({ simpleMode: on }),
 
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
 
@@ -162,19 +172,21 @@ export const useAppStore = create<AppState>()(
       version: 2,
       partialize: (state) => ({
         sidebarOpen: state.sidebarOpen,
+        simpleMode: state.simpleMode,
         dashboardWidgets: state.dashboardWidgets,
       }),
-      migrate: (persisted: any, version: number) => {
+      migrate: (persisted: unknown, version: number) => {
         if (version < 2) {
           // v2: add quality-summary widget if missing
-          const widgets = persisted?.dashboardWidgets || [];
-          const hasQuality = widgets.some((w: any) => w.type === 'quality-summary');
+          const p = persisted as Record<string, unknown> | undefined;
+          const widgets = (p?.dashboardWidgets || []) as DashboardWidgetConfig[];
+          const hasQuality = widgets.some((w) => w.type === 'quality-summary');
           if (!hasQuality) {
             widgets.push({ id: 'w-quality-summary', type: 'quality-summary', label: 'Quality / Scrap', size: 'sm' });
           }
-          return { ...persisted, dashboardWidgets: widgets };
+          return { ...(p || {}), dashboardWidgets: widgets };
         }
-        return persisted;
+        return persisted as Record<string, unknown>;
       },
       merge: (persisted, current) => {
         const p = persisted as Partial<AppState>;
@@ -220,3 +232,6 @@ async function getCurrentUsername(): Promise<string> {
   }
   return 'User';
 }
+
+// Route logger notifications (notify: true) to the toast UI.
+setLogToastSink((toast) => useAppStore.getState().addToast(toast));

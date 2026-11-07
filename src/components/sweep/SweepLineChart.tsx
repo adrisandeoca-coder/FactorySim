@@ -24,7 +24,7 @@ export function SweepLineChart({ result, parameters, kpiPath, kpiLabel }: SweepL
       return point ? extractKpiValue(point.kpis, kpiPath) : 0;
     });
 
-    const colors = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6'];
+    const colors = ['#2563EB', '#F31260', '#17C964', '#F5A524', '#8b5cf6'];
 
     return {
       x: paramValues,

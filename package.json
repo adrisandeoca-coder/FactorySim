@@ -1,6 +1,6 @@
 {
   "name": "factorysim",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Desktop Digital Twin for Manufacturing - A SimPy-based discrete event simulation platform",
   "main": "dist/electron/main.js",
   "scripts": {
@@ -17,63 +17,8 @@
     "test": "vitest",
     "test:python": "cd python && python -m pytest",
     "lint": "eslint src --ext .ts,.tsx",
-    "typecheck": "tsc --noEmit"
-  },
-  "build": {
-    "appId": "com.factorysim.app",
-    "productName": "FactorySim",
-    "directories": {
-      "buildResources": "resources",
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "python/**/*",
-      "data/**/*",
-      "resources/**/*"
-    ],
-    "asarUnpack": [
-      "node_modules/sql.js/dist/sql-wasm.wasm"
-    ],
-    "extraResources": [
-      {
-        "from": "python",
-        "to": "python",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "FactorySim",
-      "installerIcon": "resources/setup-icon.ico",
-      "uninstallerIcon": "resources/setup-icon.ico",
-      "artifactName": "FactorySim-Setup-${version}.${ext}"
-    },
-    "win": {
-      "target": [
-        "nsis"
-      ],
-      "icon": "resources/icon.ico"
-    },
-    "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "icon": "resources/icon.icns"
-    },
-    "linux": {
-      "target": [
-        "AppImage",
-        "deb"
-      ],
-      "icon": "resources/icon.png"
-    }
+    "typecheck": "tsc --noEmit",
+    "prepare:python": "python scripts/prepare-python-runtime.py"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
@@ -89,6 +34,7 @@
     "monaco-editor": "^0.55.1",
     "papaparse": "^5.4.1",
     "plotly.js": "^2.29.1",
+    "pptxgenjs": "^4.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-plotly.js": "^2.6.0",
@@ -121,8 +67,10 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "jsdom": "^28.1.0",
+    "pe-library": "^2.0.1",
     "postcss": "^8.4.35",
     "rcedit": "^5.0.2",
+    "resedit": "^3.1.0",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.3.3",
     "vite": "^5.1.0",

@@ -21,14 +21,14 @@ interface GanttScheduleViewProps {
 
 // State colors matching the app's visual language
 const STATE_COLORS: Record<string, string> = {
-  processing: '#22c55e', // green-500
-  setup: '#f59e0b',      // amber-500
+  processing: '#374151', // gray-700 — productive
+  setup: '#9ca3af',      // gray-400
   idle: '#e5e7eb',        // gray-200
-  blocked: '#ef4444',     // red-500
-  starved: '#a855f7',     // purple-500
-  failed: '#dc2626',      // red-600
-  offShift: '#6b7280',    // gray-500
-  batchWait: '#3b82f6',   // blue-500
+  blocked: '#F5A524',     // amber-600 — warning
+  starved: '#b8860b',     // dark amber — warning
+  failed: '#F31260',      // red-600 — problem (only red)
+  offShift: '#e5e7eb',    // gray-200
+  batchWait: '#64748b',   // slate-500
 };
 
 const STATE_LABELS: Record<string, string> = {
@@ -103,7 +103,7 @@ function shortProductLabel(productType?: string, productId?: string): string {
   return raw.length > 6 ? raw.slice(0, 5) + '…' : raw;
 }
 
-export function GanttScheduleView({ result, stations, utilization, startDayOfWeek = 0, startHour = 0 }: GanttScheduleViewProps) {
+const GanttScheduleView = React.memo(function GanttScheduleView({ result, stations, utilization, startDayOfWeek = 0, startHour = 0 }: GanttScheduleViewProps) {
   const [zoomIndex, setZoomIndex] = useState(0);
   const [localPlaying, setLocalPlaying] = useState(false);
   const [localPlayheadTime, setLocalPlayheadTime] = useState(0);
@@ -559,7 +559,7 @@ export function GanttScheduleView({ result, stations, utilization, startDayOfWee
       )}
 
       {/* Main Gantt area */}
-      <div className="flex border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+      <div className="flex border border-slate-300 rounded-sm overflow-hidden bg-white">
         {/* KPI sidebar */}
         {stationKpis && (
           <div className="flex-shrink-0 bg-gray-50 border-r border-gray-200" style={{ width: SIDEBAR_WIDTH }}>
@@ -746,12 +746,12 @@ export function GanttScheduleView({ result, stations, utilization, startDayOfWee
                   className="absolute top-0 bottom-0 w-0.5 z-30 pointer-events-none"
                   style={{
                     left: playheadX,
-                    backgroundColor: isReplaying ? '#6366f1' : '#2563eb', // indigo when synced, blue when local
+                    backgroundColor: isReplaying ? '#6366f1' : '#1D4ED8', // indigo when synced, blue when local
                   }}
                 >
                   <div
                     className="absolute -top-1 -left-1.5 w-3.5 h-3.5 rounded-full border-2 border-white shadow"
-                    style={{ backgroundColor: isReplaying ? '#6366f1' : '#2563eb' }}
+                    style={{ backgroundColor: isReplaying ? '#6366f1' : '#1D4ED8' }}
                   />
                 </div>
               )}
@@ -761,7 +761,7 @@ export function GanttScheduleView({ result, stations, utilization, startDayOfWee
           {/* Tooltip */}
           {tooltip && (
             <div
-              className="absolute z-50 pointer-events-none bg-gray-900 text-white px-3 py-2 rounded-lg shadow-xl text-xs max-w-[250px]"
+              className="absolute z-50 eng-tooltip pointer-events-none max-w-[250px]"
               style={{ left: tooltip.x, top: tooltip.y }}
             >
               <div className="font-bold mb-1 flex items-center gap-1.5">
@@ -771,15 +771,15 @@ export function GanttScheduleView({ result, stations, utilization, startDayOfWee
                 />
                 {STATE_LABELS[tooltip.block.state] || tooltip.block.state}
               </div>
-              <div className="text-gray-300 space-y-0.5">
+              <div className="text-slate-600 space-y-0.5">
                 <div>Station: {shortName(tooltip.block.stationName)}</div>
                 <div>Time: {formatAsDate(tooltip.block.startTime, startDayOfWeek, startHour)} — {formatAsDate(tooltip.block.endTime, startDayOfWeek, startHour)}</div>
                 <div>Duration: {formatDurationGantt(tooltip.block.endTime - tooltip.block.startTime)}</div>
                 {tooltip.block.productId && (
-                  <div className="text-blue-300 font-medium">Job: {tooltip.block.productId}</div>
+                  <div className="text-blue-700 font-medium">Job: {tooltip.block.productId}</div>
                 )}
                 {tooltip.block.productType && (
-                  <div className="text-green-300">Product: {tooltip.block.productType}</div>
+                  <div className="text-emerald-700">Product: {tooltip.block.productType}</div>
                 )}
               </div>
               {tooltip.block.productId && (
@@ -915,4 +915,5 @@ export function GanttScheduleView({ result, stations, utilization, startDayOfWee
       </div>
     </div>
   );
-}
+});
+export { GanttScheduleView };

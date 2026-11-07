@@ -24,10 +24,10 @@ if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
 
 // Fill color — understated for normal, loud only at extremes
 function fillColor(pct: number): string {
-  if (pct >= 95) return '#ef4444';  // red — alert
+  if (pct >= 95) return '#F31260';  // red — alert
   if (pct >= 80) return '#f97316';  // orange — warning
   if (pct >= 50) return '#eab308';  // yellow — attention
-  if (pct > 0) return '#22c55e';    // green — healthy
+  if (pct > 0) return '#17C964';    // green — healthy
   return '#64748b';                  // slate — empty
 }
 
@@ -69,7 +69,7 @@ export const LiveBufferNode = memo(({ data }: NodeProps<LiveBufferNodeData>) => 
         <div
           style={{
             width: 20, height: 14, borderRadius: 2,
-            backgroundColor: isFull ? '#ef4444' : fc,
+            backgroundColor: isFull ? '#F31260' : fc,
             opacity: isFull || isNearFull ? 1 : 0.7,
             border: isFull ? '2px solid #fca5a5' : isNearFull ? '2px solid #fbbf24' : '1px solid #475569',
             boxShadow: isFull ? '0 0 8px rgba(239,68,68,0.7)' : isNearFull ? '0 0 6px rgba(245,158,11,0.5)' : undefined,
@@ -87,7 +87,7 @@ export const LiveBufferNode = memo(({ data }: NodeProps<LiveBufferNodeData>) => 
         style={{
           minWidth: 60,
           minHeight: 40,
-          border: isFull ? '2px solid #ef4444' : '1.5px solid #475569',
+          border: isFull ? '2px solid #F31260' : '1.5px solid #475569',
           backgroundColor: isFull ? '#2d1519' : '#1e293b',
           boxShadow: isFull ? '0 0 10px 3px rgba(239,68,68,0.5)' : undefined,
           position: 'relative',
@@ -135,7 +135,7 @@ export const LiveBufferNode = memo(({ data }: NodeProps<LiveBufferNodeData>) => 
       style={{
         minWidth: 120,
         minHeight: height,
-        border: isFull ? '3px solid #ef4444'
+        border: isFull ? '3px solid #F31260'
           : level > 0 ? '1.5px solid #475569'
           : '1.5px solid #334155',
         backgroundColor: isFull ? '#3b1520' : '#1e293b',

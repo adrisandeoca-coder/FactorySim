@@ -40,10 +40,23 @@ class StationConfig:
     mtbf: Optional[float] = None  # Mean Time Between Failures (hours)
     mttr: Optional[float] = None  # Mean Time To Repair (hours)
     scrap_rate: float = 0.0  # Probability of producing scrap (0-1)
+    rework_target: Optional[str] = None  # Station ID to send defects for rework
+    rework_rate: float = 0.0  # Fraction of defects sent to rework vs scrapped
     batch_size: int = 1
     position: Dict[str, float] = field(default_factory=lambda: {"x": 0, "y": 0})
     product_cycle_times: Optional[Dict[str, Dict[str, Any]]] = None  # productId -> distribution config
     shifts: Optional[List[Dict[str, Any]]] = None  # Shift schedules
+    cost_per_hour: float = 0.0
+    cost_per_unit: float = 0.0
+    scrap_cost_per_unit: float = 0.0
+    # Energy modeling (kW per state)
+    energy_idle_kw: float = 0.0
+    energy_processing_kw: float = 0.0
+    energy_setup_kw: float = 0.0
+    # Preventive maintenance
+    pm_interval: Optional[float] = None   # hours between PM events
+    pm_duration: Optional[float] = None   # hours per PM event
+    pm_cost_per_event: float = 0.0
 
 
 class Station:
@@ -67,6 +80,10 @@ class Station:
         self.name = config.name
         self.batch_size = config.batch_size
         self.scrap_rate = config.scrap_rate
+        self.rework_target = config.rework_target
+        self.rework_rate = config.rework_rate
+        self.items_reworked = 0
+        self.config = config  # Store full config for cost calculation
         self.position = config.position
 
         # Initialize distributions
@@ -123,9 +140,41 @@ class Station:
         # Multi-output: maps downstream station id -> buffer for routing selection
         self.output_buffers: Dict[str, "Buffer"] = {}
 
+        # Energy tracking
+        self.energy_idle_kw = config.energy_idle_kw
+        self.energy_processing_kw = config.energy_processing_kw
+        self.energy_setup_kw = config.energy_setup_kw
+        self.total_energy_kwh = 0.0
+
+        # Preventive maintenance tracking
+        self.pm_interval = config.pm_interval
+        self.pm_duration = config.pm_duration
+        self.pm_cost_per_event = config.pm_cost_per_event
+        self.pm_events = 0
+        self.total_pm_time = 0.0
+        self._in_pm = False
+
         # Start failure process if configured
         if self.mtbf and self.mttr:
             env.process(self._failure_process())
+
+        # Start PM process if configured
+        if self.pm_interval and self.pm_duration:
+            env.process(self._pm_process())
+
+    def _accumulate_energy(self, duration: float) -> None:
+        """Accumulate energy consumption for the current state."""
+        if duration <= 0:
+            return
+        hours = duration / 3600.0
+        if self.state == StationState.PROCESSING:
+            self.total_energy_kwh += hours * self.energy_processing_kw
+        elif self.state == StationState.SETUP:
+            self.total_energy_kwh += hours * self.energy_setup_kw
+        elif self.state in (StationState.IDLE, StationState.BLOCKED,
+                            StationState.STARVED, StationState.BATCH_WAIT):
+            self.total_energy_kwh += hours * self.energy_idle_kw
+        # FAILED and OFF_SHIFT → 0 (machine off)
 
     def _log_state_change(self, new_state: StationState) -> None:
         """Log a state change for KPI tracking."""
@@ -133,6 +182,9 @@ class Station:
             return  # Skip duplicate transitions
         current_time = self.env.now
         duration = current_time - self._last_state_change
+
+        # Accumulate energy for the state being exited
+        self._accumulate_energy(duration)
 
         if self.state == StationState.IDLE:
             self.total_idle_time += duration
@@ -178,6 +230,9 @@ class Station:
         duration = current_time - self._last_state_change
         if duration <= 0:
             return
+
+        # Accumulate energy for the current state period
+        self._accumulate_energy(duration)
 
         if self.state == StationState.IDLE:
             self.total_idle_time += duration
@@ -235,6 +290,54 @@ class Station:
             self.sim.log_event("repair", self.id, {
                 "station": self.name,
                 "repair_time": repair_time,
+            })
+
+    def _pm_process(self):
+        """SimPy process for preventive maintenance at fixed intervals."""
+        interval_sec = self.pm_interval * 3600.0
+        duration_sec = self.pm_duration * 3600.0
+        while True:
+            yield self.env.timeout(interval_sec)
+
+            # If station is already failed, wait for repair first
+            while self._failed:
+                yield self._repair_event
+
+            # Trigger PM as a planned failure
+            self._in_pm = True
+            self._failed = True
+            prev_state = self.state
+            self._log_state_change(StationState.FAILED)
+
+            self.sim.log_event("pm_start", self.id, {
+                "station": self.name,
+                "interrupted_state": prev_state.value,
+            })
+
+            # Signal failure to any waiting process
+            if not self._failure_event.triggered:
+                self._failure_event.succeed()
+            self._failure_event = self.env.event()
+
+            # PM duration
+            yield self.env.timeout(duration_sec)
+
+            # PM complete
+            self._failed = False
+            self._in_pm = False
+            self.pm_events += 1
+            self.total_pm_time += duration_sec
+            self._log_state_change(StationState.IDLE)
+
+            # Signal repair complete
+            if not self._repair_event.triggered:
+                self._repair_event.succeed()
+            self._repair_event = self.env.event()
+
+            self.sim.log_event("pm_complete", self.id, {
+                "station": self.name,
+                "pm_duration": duration_sec,
+                "pm_events": self.pm_events,
             })
 
     def _get_cycle_time_for_product(self, product: "Product") -> float:
@@ -413,12 +516,27 @@ class Station:
             # Quality check
             is_scrap = self.sim.rng.random() < self.scrap_rate
             if is_scrap:
-                self.items_scrapped += 1
-                product.is_scrap = True
-                self.sim.log_event("scrap", self.id, {
-                    "station": self.name,
-                    "product_id": product.id,
-                })
+                # Check if this should be rework instead of scrap
+                if self.rework_target and self.rework_rate > 0 and self.sim.rng.random() < self.rework_rate:
+                    # Send to rework station
+                    self.items_reworked += 1
+                    product.is_scrap = False  # Not scrapped, being reworked
+                    self.sim.log_event("rework", self.id, {
+                        "station": self.name,
+                        "product_id": product.id,
+                        "rework_target": self.rework_target,
+                    })
+                    # Find rework station and inject product
+                    rework_station = self.sim.stations.get(self.rework_target)
+                    if rework_station and rework_station.input_buffer:
+                        self.env.process(self._send_to_rework(product, rework_station))
+                else:
+                    self.items_scrapped += 1
+                    product.is_scrap = True
+                    self.sim.log_event("scrap", self.id, {
+                        "station": self.name,
+                        "product_id": product.id,
+                    })
             else:
                 self.items_processed += 1
 
@@ -440,6 +558,15 @@ class Station:
             if overhead > 0:
                 product.total_waiting_time += overhead
 
+    def _send_to_rework(self, product, rework_station):
+        """Send a defective product to a rework station."""
+        try:
+            yield rework_station.input_buffer.put(product)
+        except Exception:
+            # If rework buffer is full, scrap the item
+            self.items_scrapped += 1
+            product.is_scrap = True
+
     def get_utilization(self) -> float:
         """Calculate station utilization (processing time / total time)."""
         total_time = self.env.now
@@ -451,7 +578,8 @@ class Station:
     def get_availability(self) -> float:
         """Calculate station availability (standard OEE).
 
-        A = (Scheduled - Failures - Setup) / Scheduled
+        A = (Scheduled - UnplannedFailures - Setup) / Scheduled
+        PM time is planned downtime — excluded from unplanned failures.
         Setup/changeover is an availability loss, not a speed loss.
         """
         total_time = self.env.now
@@ -461,7 +589,8 @@ class Station:
         scheduled_time = total_time - self.total_off_shift_time
         if scheduled_time <= 0:
             return 1.0
-        return max(0.0, 1.0 - (self.total_failed_time + self.total_setup_time) / scheduled_time)
+        unplanned_failure_time = self.total_failed_time - self.total_pm_time
+        return max(0.0, 1.0 - (unplanned_failure_time + self.total_setup_time) / scheduled_time)
 
     def get_quality(self) -> float:
         """Calculate quality rate (good items / total items)."""
@@ -631,8 +760,19 @@ class Station:
             "mtbf": self.mtbf,
             "mttr": self.mttr,
             "scrap_rate": self.scrap_rate,
+            "rework_target": self.rework_target,
+            "rework_rate": self.rework_rate,
             "batch_size": self.batch_size,
             "position": self.position,
+            "cost_per_hour": self.config.cost_per_hour,
+            "cost_per_unit": self.config.cost_per_unit,
+            "scrap_cost_per_unit": self.config.scrap_cost_per_unit,
+            "energy_idle_kw": self.energy_idle_kw,
+            "energy_processing_kw": self.energy_processing_kw,
+            "energy_setup_kw": self.energy_setup_kw,
+            "total_energy_kwh": self.total_energy_kwh,
+            "pm_events": self.pm_events,
+            "total_pm_time": self.total_pm_time,
         }
 
     @classmethod
@@ -646,9 +786,22 @@ class Station:
             mtbf=data.get("mtbf"),
             mttr=data.get("mttr"),
             scrap_rate=data.get("scrap_rate", data.get("scrapRate", 0.0)),
+            rework_target=data.get("rework_target", data.get("reworkTarget")),
+            rework_rate=data.get("rework_rate", data.get("reworkRate", 0.0)),
             batch_size=data.get("batch_size", data.get("batchSize", 1)),
             position=data.get("position", {"x": 0, "y": 0}),
             product_cycle_times=data.get("product_cycle_times", data.get("productCycleTimes")),
             shifts=data.get("shifts"),
+            cost_per_hour=data.get("cost_per_hour", data.get("costPerHour", 0.0)),
+            cost_per_unit=data.get("cost_per_unit", data.get("costPerUnit", 0.0)),
+            scrap_cost_per_unit=data.get("scrap_cost_per_unit", data.get("scrapCostPerUnit", 0.0)),
+            # Energy modeling
+            energy_idle_kw=data.get("energy_idle_kw", data.get("energyIdleKw", 0.0)),
+            energy_processing_kw=data.get("energy_processing_kw", data.get("energyProcessingKw", 0.0)),
+            energy_setup_kw=data.get("energy_setup_kw", data.get("energySetupKw", 0.0)),
+            # Preventive maintenance
+            pm_interval=data.get("pm_interval", data.get("pmInterval")),
+            pm_duration=data.get("pm_duration", data.get("pmDuration")),
+            pm_cost_per_event=data.get("pm_cost_per_event", data.get("pmCostPerEvent", 0.0)),
         )
         return cls(env, config, sim)

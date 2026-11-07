@@ -1,4 +1,6 @@
+import React from 'react';
 import type { WIPData, SimWarning } from '../../types';
+import { ChartEmptyState } from './ChartEmptyState';
 
 interface ChartEvent {
   time: number;
@@ -12,15 +14,11 @@ interface WipTrendChartProps {
   warnings?: SimWarning[];
 }
 
-export function WipTrendChart({ data, events = [], warnings = [] }: WipTrendChartProps) {
+const WipTrendChart = React.memo(function WipTrendChart({ data, events = [], warnings = [] }: WipTrendChartProps) {
   const timeSeries = data.timeSeries.length > 0 ? data.timeSeries : [];
 
-  if (timeSeries.length === 0) {
-    return (
-      <div className="h-64 flex items-center justify-center text-gray-400 text-sm">
-        No WIP time series data available
-      </div>
-    );
+  if (!data || timeSeries.length === 0) {
+    return <ChartEmptyState message="No WIP trend data available" />;
   }
 
   const chartWidth = 600;
@@ -71,8 +69,8 @@ export function WipTrendChart({ data, events = [], warnings = [] }: WipTrendChar
       <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full" style={{ maxHeight: '280px' }}>
         <defs>
           <linearGradient id="wipAreaGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.02" />
+            <stop offset="0%" stopColor="#2563EB" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#2563EB" stopOpacity="0.01" />
           </linearGradient>
         </defs>
 
@@ -84,8 +82,7 @@ export function WipTrendChart({ data, events = [], warnings = [] }: WipTrendChar
             y1={scaleY(val)}
             x2={padding.left + plotWidth}
             y2={scaleY(val)}
-            stroke="#e5e7eb"
-            strokeDasharray="3,3"
+            stroke="#e5e5e5"
           />
         ))}
 
@@ -95,14 +92,14 @@ export function WipTrendChart({ data, events = [], warnings = [] }: WipTrendChar
           y1={scaleY(peakWip)}
           x2={padding.left + plotWidth}
           y2={scaleY(peakWip)}
-          stroke="#ef4444"
+          stroke="#F31260"
           strokeWidth="1"
           strokeDasharray="6,3"
         />
         <text
           x={padding.left + plotWidth + 3}
           y={scaleY(peakWip) + 3}
-          fill="#ef4444"
+          fill="#F31260"
           fontSize="9"
           fontWeight="600"
         >
@@ -115,14 +112,14 @@ export function WipTrendChart({ data, events = [], warnings = [] }: WipTrendChar
           y1={scaleY(avgWip)}
           x2={padding.left + plotWidth}
           y2={scaleY(avgWip)}
-          stroke="#3b82f6"
+          stroke="#2563EB"
           strokeWidth="1"
           strokeDasharray="6,3"
         />
         <text
           x={padding.left + plotWidth + 3}
           y={scaleY(avgWip) + 3}
-          fill="#3b82f6"
+          fill="#2563EB"
           fontSize="9"
           fontWeight="600"
         >
@@ -133,10 +130,10 @@ export function WipTrendChart({ data, events = [], warnings = [] }: WipTrendChar
         <path d={areaPath} fill="url(#wipAreaGradient)" />
 
         {/* Raw line (semi-transparent) */}
-        <path d={pathData} fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinejoin="round" opacity="0.5" />
+        <path d={pathData} fill="none" stroke="#2563EB" strokeWidth="2" strokeLinejoin="round" opacity="0.5" />
 
         {/* SMA trend line */}
-        <path d={smaPath} fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinejoin="round" />
+        <path d={smaPath} fill="none" stroke="#6b7280" strokeWidth="2" strokeLinejoin="round" />
 
         {/* Y-axis labels */}
         {yTickValues.map((val) => (
@@ -172,14 +169,14 @@ export function WipTrendChart({ data, events = [], warnings = [] }: WipTrendChar
           y1={padding.top}
           x2={padding.left}
           y2={padding.top + plotHeight}
-          stroke="#e5e7eb"
+          stroke="#e5e5e5"
         />
         <line
           x1={padding.left}
           y1={padding.top + plotHeight}
           x2={padding.left + plotWidth}
           y2={padding.top + plotHeight}
-          stroke="#e5e7eb"
+          stroke="#e5e5e5"
         />
 
         {/* Event markers */}
@@ -210,29 +207,25 @@ export function WipTrendChart({ data, events = [], warnings = [] }: WipTrendChar
 
         {/* Legend */}
         <g transform={`translate(${padding.left + 8}, ${padding.top + 4})`}>
-          <line x1="0" y1="0" x2="16" y2="0" stroke="#3b82f6" strokeWidth="2" opacity="0.5" />
+          <line x1="0" y1="0" x2="16" y2="0" stroke="#2563EB" strokeWidth="2" opacity="0.5" />
           <text x="20" y="3.5" fill="#6b7280" fontSize="9" fontWeight="500">Raw</text>
-          <line x1="50" y1="0" x2="66" y2="0" stroke="#f59e0b" strokeWidth="2" />
+          <line x1="50" y1="0" x2="66" y2="0" stroke="#6b7280" strokeWidth="2" />
           <text x="70" y="3.5" fill="#6b7280" fontSize="9" fontWeight="500">Trend</text>
         </g>
       </svg>
 
       {/* Summary */}
-      <div className="flex justify-around text-xs">
-        <div className="text-center">
-          <div className="text-gray-500 uppercase tracking-wider">Current WIP</div>
-          <div className="font-semibold font-mono tabular-nums text-sm">{data.total} items</div>
-        </div>
-        <div className="text-center">
-          <div className="text-gray-500 uppercase tracking-wider">Peak WIP</div>
-          <div className="font-semibold font-mono tabular-nums text-sm">{Math.max(...timeSeries.map((d) => d.wip))} items</div>
-        </div>
-        <div className="text-center">
-          <div className="text-gray-500 uppercase tracking-wider">Avg WIP</div>
-          <div className="font-semibold font-mono tabular-nums text-sm">
-            {Math.round(timeSeries.reduce((sum, d) => sum + d.wip, 0) / timeSeries.length)} items
+      <div className="flex" style={{ paddingTop: 14, marginTop: 2, borderTop: '1px solid var(--border-subtle, #F0F0EF)' }}>
+        {[
+          { label: 'Current', value: String(data.total) },
+          { label: 'Average', value: String(Math.round(timeSeries.reduce((sum, d) => sum + d.wip, 0) / timeSeries.length)) },
+          { label: 'Peak', value: String(Math.max(...timeSeries.map((d) => d.wip))) },
+        ].map((item, i) => (
+          <div key={item.label} className="flex-1 text-center" style={i > 0 ? { borderLeft: '1px solid var(--border-subtle, #F0F0EF)' } : {}}>
+            <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.4px', fontVariantNumeric: 'tabular-nums', color: 'var(--t1, #09090B)' }}>{item.value}</div>
+            <div style={{ fontSize: 10, color: 'var(--t3, #A1A1AA)', marginTop: 2, fontWeight: 500 }}>{item.label}</div>
           </div>
-        </div>
+        ))}
       </div>
 
       {/* Steady-state warning */}
@@ -244,7 +237,8 @@ export function WipTrendChart({ data, events = [], warnings = [] }: WipTrendChar
       ))}
     </div>
   );
-}
+});
+export { WipTrendChart };
 
 function formatTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);

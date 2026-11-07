@@ -1,5 +1,8 @@
+import colors from 'tailwindcss/colors';
+
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -7,36 +10,24 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
-        },
-        factory: {
-          station: '#10b981',
-          buffer: '#f59e0b',
-          conveyor: '#6366f1',
-          source: '#22c55e',
-          sink: '#ef4444',
-        },
-        surface: {
-          900: '#0F1117',
-          800: '#12151C',
-          700: '#1A1D27',
-          600: '#242731',
-          500: '#2E313B',
-        },
+        // One neutral family: Tailwind `gray-*` classes render as slate, matching
+        // the CSS tokens in styles/index.css and the inline slate hex values.
+        gray: colors.slate,
+        // `primary-*` is the same blue as `blue-*` and var(--blue).
+        primary: colors.blue,
+      },
+      // Desktop-application corners: nearly square (was 6–16px on cards/buttons)
+      borderRadius: {
+        DEFAULT: '2px',
+        md: '2px',
+        lg: '3px',
+        xl: '4px',
+        '2xl': '4px',
+        '3xl': '6px',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        sans: ['Segoe UI', 'IBM Plex Sans', 'system-ui', 'sans-serif'],
+        mono: ['IBM Plex Mono', 'Consolas', 'monospace'],
       },
     },
   },

@@ -1,3 +1,6 @@
+# Single source of truth for packaging (the old "build" block in package.json
+# was removed: two configs disagreed, and the one in use shipped python/venv
+# twice — inside app.asar and as an extra resource).
 appId: com.factorysim.app
 productName: FactorySim
 directories:
@@ -7,22 +10,37 @@ directories:
 files:
   - dist/**/*
   - package.json
+  - resources/*.png        # window icon (loaded from app.asar/resources)
+
+asarUnpack:
+  - node_modules/sql.js/dist/sql-wasm.wasm
 
 extraResources:
+  # Simulation engine source (no developer venv, tests or caches)
   - from: python
     to: python
     filter:
-      - "**/*"
+      - "factorysim/**/*"
+      - "requirements.txt"
       - "!**/__pycache__"
       - "!**/*.pyc"
-      - "!**/tests"
 
 win:
+  extraResources:
+    # Self-contained Python for Windows — build it first with
+    #   python scripts/prepare-python-runtime.py
+    - from: python-runtime
+      to: python-runtime
   target:
     - target: nsis
       arch:
         - x64
   icon: resources/icon.ico
+  # Exe icon/version metadata is written by scripts/after-pack.cjs (pure JS),
+  # so the Windows installer can also be built on Linux/macOS without Wine.
+  signAndEditExecutable: false
+
+afterPack: scripts/after-pack.cjs
 
 mac:
   target:
@@ -47,9 +65,10 @@ nsis:
   createDesktopShortcut: always
   createStartMenuShortcut: true
   shortcutName: FactorySim
-  installerIcon: resources/icon.ico
-  uninstallerIcon: resources/icon.ico
+  installerIcon: resources/setup-icon.ico
+  uninstallerIcon: resources/setup-icon.ico
   installerHeaderIcon: resources/icon.ico
+  artifactName: FactorySim-Setup-${version}.${ext}
 
 dmg:
   contents:

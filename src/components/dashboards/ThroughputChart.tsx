@@ -1,4 +1,6 @@
+import React from 'react';
 import type { ThroughputData } from '../../types';
+import { ChartEmptyState } from './ChartEmptyState';
 
 interface ThroughputChartProps {
   data: ThroughputData;
@@ -51,15 +53,11 @@ function formatBucketLabel(startHour: number, endHour: number, totalHours: numbe
   return `D${startDay}-${endDay}`;
 }
 
-export function ThroughputChart({ data }: ThroughputChartProps) {
+const ThroughputChart = React.memo(function ThroughputChart({ data }: ThroughputChartProps) {
   const hourlyData = data.byHour.length > 0 ? data.byHour : [];
 
-  if (hourlyData.length === 0) {
-    return (
-      <div className="h-64 flex items-center justify-center text-gray-400 text-sm">
-        No hourly throughput data available
-      </div>
-    );
+  if (!data || hourlyData.length === 0) {
+    return <ChartEmptyState message="No throughput data available" />;
   }
 
   const { values, labels } = bucketData(hourlyData);
@@ -118,12 +116,17 @@ export function ThroughputChart({ data }: ThroughputChartProps) {
   const labelStep = Math.max(1, Math.ceil(labels.length / maxLabels));
 
   return (
-    <div className="h-64">
-      <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full" style={{ maxHeight: '240px' }}>
+    <div className="px-4 pb-4">
+      {/* Legend: the dashed line uses its own (cumulative) scale */}
+      <div className="flex items-center gap-4 text-xs text-gray-500" style={{ paddingLeft: 4, marginBottom: 4 }}>
+        <span className="flex items-center gap-1.5"><span style={{ width: 14, height: 2, background: '#2563EB', display: 'inline-block' }} />Units per hour</span>
+        <span className="flex items-center gap-1.5"><span style={{ width: 14, borderTop: '2px dashed #64748B', display: 'inline-block' }} />Cumulative total (0 → {maxCumulative.toLocaleString()})</span>
+      </div>
+      <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full" style={{ maxHeight: 260, display: 'block' }}>
         <defs>
           <linearGradient id="throughputAreaGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.03" />
+            <stop offset="0%" stopColor="#2563EB" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#2563EB" stopOpacity="0.01" />
           </linearGradient>
         </defs>
 
@@ -135,8 +138,7 @@ export function ThroughputChart({ data }: ThroughputChartProps) {
             y1={scaleY(val)}
             x2={padding.left + plotWidth}
             y2={scaleY(val)}
-            stroke="#e5e7eb"
-            strokeDasharray="3,3"
+            stroke="#e5e5e5"
           />
         ))}
 
@@ -144,13 +146,13 @@ export function ThroughputChart({ data }: ThroughputChartProps) {
         <path d={areaPath} fill="url(#throughputAreaGradient)" />
 
         {/* Step line */}
-        <path d={linePath} fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinejoin="round" />
+        <path d={linePath} fill="none" stroke="#2563EB" strokeWidth="2" strokeLinejoin="round" />
 
         {/* Cumulative dashed line */}
         {cumPoints && (
           <polyline
             fill="none"
-            stroke="#f59e0b"
+            stroke="#64748B"
             strokeWidth="1.5"
             strokeDasharray="6,4"
             points={cumPoints.replace(/[ML]\s*/g, '')}
@@ -201,7 +203,7 @@ export function ThroughputChart({ data }: ThroughputChartProps) {
             <circle
               key={`dot-${i}`}
               cx={x} cy={y} r={3}
-              fill="#3b82f6" stroke="#fff" strokeWidth={1}
+              fill="#2563EB" stroke="#fff" strokeWidth={1}
               opacity={0}
               className="hover:opacity-100 transition-opacity"
             >
@@ -212,20 +214,19 @@ export function ThroughputChart({ data }: ThroughputChartProps) {
       </svg>
 
       {/* Summary */}
-      <div className="mt-2 flex justify-around text-xs">
-        <div className="text-center">
-          <div className="text-gray-500 uppercase tracking-wider">Total Output</div>
-          <div className="font-semibold font-mono tabular-nums text-sm">{data.total || hourlyData.reduce((a, b) => a + b, 0)} units</div>
-        </div>
-        <div className="text-center">
-          <div className="text-gray-500 uppercase tracking-wider">Avg Rate</div>
-          <div className="font-semibold font-mono tabular-nums text-sm">{data.ratePerHour?.toFixed(0) || Math.round(hourlyData.reduce((a, b) => a + b, 0) / hourlyData.length)} /hr</div>
-        </div>
-        <div className="text-center">
-          <div className="text-gray-500 uppercase tracking-wider">Peak Hour</div>
-          <div className="font-semibold font-mono tabular-nums text-sm">{Math.max(...hourlyData)} units</div>
-        </div>
+      <div className="flex" style={{ paddingTop: 14, marginTop: 2, borderTop: '1px solid var(--border-subtle, #F0F0EF)' }}>
+        {[
+          { label: 'Total units', value: String(data.total || hourlyData.reduce((a, b) => a + b, 0)) },
+          { label: 'Avg rate', value: `${data.ratePerHour?.toFixed(0) || Math.round(hourlyData.reduce((a, b) => a + b, 0) / hourlyData.length)}/hr` },
+          { label: 'Peak hour', value: String(Math.max(...hourlyData)) },
+        ].map((item, i) => (
+          <div key={item.label} className="flex-1 text-center" style={i > 0 ? { borderLeft: '1px solid var(--border-subtle, #F0F0EF)' } : {}}>
+            <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.4px', fontVariantNumeric: 'tabular-nums', color: 'var(--t1, #09090B)' }}>{item.value}</div>
+            <div style={{ fontSize: 10, color: 'var(--t3, #A1A1AA)', marginTop: 2, fontWeight: 500 }}>{item.label}</div>
+          </div>
+        ))}
       </div>
     </div>
   );
-}
+});
+export { ThroughputChart };

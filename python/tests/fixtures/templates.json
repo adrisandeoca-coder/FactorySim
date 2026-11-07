@@ -1,0 +1,8931 @@
+[
+ {
+  "id": "flow-line",
+  "name": "Flow Line",
+  "template": {
+   "stations": [
+    {
+     "id": "s1",
+     "name": "Cutting",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 60,
+       "std": 5
+      }
+     },
+     "position": {
+      "x": 250,
+      "y": 250
+     }
+    },
+    {
+     "id": "s2",
+     "name": "Welding",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 55,
+       "std": 8
+      }
+     },
+     "position": {
+      "x": 500,
+      "y": 250
+     }
+    },
+    {
+     "id": "s3",
+     "name": "Finishing",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 65,
+       "std": 6
+      }
+     },
+     "position": {
+      "x": 750,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b1",
+     "name": "Buffer 1-2",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 375,
+      "y": 250
+     }
+    },
+    {
+     "id": "b2",
+     "name": "Buffer 2-3",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 625,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "s1"
+    },
+    {
+     "id": "c1",
+     "source": "s1",
+     "target": "b1"
+    },
+    {
+     "id": "c2",
+     "source": "b1",
+     "target": "s2"
+    },
+    {
+     "id": "c3",
+     "source": "s2",
+     "target": "b2"
+    },
+    {
+     "id": "c4",
+     "source": "b2",
+     "target": "s3"
+    },
+    {
+     "id": "c5",
+     "source": "s3",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p1",
+     "name": "Part A",
+     "routing": [
+      "s1",
+      "s2",
+      "s3"
+     ],
+     "arrivalRate": 70
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Source",
+      "arrivalRate": 70,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 50,
+      "y": 250
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Sink"
+     },
+     "position": {
+      "x": 950,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "distribution-centre",
+  "name": "Distribution Centre",
+  "template": {
+   "stations": [],
+   "buffers": [],
+   "connections": [],
+   "products": [],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "wh-dc",
+     "type": "warehouse",
+     "position": {
+      "x": 450,
+      "y": 250
+     },
+     "data": {
+      "id": "wh-dc",
+      "name": "DC",
+      "layout": {
+       "aisles": 4,
+       "baysPerAisle": 5,
+       "levels": 4,
+       "palletsPerBay": 2,
+       "bayWidth": 2.7,
+       "levelHeight": 1.5,
+       "aisleWidth": 3.5,
+       "rackDepth": 1.1,
+       "frontClearance": 4
+      },
+      "slotting": "abc",
+      "storageType": "racks",
+      "forklifts": {
+       "count": 3,
+       "speed": 2,
+       "liftSpeed": 0.4,
+       "handlingTime": 15,
+       "maxPerAisle": 1
+      },
+      "cranes": {
+       "speed": 3,
+       "liftSpeed": 1,
+       "handlingTime": 10,
+       "conveyorSpeed": 0.5
+      },
+      "pickers": {
+       "count": 4,
+       "walkSpeed": 1,
+       "timePerLine": 10,
+       "timePerUnit": 2,
+       "setupTime": 30,
+       "shifts": [],
+       "breaks": []
+      },
+      "inbound": {
+       "enabled": false,
+       "interarrival": {
+        "type": "exponential",
+        "parameters": {
+         "mean": 3600
+        }
+       },
+       "palletsPerTruck": {
+        "type": "constant",
+        "parameters": {
+         "value": 20
+        }
+       },
+       "doors": 3,
+       "unloadTimePerPallet": {
+        "type": "constant",
+        "parameters": {
+         "value": 60
+        }
+       }
+      },
+      "orders": {
+       "enabled": true,
+       "interarrival": {
+        "type": "exponential",
+        "parameters": {
+         "mean": 90
+        }
+       },
+       "linesPerOrder": {
+        "type": "triangular",
+        "parameters": {
+         "min": 1,
+         "mode": 3,
+         "max": 8
+        }
+       },
+       "unitsPerLine": {
+        "type": "triangular",
+        "parameters": {
+         "min": 1,
+         "mode": 2,
+         "max": 6
+        }
+       },
+       "packStations": 2,
+       "packTime": {
+        "type": "constant",
+        "parameters": {
+         "value": 120
+        }
+       },
+       "departureInterval": 3600
+      },
+      "outbound": {
+       "loadTimePerOrder": {
+        "type": "constant",
+        "parameters": {
+         "value": 20
+        }
+       }
+      },
+      "crossDock": false,
+      "lineSupply": {
+       "callOffShare": 0.2
+      },
+      "store": {
+       "dwellTime": {
+        "type": "constant",
+        "parameters": {
+         "value": 0
+        }
+       }
+      },
+      "skus": [
+       {
+        "id": "sku-1",
+        "name": "Coffee beans",
+        "class": "A",
+        "unitsPerPallet": 48,
+        "initialPallets": 69,
+        "reorderPoint": 33,
+        "orderQuantity": 72,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 30
+       },
+       {
+        "id": "sku-2",
+        "name": "Tea",
+        "class": "A",
+        "unitsPerPallet": 48,
+        "initialPallets": 46,
+        "reorderPoint": 22,
+        "orderQuantity": 48,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 20
+       },
+       {
+        "id": "sku-3",
+        "name": "Sugar",
+        "class": "B",
+        "unitsPerPallet": 48,
+        "initialPallets": 28,
+        "reorderPoint": 14,
+        "orderQuantity": 29,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 12
+       },
+       {
+        "id": "sku-4",
+        "name": "Flour",
+        "class": "B",
+        "unitsPerPallet": 48,
+        "initialPallets": 24,
+        "reorderPoint": 12,
+        "orderQuantity": 24,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 10
+       },
+       {
+        "id": "sku-5",
+        "name": "Rice",
+        "class": "B",
+        "unitsPerPallet": 48,
+        "initialPallets": 20,
+        "reorderPoint": 10,
+        "orderQuantity": 20,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 8
+       },
+       {
+        "id": "sku-6",
+        "name": "Pasta",
+        "class": "C",
+        "unitsPerPallet": 48,
+        "initialPallets": 15,
+        "reorderPoint": 8,
+        "orderQuantity": 15,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 6
+       },
+       {
+        "id": "sku-7",
+        "name": "Olive oil",
+        "class": "C",
+        "unitsPerPallet": 48,
+        "initialPallets": 13,
+        "reorderPoint": 7,
+        "orderQuantity": 12,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 5
+       },
+       {
+        "id": "sku-8",
+        "name": "Canned tomatoes",
+        "class": "C",
+        "unitsPerPallet": 48,
+        "initialPallets": 11,
+        "reorderPoint": 6,
+        "orderQuantity": 10,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 4
+       },
+       {
+        "id": "sku-9",
+        "name": "Spices",
+        "class": "C",
+        "unitsPerPallet": 48,
+        "initialPallets": 9,
+        "reorderPoint": 5,
+        "orderQuantity": 8,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 3
+       },
+       {
+        "id": "sku-10",
+        "name": "Honey",
+        "class": "C",
+        "unitsPerPallet": 48,
+        "initialPallets": 6,
+        "reorderPoint": 4,
+        "orderQuantity": 5,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 2
+       }
+      ]
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "asrs-dc",
+  "name": "High-bay AS/RS",
+  "template": {
+   "stations": [],
+   "buffers": [],
+   "connections": [],
+   "products": [],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "wh-asrs",
+     "type": "warehouse",
+     "position": {
+      "x": 450,
+      "y": 250
+     },
+     "data": {
+      "id": "wh-asrs",
+      "name": "AS/RS",
+      "layout": {
+       "aisles": 3,
+       "baysPerAisle": 10,
+       "levels": 8,
+       "palletsPerBay": 1,
+       "bayWidth": 1.4,
+       "levelHeight": 1.6,
+       "aisleWidth": 1.6,
+       "rackDepth": 1.2,
+       "frontClearance": 6
+      },
+      "slotting": "closest",
+      "storageType": "asrs",
+      "forklifts": {
+       "count": 2,
+       "speed": 2,
+       "liftSpeed": 0.4,
+       "handlingTime": 15,
+       "maxPerAisle": 1
+      },
+      "cranes": {
+       "speed": 3,
+       "liftSpeed": 1,
+       "handlingTime": 10,
+       "conveyorSpeed": 0.5
+      },
+      "pickers": {
+       "count": 2,
+       "walkSpeed": 1,
+       "timePerLine": 10,
+       "timePerUnit": 2,
+       "setupTime": 30,
+       "shifts": [],
+       "breaks": []
+      },
+      "inbound": {
+       "enabled": false,
+       "interarrival": {
+        "type": "exponential",
+        "parameters": {
+         "mean": 3600
+        }
+       },
+       "palletsPerTruck": {
+        "type": "constant",
+        "parameters": {
+         "value": 20
+        }
+       },
+       "doors": 3,
+       "unloadTimePerPallet": {
+        "type": "constant",
+        "parameters": {
+         "value": 60
+        }
+       }
+      },
+      "orders": {
+       "enabled": true,
+       "interarrival": {
+        "type": "exponential",
+        "parameters": {
+         "mean": 120
+        }
+       },
+       "linesPerOrder": {
+        "type": "triangular",
+        "parameters": {
+         "min": 1,
+         "mode": 3,
+         "max": 8
+        }
+       },
+       "unitsPerLine": {
+        "type": "triangular",
+        "parameters": {
+         "min": 1,
+         "mode": 2,
+         "max": 6
+        }
+       },
+       "packStations": 2,
+       "packTime": {
+        "type": "constant",
+        "parameters": {
+         "value": 120
+        }
+       },
+       "departureInterval": 3600
+      },
+      "outbound": {
+       "loadTimePerOrder": {
+        "type": "constant",
+        "parameters": {
+         "value": 20
+        }
+       }
+      },
+      "crossDock": true,
+      "lineSupply": {
+       "callOffShare": 0.2
+      },
+      "store": {
+       "dwellTime": {
+        "type": "constant",
+        "parameters": {
+         "value": 0
+        }
+       }
+      },
+      "skus": [
+       {
+        "id": "sku-1",
+        "name": "Pumps",
+        "class": "A",
+        "unitsPerPallet": 48,
+        "initialPallets": 59,
+        "reorderPoint": 19,
+        "orderQuantity": 81,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 30
+       },
+       {
+        "id": "sku-2",
+        "name": "Valves",
+        "class": "A",
+        "unitsPerPallet": 48,
+        "initialPallets": 40,
+        "reorderPoint": 13,
+        "orderQuantity": 54,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 20
+       },
+       {
+        "id": "sku-3",
+        "name": "Gaskets",
+        "class": "B",
+        "unitsPerPallet": 48,
+        "initialPallets": 30,
+        "reorderPoint": 10,
+        "orderQuantity": 41,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 15
+       },
+       {
+        "id": "sku-4",
+        "name": "Motors",
+        "class": "B",
+        "unitsPerPallet": 48,
+        "initialPallets": 20,
+        "reorderPoint": 7,
+        "orderQuantity": 27,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 10
+       },
+       {
+        "id": "sku-5",
+        "name": "Filters",
+        "class": "B",
+        "unitsPerPallet": 48,
+        "initialPallets": 20,
+        "reorderPoint": 7,
+        "orderQuantity": 27,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 10
+       },
+       {
+        "id": "sku-6",
+        "name": "Sensors",
+        "class": "C",
+        "unitsPerPallet": 48,
+        "initialPallets": 13,
+        "reorderPoint": 5,
+        "orderQuantity": 17,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 6
+       },
+       {
+        "id": "sku-7",
+        "name": "Cables",
+        "class": "C",
+        "unitsPerPallet": 48,
+        "initialPallets": 11,
+        "reorderPoint": 4,
+        "orderQuantity": 14,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 5
+       },
+       {
+        "id": "sku-8",
+        "name": "Fittings",
+        "class": "C",
+        "unitsPerPallet": 48,
+        "initialPallets": 9,
+        "reorderPoint": 4,
+        "orderQuantity": 11,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 28800
+         }
+        },
+        "demandShare": 4
+       }
+      ]
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "line-with-stores",
+  "name": "Line with Stores",
+  "template": {
+   "stations": [
+    {
+     "id": "s1",
+     "name": "Machining",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 50,
+       "std": 5
+      }
+     },
+     "position": {
+      "x": 400,
+      "y": 250
+     }
+    },
+    {
+     "id": "s2",
+     "name": "Assembly",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 45,
+       "std": 6
+      }
+     },
+     "position": {
+      "x": 650,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b1",
+     "name": "Buffer",
+     "capacity": 8,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 525,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "wh-rm"
+    },
+    {
+     "id": "c1",
+     "source": "wh-rm",
+     "target": "s1"
+    },
+    {
+     "id": "c2",
+     "source": "s1",
+     "target": "b1"
+    },
+    {
+     "id": "c3",
+     "source": "b1",
+     "target": "s2"
+    },
+    {
+     "id": "c4",
+     "source": "s2",
+     "target": "wh-fg"
+    },
+    {
+     "id": "c5",
+     "source": "wh-fg",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p1",
+     "name": "Bracket",
+     "routing": [
+      "s1",
+      "s2"
+     ],
+     "arrivalRate": 60
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Release",
+      "arrivalRate": 60,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 50,
+      "y": 250
+     }
+    },
+    {
+     "id": "wh-rm",
+     "type": "warehouse",
+     "position": {
+      "x": 220,
+      "y": 250
+     },
+     "data": {
+      "id": "wh-rm",
+      "name": "Raw material store",
+      "layout": {
+       "aisles": 1,
+       "baysPerAisle": 4,
+       "levels": 3,
+       "palletsPerBay": 2,
+       "bayWidth": 2.7,
+       "levelHeight": 1.5,
+       "aisleWidth": 3.5,
+       "rackDepth": 1.1,
+       "frontClearance": 4
+      },
+      "slotting": "closest",
+      "storageType": "racks",
+      "forklifts": {
+       "count": 1,
+       "speed": 2,
+       "liftSpeed": 0.4,
+       "handlingTime": 15,
+       "maxPerAisle": 1
+      },
+      "cranes": {
+       "speed": 3,
+       "liftSpeed": 1,
+       "handlingTime": 10,
+       "conveyorSpeed": 0.5
+      },
+      "pickers": {
+       "count": 3,
+       "walkSpeed": 1,
+       "timePerLine": 10,
+       "timePerUnit": 2,
+       "setupTime": 30,
+       "shifts": [],
+       "breaks": []
+      },
+      "inbound": {
+       "enabled": false,
+       "interarrival": {
+        "type": "exponential",
+        "parameters": {
+         "mean": 3600
+        }
+       },
+       "palletsPerTruck": {
+        "type": "constant",
+        "parameters": {
+         "value": 20
+        }
+       },
+       "doors": 2,
+       "unloadTimePerPallet": {
+        "type": "constant",
+        "parameters": {
+         "value": 60
+        }
+       }
+      },
+      "orders": {
+       "enabled": false,
+       "interarrival": {
+        "type": "exponential",
+        "parameters": {
+         "mean": 300
+        }
+       },
+       "linesPerOrder": {
+        "type": "triangular",
+        "parameters": {
+         "min": 1,
+         "mode": 3,
+         "max": 8
+        }
+       },
+       "unitsPerLine": {
+        "type": "triangular",
+        "parameters": {
+         "min": 1,
+         "mode": 2,
+         "max": 6
+        }
+       },
+       "packStations": 1,
+       "packTime": {
+        "type": "constant",
+        "parameters": {
+         "value": 120
+        }
+       },
+       "departureInterval": 0
+      },
+      "outbound": {
+       "loadTimePerOrder": {
+        "type": "constant",
+        "parameters": {
+         "value": 20
+        }
+       }
+      },
+      "crossDock": false,
+      "lineSupply": {
+       "callOffShare": 0.2
+      },
+      "store": {
+       "dwellTime": {
+        "type": "constant",
+        "parameters": {
+         "value": 0
+        }
+       }
+      },
+      "skus": [
+       {
+        "id": "rm-steel",
+        "name": "Steel blanks",
+        "productId": "p1",
+        "class": "A",
+        "unitsPerPallet": 60,
+        "initialPallets": 24,
+        "reorderPoint": 8,
+        "orderQuantity": 16,
+        "leadTime": {
+         "type": "constant",
+         "parameters": {
+          "value": 10800
+         }
+        },
+        "demandShare": 0
+       }
+      ]
+     }
+    },
+    {
+     "id": "wh-fg",
+     "type": "warehouse",
+     "position": {
+      "x": 830,
+      "y": 250
+     },
+     "data": {
+      "id": "wh-fg",
+      "name": "Finished goods store",
+      "layout": {
+       "aisles": 1,
+       "baysPerAisle": 4,
+       "levels": 3,
+       "palletsPerBay": 2,
+       "bayWidth": 2.7,
+       "levelHeight": 1.5,
+       "aisleWidth": 3.5,
+       "rackDepth": 1.1,
+       "frontClearance": 4
+      },
+      "slotting": "closest",
+      "storageType": "racks",
+      "forklifts": {
+       "count": 1,
+       "speed": 2,
+       "liftSpeed": 0.4,
+       "handlingTime": 15,
+       "maxPerAisle": 1
+      },
+      "cranes": {
+       "speed": 3,
+       "liftSpeed": 1,
+       "handlingTime": 10,
+       "conveyorSpeed": 0.5
+      },
+      "pickers": {
+       "count": 1,
+       "walkSpeed": 1,
+       "timePerLine": 10,
+       "timePerUnit": 2,
+       "setupTime": 30,
+       "shifts": [],
+       "breaks": []
+      },
+      "inbound": {
+       "enabled": false,
+       "interarrival": {
+        "type": "exponential",
+        "parameters": {
+         "mean": 3600
+        }
+       },
+       "palletsPerTruck": {
+        "type": "constant",
+        "parameters": {
+         "value": 20
+        }
+       },
+       "doors": 2,
+       "unloadTimePerPallet": {
+        "type": "constant",
+        "parameters": {
+         "value": 60
+        }
+       }
+      },
+      "orders": {
+       "enabled": true,
+       "interarrival": {
+        "type": "exponential",
+        "parameters": {
+         "mean": 900
+        }
+       },
+       "linesPerOrder": {
+        "type": "constant",
+        "parameters": {
+         "value": 1
+        }
+       },
+       "unitsPerLine": {
+        "type": "triangular",
+        "parameters": {
+         "min": 4,
+         "mode": 12,
+         "max": 20
+        }
+       },
+       "packStations": 1,
+       "packTime": {
+        "type": "constant",
+        "parameters": {
+         "value": 120
+        }
+       },
+       "departureInterval": 0
+      },
+      "outbound": {
+       "loadTimePerOrder": {
+        "type": "constant",
+        "parameters": {
+         "value": 20
+        }
+       }
+      },
+      "crossDock": false,
+      "lineSupply": {
+       "callOffShare": 0.2
+      },
+      "store": {
+       "dwellTime": {
+        "type": "constant",
+        "parameters": {
+         "value": 0
+        }
+       }
+      },
+      "skus": [
+       {
+        "id": "fg-bracket",
+        "name": "Bracket",
+        "productId": "p1",
+        "class": "A",
+        "unitsPerPallet": 40,
+        "initialPallets": 16,
+        "reorderPoint": -1,
+        "orderQuantity": 1,
+        "demandShare": 1
+       }
+      ]
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Shipped to store"
+     },
+     "position": {
+      "x": 1000,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "job-shop",
+  "name": "Job Shop",
+  "template": {
+   "stations": [
+    {
+     "id": "s1",
+     "name": "Milling 1",
+     "cycleTime": {
+      "type": "triangular",
+      "parameters": {
+       "min": 30,
+       "mode": 45,
+       "max": 60
+      }
+     },
+     "position": {
+      "x": 300,
+      "y": 100
+     }
+    },
+    {
+     "id": "s2",
+     "name": "Milling 2",
+     "cycleTime": {
+      "type": "triangular",
+      "parameters": {
+       "min": 30,
+       "mode": 45,
+       "max": 60
+      }
+     },
+     "position": {
+      "x": 300,
+      "y": 350
+     }
+    },
+    {
+     "id": "s3",
+     "name": "Turning",
+     "cycleTime": {
+      "type": "exponential",
+      "parameters": {
+       "mean": 40
+      }
+     },
+     "position": {
+      "x": 550,
+      "y": 225
+     }
+    },
+    {
+     "id": "s4",
+     "name": "Assembly",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 50,
+       "std": 10
+      }
+     },
+     "position": {
+      "x": 800,
+      "y": 225
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b1",
+     "name": "Input Queue",
+     "capacity": 50,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 150,
+      "y": 225
+     }
+    },
+    {
+     "id": "b2",
+     "name": "WIP Buffer",
+     "capacity": 30,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 425,
+      "y": 225
+     }
+    },
+    {
+     "id": "b3",
+     "name": "Assembly Queue",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 675,
+      "y": 225
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "b1"
+    },
+    {
+     "id": "c1",
+     "source": "b1",
+     "target": "split-1"
+    },
+    {
+     "id": "c2",
+     "source": "split-1",
+     "target": "s1"
+    },
+    {
+     "id": "c3",
+     "source": "split-1",
+     "target": "s2"
+    },
+    {
+     "id": "c4",
+     "source": "s1",
+     "target": "b2"
+    },
+    {
+     "id": "c5",
+     "source": "s2",
+     "target": "b2"
+    },
+    {
+     "id": "c6",
+     "source": "b2",
+     "target": "s3"
+    },
+    {
+     "id": "c7",
+     "source": "s3",
+     "target": "b3"
+    },
+    {
+     "id": "c8",
+     "source": "b3",
+     "target": "s4"
+    },
+    {
+     "id": "c9",
+     "source": "s4",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p1",
+     "name": "Shaft",
+     "routing": [
+      "s1",
+      "s3",
+      "s4"
+     ],
+     "arrivalRate": 90
+    },
+    {
+     "id": "p2",
+     "name": "Housing",
+     "routing": [
+      "s2",
+      "s3",
+      "s4"
+     ],
+     "arrivalRate": 90
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Source",
+      "arrivalRate": 90,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 50,
+      "y": 225
+     }
+    },
+    {
+     "id": "split-1",
+     "type": "splitter",
+     "data": {
+      "id": "split-1",
+      "name": "Router",
+      "outputs": 2,
+      "splitType": "equal"
+     },
+     "position": {
+      "x": 150,
+      "y": 100
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Sink"
+     },
+     "position": {
+      "x": 1000,
+      "y": 225
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "assembly-cell",
+  "name": "Assembly Cell",
+  "template": {
+   "stations": [
+    {
+     "id": "s1",
+     "name": "Sub-Assembly A",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 30,
+       "std": 5
+      }
+     },
+     "position": {
+      "x": 250,
+      "y": 100
+     }
+    },
+    {
+     "id": "s2",
+     "name": "Sub-Assembly B",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 35,
+       "std": 5
+      }
+     },
+     "position": {
+      "x": 250,
+      "y": 350
+     }
+    },
+    {
+     "id": "s3",
+     "name": "Final Assembly",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 45,
+       "std": 8
+      }
+     },
+     "position": {
+      "x": 550,
+      "y": 225
+     }
+    },
+    {
+     "id": "s4",
+     "name": "Testing",
+     "cycleTime": {
+      "type": "exponential",
+      "parameters": {
+       "mean": 20
+      }
+     },
+     "scrapRate": 0.02,
+     "position": {
+      "x": 750,
+      "y": 225
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b1",
+     "name": "Buffer A",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 400,
+      "y": 100
+     }
+    },
+    {
+     "id": "b2",
+     "name": "Buffer B",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 400,
+      "y": 350
+     }
+    },
+    {
+     "id": "b3",
+     "name": "Test Queue",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 650,
+      "y": 225
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0a",
+     "source": "src-a",
+     "target": "s1"
+    },
+    {
+     "id": "c0b",
+     "source": "src-b",
+     "target": "s2"
+    },
+    {
+     "id": "c1",
+     "source": "s1",
+     "target": "b1"
+    },
+    {
+     "id": "c2",
+     "source": "s2",
+     "target": "b2"
+    },
+    {
+     "id": "c3",
+     "source": "b1",
+     "target": "s3"
+    },
+    {
+     "id": "c4",
+     "source": "b2",
+     "target": "s3"
+    },
+    {
+     "id": "c5",
+     "source": "s3",
+     "target": "b3"
+    },
+    {
+     "id": "c6",
+     "source": "b3",
+     "target": "s4"
+    },
+    {
+     "id": "c7",
+     "source": "s4",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p1",
+     "name": "Component A",
+     "routing": [
+      "s1",
+      "s3",
+      "s4"
+     ],
+     "arrivalRate": 60
+    },
+    {
+     "id": "p2",
+     "name": "Component B",
+     "routing": [
+      "s2",
+      "s3",
+      "s4"
+     ],
+     "arrivalRate": 60
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-a",
+     "type": "source",
+     "data": {
+      "id": "src-a",
+      "name": "Source A",
+      "arrivalRate": 60,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 50,
+      "y": 100
+     }
+    },
+    {
+     "id": "src-b",
+     "type": "source",
+     "data": {
+      "id": "src-b",
+      "name": "Source B",
+      "arrivalRate": 60,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 50,
+      "y": 350
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Sink"
+     },
+     "position": {
+      "x": 950,
+      "y": 225
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "u-cell",
+  "name": "U-Cell",
+  "template": {
+   "stations": [
+    {
+     "id": "s1",
+     "name": "Op 10",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 25
+      }
+     },
+     "position": {
+      "x": 200,
+      "y": 100
+     }
+    },
+    {
+     "id": "s2",
+     "name": "Op 20",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 25
+      }
+     },
+     "position": {
+      "x": 400,
+      "y": 100
+     }
+    },
+    {
+     "id": "s3",
+     "name": "Op 30",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 25
+      }
+     },
+     "position": {
+      "x": 600,
+      "y": 100
+     }
+    },
+    {
+     "id": "s4",
+     "name": "Op 40",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 25
+      }
+     },
+     "position": {
+      "x": 600,
+      "y": 350
+     }
+    },
+    {
+     "id": "s5",
+     "name": "Op 50",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 25
+      }
+     },
+     "position": {
+      "x": 400,
+      "y": 350
+     }
+    },
+    {
+     "id": "s6",
+     "name": "Op 60",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 25
+      }
+     },
+     "position": {
+      "x": 200,
+      "y": 350
+     }
+    }
+   ],
+   "buffers": [],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "s1"
+    },
+    {
+     "id": "c1",
+     "source": "s1",
+     "target": "s2"
+    },
+    {
+     "id": "c2",
+     "source": "s2",
+     "target": "s3"
+    },
+    {
+     "id": "c3",
+     "source": "s3",
+     "target": "s4"
+    },
+    {
+     "id": "c4",
+     "source": "s4",
+     "target": "s5"
+    },
+    {
+     "id": "c5",
+     "source": "s5",
+     "target": "s6"
+    },
+    {
+     "id": "c6",
+     "source": "s6",
+     "target": "insp-1"
+    },
+    {
+     "id": "c7",
+     "source": "insp-1",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p1",
+     "name": "Widget",
+     "routing": [
+      "s1",
+      "s2",
+      "s3",
+      "s4",
+      "s5",
+      "s6"
+     ],
+     "arrivalRate": 30
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Source",
+      "arrivalRate": 30,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 50,
+      "y": 100
+     }
+    },
+    {
+     "id": "insp-1",
+     "type": "inspection",
+     "data": {
+      "id": "insp-1",
+      "name": "Final Inspection",
+      "inspectionTime": 15,
+      "defectRate": 3,
+      "inspectionType": "visual"
+     },
+     "position": {
+      "x": 200,
+      "y": 500
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Sink"
+     },
+     "position": {
+      "x": 400,
+      "y": 500
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "batch-process",
+  "name": "Batch Processing",
+  "template": {
+   "stations": [
+    {
+     "id": "s1",
+     "name": "Mixing",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 120
+      }
+     },
+     "batchSize": 10,
+     "position": {
+      "x": 250,
+      "y": 225
+     }
+    },
+    {
+     "id": "s2",
+     "name": "Heating",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 180
+      }
+     },
+     "batchSize": 10,
+     "position": {
+      "x": 500,
+      "y": 225
+     }
+    },
+    {
+     "id": "s3",
+     "name": "Cooling",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 90
+      }
+     },
+     "batchSize": 10,
+     "position": {
+      "x": 750,
+      "y": 225
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b1",
+     "name": "Raw Materials",
+     "capacity": 50,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 150,
+      "y": 225
+     }
+    },
+    {
+     "id": "b2",
+     "name": "Heat Queue",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 375,
+      "y": 225
+     }
+    },
+    {
+     "id": "b3",
+     "name": "Cool Queue",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 625,
+      "y": 225
+     }
+    },
+    {
+     "id": "b4",
+     "name": "Finished Goods",
+     "capacity": 100,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 875,
+      "y": 225
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "b1"
+    },
+    {
+     "id": "c1",
+     "source": "b1",
+     "target": "s1"
+    },
+    {
+     "id": "c2",
+     "source": "s1",
+     "target": "b2"
+    },
+    {
+     "id": "c3",
+     "source": "b2",
+     "target": "s2"
+    },
+    {
+     "id": "c4",
+     "source": "s2",
+     "target": "b3"
+    },
+    {
+     "id": "c5",
+     "source": "b3",
+     "target": "s3"
+    },
+    {
+     "id": "c6",
+     "source": "s3",
+     "target": "b4"
+    },
+    {
+     "id": "c7",
+     "source": "b4",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p1",
+     "name": "Batch Product",
+     "routing": [
+      "s1",
+      "s2",
+      "s3"
+     ],
+     "arrivalRate": 120
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Source",
+      "arrivalRate": 120,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 50,
+      "y": 225
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Sink"
+     },
+     "position": {
+      "x": 1050,
+      "y": 225
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "conveyor-line",
+  "name": "Conveyor Line",
+  "template": {
+   "stations": [
+    {
+     "id": "s1",
+     "name": "Stamping",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 40,
+       "std": 4
+      }
+     },
+     "position": {
+      "x": 200,
+      "y": 250
+     }
+    },
+    {
+     "id": "s2",
+     "name": "Bending",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 35,
+       "std": 3
+      }
+     },
+     "position": {
+      "x": 500,
+      "y": 250
+     }
+    },
+    {
+     "id": "s3",
+     "name": "Drilling",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 50,
+       "std": 6
+      }
+     },
+     "position": {
+      "x": 800,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b-in",
+     "name": "Input Queue",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 100,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "b-in"
+    },
+    {
+     "id": "c1",
+     "source": "b-in",
+     "target": "s1"
+    },
+    {
+     "id": "c2",
+     "source": "s1",
+     "target": "conv-1"
+    },
+    {
+     "id": "c3",
+     "source": "conv-1",
+     "target": "s2"
+    },
+    {
+     "id": "c4",
+     "source": "s2",
+     "target": "conv-2"
+    },
+    {
+     "id": "c5",
+     "source": "conv-2",
+     "target": "s3"
+    },
+    {
+     "id": "c6",
+     "source": "s3",
+     "target": "insp-1"
+    },
+    {
+     "id": "c7",
+     "source": "insp-1",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p1",
+     "name": "Metal Part",
+     "routing": [
+      "s1",
+      "s2",
+      "s3"
+     ],
+     "arrivalRate": 55
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Source",
+      "arrivalRate": 55,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 30,
+      "y": 250
+     }
+    },
+    {
+     "id": "conv-1",
+     "type": "conveyor",
+     "data": {
+      "id": "conv-1",
+      "name": "Conveyor A",
+      "length": 5,
+      "speed": 1,
+      "capacity": 5
+     },
+     "position": {
+      "x": 350,
+      "y": 250
+     }
+    },
+    {
+     "id": "conv-2",
+     "type": "conveyor",
+     "data": {
+      "id": "conv-2",
+      "name": "Conveyor B",
+      "length": 8,
+      "speed": 1.5,
+      "capacity": 8
+     },
+     "position": {
+      "x": 650,
+      "y": 250
+     }
+    },
+    {
+     "id": "insp-1",
+     "type": "inspection",
+     "data": {
+      "id": "insp-1",
+      "name": "Final QC",
+      "inspectionTime": 10,
+      "defectRate": 2,
+      "inspectionType": "visual"
+     },
+     "position": {
+      "x": 950,
+      "y": 250
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Sink"
+     },
+     "position": {
+      "x": 1100,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "product-routing",
+  "name": "Product-Based Routing",
+  "template": {
+   "stations": [
+    {
+     "id": "s-small",
+     "name": "Small Parts Line",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 30,
+       "std": 3
+      }
+     },
+     "position": {
+      "x": 450,
+      "y": 100
+     }
+    },
+    {
+     "id": "s-large",
+     "name": "Large Parts Line",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 60,
+       "std": 8
+      }
+     },
+     "position": {
+      "x": 450,
+      "y": 400
+     }
+    },
+    {
+     "id": "s-pack",
+     "name": "Packing",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 20
+      }
+     },
+     "position": {
+      "x": 850,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b-in",
+     "name": "Incoming",
+     "capacity": 30,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 150,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-pack",
+     "name": "Pack Queue",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 700,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "b-in"
+    },
+    {
+     "id": "c1",
+     "source": "b-in",
+     "target": "split-1"
+    },
+    {
+     "id": "c2",
+     "source": "split-1",
+     "target": "s-small"
+    },
+    {
+     "id": "c3",
+     "source": "split-1",
+     "target": "s-large"
+    },
+    {
+     "id": "c4",
+     "source": "s-small",
+     "target": "merge-1"
+    },
+    {
+     "id": "c5",
+     "source": "s-large",
+     "target": "merge-1"
+    },
+    {
+     "id": "c6",
+     "source": "merge-1",
+     "target": "b-pack"
+    },
+    {
+     "id": "c7",
+     "source": "b-pack",
+     "target": "s-pack"
+    },
+    {
+     "id": "c8",
+     "source": "s-pack",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p-small",
+     "name": "Small Widget",
+     "routing": [
+      "s-small",
+      "s-pack"
+     ],
+     "arrivalRate": 40
+    },
+    {
+     "id": "p-large",
+     "name": "Large Widget",
+     "routing": [
+      "s-large",
+      "s-pack"
+     ],
+     "arrivalRate": 80
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Source",
+      "arrivalRate": 40,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 30,
+      "y": 250
+     }
+    },
+    {
+     "id": "split-1",
+     "type": "splitter",
+     "data": {
+      "id": "split-1",
+      "name": "Product Router",
+      "outputs": 2,
+      "splitType": "product-based",
+      "productRouting": {
+       "p-small": 0,
+       "p-large": 1
+      }
+     },
+     "position": {
+      "x": 300,
+      "y": 250
+     }
+    },
+    {
+     "id": "merge-1",
+     "type": "merge",
+     "data": {
+      "id": "merge-1",
+      "name": "Merge",
+      "inputs": 2,
+      "mergeType": "fifo"
+     },
+     "position": {
+      "x": 600,
+      "y": 250
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Shipping"
+     },
+     "position": {
+      "x": 1050,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "assembly-disassembly",
+  "name": "Assembly & Disassembly",
+  "template": {
+   "stations": [
+    {
+     "id": "s-prep",
+     "name": "Prep Station",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 20
+      }
+     },
+     "position": {
+      "x": 250,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-rework-a",
+     "name": "Rework Frame",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 40,
+       "std": 5
+      }
+     },
+     "position": {
+      "x": 600,
+      "y": 100
+     }
+    },
+    {
+     "id": "s-rework-b",
+     "name": "Rework Motor",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 50,
+       "std": 8
+      }
+     },
+     "position": {
+      "x": 600,
+      "y": 400
+     }
+    },
+    {
+     "id": "s-test",
+     "name": "Final Test",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 25
+      }
+     },
+     "scrapRate": 0.01,
+     "position": {
+      "x": 1000,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b-in",
+     "name": "Incoming",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 150,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-prep-out",
+     "name": "Prep Output",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 420,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-rework-out",
+     "name": "Rework Output",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 800,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "b-in"
+    },
+    {
+     "id": "c1",
+     "source": "b-in",
+     "target": "s-prep"
+    },
+    {
+     "id": "c2",
+     "source": "s-prep",
+     "target": "disasm-1"
+    },
+    {
+     "id": "c3",
+     "source": "disasm-1",
+     "target": "s-rework-a"
+    },
+    {
+     "id": "c4",
+     "source": "disasm-1",
+     "target": "s-rework-b"
+    },
+    {
+     "id": "c5",
+     "source": "s-rework-a",
+     "target": "assy-1"
+    },
+    {
+     "id": "c6",
+     "source": "s-rework-b",
+     "target": "assy-1"
+    },
+    {
+     "id": "c7",
+     "source": "assy-1",
+     "target": "s-test"
+    },
+    {
+     "id": "c8",
+     "source": "s-test",
+     "target": "sink-1"
+    },
+    {
+     "id": "cs1",
+     "source": "s-prep",
+     "target": "b-prep-out"
+    },
+    {
+     "id": "cs2",
+     "source": "b-prep-out",
+     "target": "s-rework-a"
+    },
+    {
+     "id": "cs3",
+     "source": "b-prep-out",
+     "target": "s-rework-b"
+    },
+    {
+     "id": "cs4",
+     "source": "s-rework-a",
+     "target": "b-rework-out"
+    },
+    {
+     "id": "cs5",
+     "source": "s-rework-b",
+     "target": "b-rework-out"
+    },
+    {
+     "id": "cs6",
+     "source": "b-rework-out",
+     "target": "s-test"
+    }
+   ],
+   "products": [
+    {
+     "id": "p-unit",
+     "name": "Motor Unit",
+     "routing": [
+      "s-prep"
+     ],
+     "arrivalRate": 90
+    },
+    {
+     "id": "p-frame",
+     "name": "Frame",
+     "routing": [
+      "s-rework-a",
+      "s-test"
+     ]
+    },
+    {
+     "id": "p-motor",
+     "name": "Motor",
+     "routing": [
+      "s-rework-b",
+      "s-test"
+     ]
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Source",
+      "arrivalRate": 90,
+      "feedMode": "interval",
+      "productFilter": "p-unit"
+     },
+     "position": {
+      "x": 30,
+      "y": 250
+     }
+    },
+    {
+     "id": "disasm-1",
+     "type": "disassembly",
+     "data": {
+      "id": "disasm-1",
+      "name": "Disassembly",
+      "cycleTime": 30,
+      "outputParts": [
+       {
+        "productId": "p-frame",
+        "productName": "Frame",
+        "quantity": 1
+       },
+       {
+        "productId": "p-motor",
+        "productName": "Motor",
+        "quantity": 1
+       }
+      ]
+     },
+     "position": {
+      "x": 400,
+      "y": 150
+     }
+    },
+    {
+     "id": "assy-1",
+     "type": "assembly",
+     "data": {
+      "id": "assy-1",
+      "name": "Reassembly",
+      "cycleTime": 45,
+      "inputParts": 2,
+      "inputPartsByProduct": [
+       {
+        "productId": "p-frame",
+        "productName": "Frame",
+        "quantity": 1
+       },
+       {
+        "productId": "p-motor",
+        "productName": "Motor",
+        "quantity": 1
+       }
+      ]
+     },
+     "position": {
+      "x": 800,
+      "y": 150
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Sink"
+     },
+     "position": {
+      "x": 1150,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "pallet-line",
+  "name": "Palletize & Depalletize",
+  "template": {
+   "stations": [
+    {
+     "id": "s-fill",
+     "name": "Filling",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 15
+      }
+     },
+     "position": {
+      "x": 200,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-label",
+     "name": "Labeling",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 10
+      }
+     },
+     "position": {
+      "x": 900,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b-in",
+     "name": "Raw Materials",
+     "capacity": 50,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 100,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-mid",
+     "name": "Transfer Buffer",
+     "capacity": 30,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 550,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "b-in"
+    },
+    {
+     "id": "c1",
+     "source": "b-in",
+     "target": "s-fill"
+    },
+    {
+     "id": "c2",
+     "source": "s-fill",
+     "target": "pall-1"
+    },
+    {
+     "id": "c3",
+     "source": "pall-1",
+     "target": "conv-1"
+    },
+    {
+     "id": "c4",
+     "source": "conv-1",
+     "target": "depall-1"
+    },
+    {
+     "id": "c5",
+     "source": "depall-1",
+     "target": "s-label"
+    },
+    {
+     "id": "c6",
+     "source": "s-label",
+     "target": "sink-1"
+    },
+    {
+     "id": "cs1",
+     "source": "s-fill",
+     "target": "b-mid"
+    },
+    {
+     "id": "cs2",
+     "source": "b-mid",
+     "target": "s-label"
+    }
+   ],
+   "products": [
+    {
+     "id": "p-bottle",
+     "name": "Bottle",
+     "routing": [
+      "s-fill",
+      "s-label"
+     ],
+     "arrivalRate": 20
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Source",
+      "arrivalRate": 20,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 30,
+      "y": 250
+     }
+    },
+    {
+     "id": "pall-1",
+     "type": "palletize",
+     "data": {
+      "id": "pall-1",
+      "name": "Palletizer",
+      "defaultPalletSize": 12,
+      "cycleTime": 30
+     },
+     "position": {
+      "x": 350,
+      "y": 250
+     }
+    },
+    {
+     "id": "conv-1",
+     "type": "conveyor",
+     "data": {
+      "id": "conv-1",
+      "name": "Transfer Conveyor",
+      "length": 10,
+      "speed": 2,
+      "capacity": 10
+     },
+     "position": {
+      "x": 550,
+      "y": 150
+     }
+    },
+    {
+     "id": "depall-1",
+     "type": "depalletize",
+     "data": {
+      "id": "depall-1",
+      "name": "Depalletizer",
+      "cycleTime": 5
+     },
+     "position": {
+      "x": 750,
+      "y": 250
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Shipping"
+     },
+     "position": {
+      "x": 1050,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "match-buffer-sync",
+  "name": "Match Buffer Sync",
+  "template": {
+   "stations": [
+    {
+     "id": "s-left-a",
+     "name": "Machine Left A",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 35,
+       "std": 4
+      }
+     },
+     "position": {
+      "x": 250,
+      "y": 100
+     }
+    },
+    {
+     "id": "s-left-b",
+     "name": "Machine Left B",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 40,
+       "std": 5
+      }
+     },
+     "position": {
+      "x": 450,
+      "y": 100
+     }
+    },
+    {
+     "id": "s-right-a",
+     "name": "Machine Right A",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 30,
+       "std": 3
+      }
+     },
+     "position": {
+      "x": 250,
+      "y": 400
+     }
+    },
+    {
+     "id": "s-right-b",
+     "name": "Machine Right B",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 45,
+       "std": 6
+      }
+     },
+     "position": {
+      "x": 450,
+      "y": 400
+     }
+    },
+    {
+     "id": "s-final",
+     "name": "Final Assembly",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 55,
+       "std": 7
+      }
+     },
+     "position": {
+      "x": 900,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b-l1",
+     "name": "Left Buffer 1",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 350,
+      "y": 100
+     }
+    },
+    {
+     "id": "b-r1",
+     "name": "Right Buffer 1",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 350,
+      "y": 400
+     }
+    },
+    {
+     "id": "b-merge",
+     "name": "Merge Buffer",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 700,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0a",
+     "source": "src-left",
+     "target": "s-left-a"
+    },
+    {
+     "id": "c1a",
+     "source": "s-left-a",
+     "target": "b-l1"
+    },
+    {
+     "id": "c2a",
+     "source": "b-l1",
+     "target": "s-left-b"
+    },
+    {
+     "id": "c3a",
+     "source": "s-left-b",
+     "target": "match-1"
+    },
+    {
+     "id": "c0b",
+     "source": "src-right",
+     "target": "s-right-a"
+    },
+    {
+     "id": "c1b",
+     "source": "s-right-a",
+     "target": "b-r1"
+    },
+    {
+     "id": "c2b",
+     "source": "b-r1",
+     "target": "s-right-b"
+    },
+    {
+     "id": "c3b",
+     "source": "s-right-b",
+     "target": "match-1"
+    },
+    {
+     "id": "c4",
+     "source": "match-1",
+     "target": "s-final"
+    },
+    {
+     "id": "c5",
+     "source": "s-final",
+     "target": "insp-1"
+    },
+    {
+     "id": "c6",
+     "source": "insp-1",
+     "target": "sink-1"
+    },
+    {
+     "id": "cs1",
+     "source": "s-left-b",
+     "target": "b-merge"
+    },
+    {
+     "id": "cs2",
+     "source": "s-right-b",
+     "target": "b-merge"
+    },
+    {
+     "id": "cs3",
+     "source": "b-merge",
+     "target": "s-final"
+    }
+   ],
+   "products": [
+    {
+     "id": "p-left",
+     "name": "Left Panel",
+     "routing": [
+      "s-left-a",
+      "s-left-b",
+      "s-final"
+     ],
+     "arrivalRate": 50
+    },
+    {
+     "id": "p-right",
+     "name": "Right Panel",
+     "routing": [
+      "s-right-a",
+      "s-right-b",
+      "s-final"
+     ],
+     "arrivalRate": 50
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-left",
+     "type": "source",
+     "data": {
+      "id": "src-left",
+      "name": "Left Source",
+      "arrivalRate": 50,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 50,
+      "y": 100
+     }
+    },
+    {
+     "id": "src-right",
+     "type": "source",
+     "data": {
+      "id": "src-right",
+      "name": "Right Source",
+      "arrivalRate": 50,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 50,
+      "y": 400
+     }
+    },
+    {
+     "id": "match-1",
+     "type": "matchbuffer",
+     "data": {
+      "id": "match-1",
+      "name": "Part Sync",
+      "capacity": 20,
+      "matchKey": "batch",
+      "requiredParts": [
+       {
+        "productId": "p-left",
+        "productName": "Left Panel",
+        "quantity": 1
+       },
+       {
+        "productId": "p-right",
+        "productName": "Right Panel",
+        "quantity": 1
+       }
+      ],
+      "timeout": 600
+     },
+     "position": {
+      "x": 680,
+      "y": 250
+     }
+    },
+    {
+     "id": "insp-1",
+     "type": "inspection",
+     "data": {
+      "id": "insp-1",
+      "name": "Final QC",
+      "inspectionTime": 15,
+      "defectRate": 1.5,
+      "inspectionType": "automated"
+     },
+     "position": {
+      "x": 1050,
+      "y": 250
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Finished Goods"
+     },
+     "position": {
+      "x": 1200,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "automotive-paint-shop",
+  "name": "Automotive Paint Shop",
+  "template": {
+   "stations": [
+    {
+     "id": "s-pretreat",
+     "name": "Pretreatment",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 180
+      }
+     },
+     "position": {
+      "x": 150,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-ecoat",
+     "name": "E-Coat",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 240
+      }
+     },
+     "position": {
+      "x": 350,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-primer",
+     "name": "Primer Booth",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 300,
+       "std": 20
+      }
+     },
+     "scrapRate": 0.02,
+     "position": {
+      "x": 550,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-oven1",
+     "name": "Primer Oven",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 600
+      }
+     },
+     "position": {
+      "x": 750,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-base",
+     "name": "Base Coat Booth",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 360,
+       "std": 30
+      }
+     },
+     "scrapRate": 0.03,
+     "mtbf": 8,
+     "mttr": 0.5,
+     "position": {
+      "x": 950,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-clear",
+     "name": "Clear Coat",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 300,
+       "std": 25
+      }
+     },
+     "scrapRate": 0.01,
+     "position": {
+      "x": 1150,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-oven2",
+     "name": "Final Oven",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 600
+      }
+     },
+     "position": {
+      "x": 1350,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b1",
+     "name": "Pre-Ecoat",
+     "capacity": 5,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 250,
+      "y": 250
+     }
+    },
+    {
+     "id": "b2",
+     "name": "Pre-Primer",
+     "capacity": 5,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 450,
+      "y": 250
+     }
+    },
+    {
+     "id": "b3",
+     "name": "Pre-Oven",
+     "capacity": 3,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 650,
+      "y": 250
+     }
+    },
+    {
+     "id": "b4",
+     "name": "Pre-Base",
+     "capacity": 5,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 850,
+      "y": 250
+     }
+    },
+    {
+     "id": "b5",
+     "name": "Pre-Clear",
+     "capacity": 5,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 1050,
+      "y": 250
+     }
+    },
+    {
+     "id": "b6",
+     "name": "Pre-FinalOven",
+     "capacity": 3,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 1250,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "s-pretreat"
+    },
+    {
+     "id": "c1",
+     "source": "s-pretreat",
+     "target": "b1"
+    },
+    {
+     "id": "c2",
+     "source": "b1",
+     "target": "s-ecoat"
+    },
+    {
+     "id": "c3",
+     "source": "s-ecoat",
+     "target": "b2"
+    },
+    {
+     "id": "c4",
+     "source": "b2",
+     "target": "s-primer"
+    },
+    {
+     "id": "c5",
+     "source": "s-primer",
+     "target": "b3"
+    },
+    {
+     "id": "c6",
+     "source": "b3",
+     "target": "s-oven1"
+    },
+    {
+     "id": "c7",
+     "source": "s-oven1",
+     "target": "b4"
+    },
+    {
+     "id": "c8",
+     "source": "b4",
+     "target": "s-base"
+    },
+    {
+     "id": "c9",
+     "source": "s-base",
+     "target": "b5"
+    },
+    {
+     "id": "c10",
+     "source": "b5",
+     "target": "s-clear"
+    },
+    {
+     "id": "c11",
+     "source": "s-clear",
+     "target": "b6"
+    },
+    {
+     "id": "c12",
+     "source": "b6",
+     "target": "s-oven2"
+    },
+    {
+     "id": "c13",
+     "source": "s-oven2",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p1",
+     "name": "Car Body",
+     "routing": [
+      "s-pretreat",
+      "s-ecoat",
+      "s-primer",
+      "s-oven1",
+      "s-base",
+      "s-clear",
+      "s-oven2"
+     ],
+     "arrivalRate": 300
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Body-in-White",
+      "arrivalRate": 300,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 30,
+      "y": 250
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "To Assembly"
+     },
+     "position": {
+      "x": 1500,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "smt-pcb-line",
+  "name": "SMT / PCB Assembly",
+  "template": {
+   "stations": [
+    {
+     "id": "s-print",
+     "name": "Solder Paste Printer",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 15,
+       "std": 2
+      }
+     },
+     "scrapRate": 0.005,
+     "position": {
+      "x": 200,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-pnp1",
+     "name": "Pick & Place 1",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 25,
+       "std": 3
+      }
+     },
+     "mtbf": 4,
+     "mttr": 0.25,
+     "position": {
+      "x": 400,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-pnp2",
+     "name": "Pick & Place 2",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 20,
+       "std": 2
+      }
+     },
+     "mtbf": 4,
+     "mttr": 0.25,
+     "position": {
+      "x": 600,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-reflow",
+     "name": "Reflow Oven",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 180
+      }
+     },
+     "position": {
+      "x": 800,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-aoi",
+     "name": "AOI Inspection",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 10
+      }
+     },
+     "scrapRate": 0.03,
+     "position": {
+      "x": 1000,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b1",
+     "name": "Post-Print",
+     "capacity": 8,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 300,
+      "y": 250
+     }
+    },
+    {
+     "id": "b2",
+     "name": "Post-PnP1",
+     "capacity": 8,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 500,
+      "y": 250
+     }
+    },
+    {
+     "id": "b3",
+     "name": "Pre-Reflow",
+     "capacity": 4,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 700,
+      "y": 250
+     }
+    },
+    {
+     "id": "b4",
+     "name": "Post-Reflow",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 900,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "s-print"
+    },
+    {
+     "id": "c1",
+     "source": "s-print",
+     "target": "b1"
+    },
+    {
+     "id": "c2",
+     "source": "b1",
+     "target": "s-pnp1"
+    },
+    {
+     "id": "c3",
+     "source": "s-pnp1",
+     "target": "b2"
+    },
+    {
+     "id": "c4",
+     "source": "b2",
+     "target": "s-pnp2"
+    },
+    {
+     "id": "c5",
+     "source": "s-pnp2",
+     "target": "b3"
+    },
+    {
+     "id": "c6",
+     "source": "b3",
+     "target": "s-reflow"
+    },
+    {
+     "id": "c7",
+     "source": "s-reflow",
+     "target": "b4"
+    },
+    {
+     "id": "c8",
+     "source": "b4",
+     "target": "s-aoi"
+    },
+    {
+     "id": "c9",
+     "source": "s-aoi",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p1",
+     "name": "PCB Board",
+     "routing": [
+      "s-print",
+      "s-pnp1",
+      "s-pnp2",
+      "s-reflow",
+      "s-aoi"
+     ],
+     "arrivalRate": 20
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Bare PCB Loader",
+      "arrivalRate": 20,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 50,
+      "y": 250
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Good Boards"
+     },
+     "position": {
+      "x": 1150,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "cnc-setup-heavy",
+  "name": "CNC Machine Shop",
+  "template": {
+   "stations": [
+    {
+     "id": "s-cnc1",
+     "name": "CNC Lathe",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 90,
+       "std": 10
+      }
+     },
+     "setupTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 120
+      }
+     },
+     "mtbf": 6,
+     "mttr": 0.5,
+     "position": {
+      "x": 300,
+      "y": 100
+     }
+    },
+    {
+     "id": "s-cnc2",
+     "name": "CNC Mill",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 120,
+       "std": 15
+      }
+     },
+     "setupTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 180
+      }
+     },
+     "mtbf": 6,
+     "mttr": 0.5,
+     "position": {
+      "x": 300,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-cnc3",
+     "name": "CNC Grinder",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 75,
+       "std": 8
+      }
+     },
+     "setupTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 90
+      }
+     },
+     "position": {
+      "x": 300,
+      "y": 400
+     }
+    },
+    {
+     "id": "s-deburr",
+     "name": "Deburr & Wash",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 45
+      }
+     },
+     "position": {
+      "x": 600,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-cmm",
+     "name": "CMM Inspection",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 60,
+       "std": 10
+      }
+     },
+     "scrapRate": 0.04,
+     "position": {
+      "x": 800,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b-in",
+     "name": "Raw Stock",
+     "capacity": 50,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 100,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-post-cnc",
+     "name": "Post-CNC",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 450,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-post-deburr",
+     "name": "Post-Deburr",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 700,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "b-in"
+    },
+    {
+     "id": "c1",
+     "source": "b-in",
+     "target": "s-cnc1"
+    },
+    {
+     "id": "c2",
+     "source": "b-in",
+     "target": "s-cnc2"
+    },
+    {
+     "id": "c3",
+     "source": "b-in",
+     "target": "s-cnc3"
+    },
+    {
+     "id": "c4",
+     "source": "s-cnc1",
+     "target": "b-post-cnc"
+    },
+    {
+     "id": "c5",
+     "source": "s-cnc2",
+     "target": "b-post-cnc"
+    },
+    {
+     "id": "c6",
+     "source": "s-cnc3",
+     "target": "b-post-cnc"
+    },
+    {
+     "id": "c7",
+     "source": "b-post-cnc",
+     "target": "s-deburr"
+    },
+    {
+     "id": "c8",
+     "source": "s-deburr",
+     "target": "b-post-deburr"
+    },
+    {
+     "id": "c9",
+     "source": "b-post-deburr",
+     "target": "s-cmm"
+    },
+    {
+     "id": "c10",
+     "source": "s-cmm",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p-shaft",
+     "name": "Shaft",
+     "routing": [
+      "s-cnc1",
+      "s-deburr",
+      "s-cmm"
+     ],
+     "arrivalRate": 150
+    },
+    {
+     "id": "p-housing",
+     "name": "Housing",
+     "routing": [
+      "s-cnc2",
+      "s-deburr",
+      "s-cmm"
+     ],
+     "arrivalRate": 200
+    },
+    {
+     "id": "p-gear",
+     "name": "Gear",
+     "routing": [
+      "s-cnc3",
+      "s-deburr",
+      "s-cmm"
+     ],
+     "arrivalRate": 120
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Raw Material",
+      "arrivalRate": 120,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 30,
+      "y": 250
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Finished Parts"
+     },
+     "position": {
+      "x": 1000,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "pharma-packaging",
+  "name": "Pharma Packaging Line",
+  "template": {
+   "stations": [
+    {
+     "id": "s-fill",
+     "name": "Bottle Filler",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 8,
+       "std": 1
+      }
+     },
+     "scrapRate": 0.005,
+     "position": {
+      "x": 200,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-cap",
+     "name": "Capping Machine",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 6,
+       "std": 0.5
+      }
+     },
+     "mtbf": 2,
+     "mttr": 0.15,
+     "position": {
+      "x": 400,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-label",
+     "name": "Labeler",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 5,
+       "std": 0.5
+      }
+     },
+     "scrapRate": 0.01,
+     "position": {
+      "x": 600,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-vision",
+     "name": "Vision Inspection",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 3
+      }
+     },
+     "scrapRate": 0.02,
+     "position": {
+      "x": 800,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-carton",
+     "name": "Cartoner",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 10,
+       "std": 1
+      }
+     },
+     "mtbf": 3,
+     "mttr": 0.2,
+     "position": {
+      "x": 1000,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-case",
+     "name": "Case Packer",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 15
+      }
+     },
+     "position": {
+      "x": 1200,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b1",
+     "name": "Post-Fill",
+     "capacity": 30,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 300,
+      "y": 250
+     }
+    },
+    {
+     "id": "b2",
+     "name": "Post-Cap",
+     "capacity": 30,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 500,
+      "y": 250
+     }
+    },
+    {
+     "id": "b3",
+     "name": "Post-Label",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 700,
+      "y": 250
+     }
+    },
+    {
+     "id": "b4",
+     "name": "Post-Inspect",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 900,
+      "y": 250
+     }
+    },
+    {
+     "id": "b5",
+     "name": "Post-Carton",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 1100,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "s-fill"
+    },
+    {
+     "id": "c1",
+     "source": "s-fill",
+     "target": "b1"
+    },
+    {
+     "id": "c2",
+     "source": "b1",
+     "target": "s-cap"
+    },
+    {
+     "id": "c3",
+     "source": "s-cap",
+     "target": "b2"
+    },
+    {
+     "id": "c4",
+     "source": "b2",
+     "target": "s-label"
+    },
+    {
+     "id": "c5",
+     "source": "s-label",
+     "target": "b3"
+    },
+    {
+     "id": "c6",
+     "source": "b3",
+     "target": "s-vision"
+    },
+    {
+     "id": "c7",
+     "source": "s-vision",
+     "target": "b4"
+    },
+    {
+     "id": "c8",
+     "source": "b4",
+     "target": "s-carton"
+    },
+    {
+     "id": "c9",
+     "source": "s-carton",
+     "target": "b5"
+    },
+    {
+     "id": "c10",
+     "source": "b5",
+     "target": "s-case"
+    },
+    {
+     "id": "c11",
+     "source": "s-case",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p1",
+     "name": "Pill Bottle",
+     "routing": [
+      "s-fill",
+      "s-cap",
+      "s-label",
+      "s-vision",
+      "s-carton",
+      "s-case"
+     ],
+     "arrivalRate": 10
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Empty Bottles",
+      "arrivalRate": 10,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 50,
+      "y": 250
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Warehouse"
+     },
+     "position": {
+      "x": 1350,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "food-bottling",
+  "name": "Beverage Bottling",
+  "template": {
+   "stations": [
+    {
+     "id": "s-rinse",
+     "name": "Rinser",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 4
+      }
+     },
+     "position": {
+      "x": 200,
+      "y": 200
+     }
+    },
+    {
+     "id": "s-fill",
+     "name": "Filler",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 5,
+       "std": 0.5
+      }
+     },
+     "scrapRate": 0.008,
+     "position": {
+      "x": 400,
+      "y": 200
+     }
+    },
+    {
+     "id": "s-cap",
+     "name": "Capper",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 3
+      }
+     },
+     "mtbf": 1.5,
+     "mttr": 0.1,
+     "position": {
+      "x": 600,
+      "y": 200
+     }
+    },
+    {
+     "id": "s-past",
+     "name": "Pasteurizer",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 120
+      }
+     },
+     "position": {
+      "x": 800,
+      "y": 200
+     }
+    },
+    {
+     "id": "s-label",
+     "name": "Labeler",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 4,
+       "std": 0.3
+      }
+     },
+     "setupTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 300
+      }
+     },
+     "scrapRate": 0.01,
+     "position": {
+      "x": 1000,
+      "y": 200
+     }
+    },
+    {
+     "id": "s-pack",
+     "name": "Case Packer",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 12
+      }
+     },
+     "position": {
+      "x": 1200,
+      "y": 200
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b1",
+     "name": "Rinse-Fill",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 300,
+      "y": 200
+     }
+    },
+    {
+     "id": "b2",
+     "name": "Fill-Cap",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 500,
+      "y": 200
+     }
+    },
+    {
+     "id": "b3",
+     "name": "Cap-Past",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 700,
+      "y": 200
+     }
+    },
+    {
+     "id": "b4",
+     "name": "Past-Label",
+     "capacity": 50,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 900,
+      "y": 200
+     }
+    },
+    {
+     "id": "b5",
+     "name": "Label-Pack",
+     "capacity": 24,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 1100,
+      "y": 200
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "s-rinse"
+    },
+    {
+     "id": "c1",
+     "source": "s-rinse",
+     "target": "b1"
+    },
+    {
+     "id": "c2",
+     "source": "b1",
+     "target": "s-fill"
+    },
+    {
+     "id": "c3",
+     "source": "s-fill",
+     "target": "b2"
+    },
+    {
+     "id": "c4",
+     "source": "b2",
+     "target": "s-cap"
+    },
+    {
+     "id": "c5",
+     "source": "s-cap",
+     "target": "b3"
+    },
+    {
+     "id": "c6",
+     "source": "b3",
+     "target": "s-past"
+    },
+    {
+     "id": "c7",
+     "source": "s-past",
+     "target": "b4"
+    },
+    {
+     "id": "c8",
+     "source": "b4",
+     "target": "s-label"
+    },
+    {
+     "id": "c9",
+     "source": "s-label",
+     "target": "b5"
+    },
+    {
+     "id": "c10",
+     "source": "b5",
+     "target": "s-pack"
+    },
+    {
+     "id": "c11",
+     "source": "s-pack",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p-juice",
+     "name": "Orange Juice",
+     "routing": [
+      "s-rinse",
+      "s-fill",
+      "s-cap",
+      "s-past",
+      "s-label",
+      "s-pack"
+     ],
+     "arrivalRate": 5
+    },
+    {
+     "id": "p-water",
+     "name": "Sparkling Water",
+     "routing": [
+      "s-rinse",
+      "s-fill",
+      "s-cap",
+      "s-past",
+      "s-label",
+      "s-pack"
+     ],
+     "arrivalRate": 4
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Empty Bottles",
+      "arrivalRate": 4,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 50,
+      "y": 200
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Palletizing"
+     },
+     "position": {
+      "x": 1350,
+      "y": 200
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "unreliable-bottleneck",
+  "name": "Reliability Stress Test",
+  "template": {
+   "stations": [
+    {
+     "id": "s-fast1",
+     "name": "Fast Station A",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 20
+      }
+     },
+     "position": {
+      "x": 200,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-bottleneck",
+     "name": "Unreliable Bottleneck",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 90,
+       "std": 15
+      }
+     },
+     "mtbf": 1,
+     "mttr": 0.25,
+     "scrapRate": 0.08,
+     "position": {
+      "x": 500,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-fast2",
+     "name": "Fast Station B",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 25
+      }
+     },
+     "position": {
+      "x": 800,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b1",
+     "name": "Pre-Bottleneck",
+     "capacity": 4,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 350,
+      "y": 250
+     }
+    },
+    {
+     "id": "b2",
+     "name": "Post-Bottleneck",
+     "capacity": 4,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 650,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "s-fast1"
+    },
+    {
+     "id": "c1",
+     "source": "s-fast1",
+     "target": "b1"
+    },
+    {
+     "id": "c2",
+     "source": "b1",
+     "target": "s-bottleneck"
+    },
+    {
+     "id": "c3",
+     "source": "s-bottleneck",
+     "target": "b2"
+    },
+    {
+     "id": "c4",
+     "source": "b2",
+     "target": "s-fast2"
+    },
+    {
+     "id": "c5",
+     "source": "s-fast2",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p1",
+     "name": "Part",
+     "routing": [
+      "s-fast1",
+      "s-bottleneck",
+      "s-fast2"
+     ],
+     "arrivalRate": 30
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Source",
+      "arrivalRate": 30,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 50,
+      "y": 250
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Sink"
+     },
+     "position": {
+      "x": 1000,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "parallel-redundant",
+  "name": "Parallel Redundant Lines",
+  "template": {
+   "stations": [
+    {
+     "id": "s-a1",
+     "name": "Line A - Machine",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 60,
+       "std": 5
+      }
+     },
+     "position": {
+      "x": 400,
+      "y": 100
+     }
+    },
+    {
+     "id": "s-a2",
+     "name": "Line A - Finish",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 45,
+       "std": 4
+      }
+     },
+     "position": {
+      "x": 650,
+      "y": 100
+     }
+    },
+    {
+     "id": "s-b1",
+     "name": "Line B - Machine",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 60,
+       "std": 5
+      }
+     },
+     "position": {
+      "x": 400,
+      "y": 400
+     }
+    },
+    {
+     "id": "s-b2",
+     "name": "Line B - Finish",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 45,
+       "std": 4
+      }
+     },
+     "position": {
+      "x": 650,
+      "y": 400
+     }
+    },
+    {
+     "id": "s-qc",
+     "name": "Final QC",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 20
+      }
+     },
+     "scrapRate": 0.02,
+     "position": {
+      "x": 950,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b-in",
+     "name": "Incoming",
+     "capacity": 30,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 150,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-a",
+     "name": "Line A WIP",
+     "capacity": 8,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 525,
+      "y": 100
+     }
+    },
+    {
+     "id": "b-b",
+     "name": "Line B WIP",
+     "capacity": 8,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 525,
+      "y": 400
+     }
+    },
+    {
+     "id": "b-merge",
+     "name": "Pre-QC Merge",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 800,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "b-in"
+    },
+    {
+     "id": "c1",
+     "source": "b-in",
+     "target": "split-1"
+    },
+    {
+     "id": "c2",
+     "source": "split-1",
+     "target": "s-a1"
+    },
+    {
+     "id": "c3",
+     "source": "split-1",
+     "target": "s-b1"
+    },
+    {
+     "id": "c4",
+     "source": "s-a1",
+     "target": "b-a"
+    },
+    {
+     "id": "c5",
+     "source": "b-a",
+     "target": "s-a2"
+    },
+    {
+     "id": "c6",
+     "source": "s-b1",
+     "target": "b-b"
+    },
+    {
+     "id": "c7",
+     "source": "b-b",
+     "target": "s-b2"
+    },
+    {
+     "id": "c8",
+     "source": "s-a2",
+     "target": "merge-1"
+    },
+    {
+     "id": "c9",
+     "source": "s-b2",
+     "target": "merge-1"
+    },
+    {
+     "id": "c10",
+     "source": "merge-1",
+     "target": "b-merge"
+    },
+    {
+     "id": "c11",
+     "source": "b-merge",
+     "target": "s-qc"
+    },
+    {
+     "id": "c12",
+     "source": "s-qc",
+     "target": "sink-1"
+    },
+    {
+     "id": "cs1",
+     "source": "b-in",
+     "target": "s-a1"
+    },
+    {
+     "id": "cs2",
+     "source": "b-in",
+     "target": "s-b1"
+    },
+    {
+     "id": "cs3",
+     "source": "s-a2",
+     "target": "b-merge"
+    },
+    {
+     "id": "cs4",
+     "source": "s-b2",
+     "target": "b-merge"
+    }
+   ],
+   "products": [
+    {
+     "id": "p-a",
+     "name": "Product (Line A)",
+     "routing": [
+      "s-a1",
+      "s-a2",
+      "s-qc"
+     ],
+     "arrivalRate": 70
+    },
+    {
+     "id": "p-b",
+     "name": "Product (Line B)",
+     "routing": [
+      "s-b1",
+      "s-b2",
+      "s-qc"
+     ],
+     "arrivalRate": 70
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Source",
+      "arrivalRate": 35,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 30,
+      "y": 250
+     }
+    },
+    {
+     "id": "split-1",
+     "type": "splitter",
+     "data": {
+      "id": "split-1",
+      "name": "Line Splitter",
+      "outputs": 2,
+      "splitType": "equal"
+     },
+     "position": {
+      "x": 250,
+      "y": 250
+     }
+    },
+    {
+     "id": "merge-1",
+     "type": "merge",
+     "data": {
+      "id": "merge-1",
+      "name": "Line Merge",
+      "inputs": 2,
+      "mergeType": "fifo"
+     },
+     "position": {
+      "x": 750,
+      "y": 250
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Finished Goods"
+     },
+     "position": {
+      "x": 1100,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "operator-staffed-line",
+  "name": "Operator-Staffed Line",
+  "template": {
+   "stations": [
+    {
+     "id": "s-load",
+     "name": "Loading",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 20
+      }
+     },
+     "position": {
+      "x": 200,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-machine",
+     "name": "CNC Machine",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 60,
+       "std": 8
+      }
+     },
+     "mtbf": 4,
+     "mttr": 0.3,
+     "position": {
+      "x": 500,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-inspect",
+     "name": "Manual Inspect",
+     "cycleTime": {
+      "type": "lognormal",
+      "parameters": {
+       "mean": 2.5,
+       "std": 0.4
+      }
+     },
+     "scrapRate": 0.03,
+     "position": {
+      "x": 800,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b-in",
+     "name": "Input Queue",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 100,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-mid",
+     "name": "WIP Buffer",
+     "capacity": 8,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 350,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-out",
+     "name": "Inspect Queue",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 650,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "b-in"
+    },
+    {
+     "id": "c1",
+     "source": "b-in",
+     "target": "s-load"
+    },
+    {
+     "id": "c2",
+     "source": "s-load",
+     "target": "b-mid"
+    },
+    {
+     "id": "c3",
+     "source": "b-mid",
+     "target": "s-machine"
+    },
+    {
+     "id": "c4",
+     "source": "s-machine",
+     "target": "b-out"
+    },
+    {
+     "id": "c5",
+     "source": "b-out",
+     "target": "s-inspect"
+    },
+    {
+     "id": "c6",
+     "source": "s-inspect",
+     "target": "sink-1"
+    },
+    {
+     "id": "c-op1-load",
+     "source": "op-loader",
+     "target": "s-load"
+    },
+    {
+     "id": "c-op1-insp",
+     "source": "op-loader",
+     "target": "s-inspect"
+    },
+    {
+     "id": "c-op2-machine",
+     "source": "op-machinist",
+     "target": "s-machine"
+    }
+   ],
+   "products": [
+    {
+     "id": "p1",
+     "name": "Precision Part",
+     "routing": [
+      "s-load",
+      "s-machine",
+      "s-inspect"
+     ],
+     "arrivalRate": 45
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Raw Material",
+      "arrivalRate": 45,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 30,
+      "y": 250
+     }
+    },
+    {
+     "id": "op-loader",
+     "type": "operator",
+     "data": {
+      "id": "op-loader",
+      "name": "Loader/Inspector",
+      "count": 2,
+      "efficiency": 85
+     },
+     "position": {
+      "x": 500,
+      "y": 100
+     }
+    },
+    {
+     "id": "op-machinist",
+     "type": "operator",
+     "data": {
+      "id": "op-machinist",
+      "name": "CNC Operator",
+      "count": 1,
+      "efficiency": 95
+     },
+     "position": {
+      "x": 500,
+      "y": 400
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Finished Goods"
+     },
+     "position": {
+      "x": 1000,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "priority-queue-line",
+  "name": "Priority Queue Line",
+  "template": {
+   "stations": [
+    {
+     "id": "s-prep",
+     "name": "Preparation",
+     "cycleTime": {
+      "type": "uniform",
+      "parameters": {
+       "min": 20,
+       "max": 40
+      }
+     },
+     "productCycleTimes": {
+      "p-express": {
+       "type": "constant",
+       "parameters": {
+        "value": 15
+       }
+      },
+      "p-standard": {
+       "type": "normal",
+       "parameters": {
+        "mean": 35,
+        "std": 5
+       }
+      }
+     },
+     "position": {
+      "x": 300,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-process",
+     "name": "Processing",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 50,
+       "std": 10
+      }
+     },
+     "productCycleTimes": {
+      "p-express": {
+       "type": "constant",
+       "parameters": {
+        "value": 30
+       }
+      },
+      "p-bulk": {
+       "type": "constant",
+       "parameters": {
+        "value": 70
+       }
+      }
+     },
+     "position": {
+      "x": 600,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-finish",
+     "name": "Finishing",
+     "cycleTime": {
+      "type": "triangular",
+      "parameters": {
+       "min": 15,
+       "mode": 25,
+       "max": 40
+      }
+     },
+     "scrapRate": 0.01,
+     "position": {
+      "x": 900,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b-prio1",
+     "name": "Priority Input",
+     "capacity": 30,
+     "queueRule": "PRIORITY",
+     "position": {
+      "x": 150,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-prio2",
+     "name": "Priority WIP",
+     "capacity": 15,
+     "queueRule": "PRIORITY",
+     "position": {
+      "x": 450,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-prio3",
+     "name": "Priority Finish",
+     "capacity": 15,
+     "queueRule": "PRIORITY",
+     "position": {
+      "x": 750,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "b-prio1"
+    },
+    {
+     "id": "c1",
+     "source": "b-prio1",
+     "target": "s-prep"
+    },
+    {
+     "id": "c2",
+     "source": "s-prep",
+     "target": "b-prio2"
+    },
+    {
+     "id": "c3",
+     "source": "b-prio2",
+     "target": "s-process"
+    },
+    {
+     "id": "c4",
+     "source": "s-process",
+     "target": "b-prio3"
+    },
+    {
+     "id": "c5",
+     "source": "b-prio3",
+     "target": "s-finish"
+    },
+    {
+     "id": "c6",
+     "source": "s-finish",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p-express",
+     "name": "Express Order",
+     "routing": [
+      "s-prep",
+      "s-process",
+      "s-finish"
+     ],
+     "arrivalRate": 120,
+     "priority": 10
+    },
+    {
+     "id": "p-standard",
+     "name": "Standard Order",
+     "routing": [
+      "s-prep",
+      "s-process",
+      "s-finish"
+     ],
+     "arrivalRate": 60,
+     "priority": 5
+    },
+    {
+     "id": "p-bulk",
+     "name": "Bulk Order",
+     "routing": [
+      "s-prep",
+      "s-process",
+      "s-finish"
+     ],
+     "arrivalRate": 90,
+     "priority": 1
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Order Intake",
+      "arrivalRate": 45,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 30,
+      "y": 250
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Dispatch"
+     },
+     "position": {
+      "x": 1100,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "lifo-warehouse-line",
+  "name": "LIFO Stack Buffer",
+  "template": {
+   "stations": [
+    {
+     "id": "s-receive",
+     "name": "Receiving",
+     "cycleTime": {
+      "type": "weibull",
+      "parameters": {
+       "shape": 2,
+       "scale": 30
+      }
+     },
+     "position": {
+      "x": 200,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-store",
+     "name": "Storage Handler",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 15
+      }
+     },
+     "position": {
+      "x": 500,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-ship",
+     "name": "Shipping",
+     "cycleTime": {
+      "type": "uniform",
+      "parameters": {
+       "min": 10,
+       "max": 25
+      }
+     },
+     "position": {
+      "x": 800,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b-dock",
+     "name": "Dock Queue",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 100,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-stack",
+     "name": "Pallet Stack (LIFO)",
+     "capacity": 40,
+     "queueRule": "LIFO",
+     "position": {
+      "x": 350,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-ship",
+     "name": "Ship Queue",
+     "capacity": 12,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 650,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "b-dock"
+    },
+    {
+     "id": "c1",
+     "source": "b-dock",
+     "target": "s-receive"
+    },
+    {
+     "id": "c2",
+     "source": "s-receive",
+     "target": "b-stack"
+    },
+    {
+     "id": "c3",
+     "source": "b-stack",
+     "target": "s-store"
+    },
+    {
+     "id": "c4",
+     "source": "s-store",
+     "target": "b-ship"
+    },
+    {
+     "id": "c5",
+     "source": "b-ship",
+     "target": "s-ship"
+    },
+    {
+     "id": "c6",
+     "source": "s-ship",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p1",
+     "name": "Pallet",
+     "routing": [
+      "s-receive",
+      "s-store",
+      "s-ship"
+     ],
+     "arrivalRate": 40
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Truck Dock",
+      "arrivalRate": 40,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 30,
+      "y": 250
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Outbound Dock"
+     },
+     "position": {
+      "x": 1000,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "order-driven-production",
+  "name": "Order-Driven Production",
+  "template": {
+   "stations": [
+    {
+     "id": "s-cut",
+     "name": "Laser Cutter",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 45,
+       "std": 5
+      }
+     },
+     "setupTime": {
+      "type": "triangular",
+      "parameters": {
+       "min": 30,
+       "mode": 60,
+       "max": 120
+      }
+     },
+     "position": {
+      "x": 300,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-bend",
+     "name": "Press Brake",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 55,
+       "std": 8
+      }
+     },
+     "setupTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 45
+      }
+     },
+     "position": {
+      "x": 600,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-weld",
+     "name": "Weld Cell",
+     "cycleTime": {
+      "type": "lognormal",
+      "parameters": {
+       "mean": 3.5,
+       "std": 0.5
+      }
+     },
+     "scrapRate": 0.02,
+     "position": {
+      "x": 900,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b-in",
+     "name": "Order Queue",
+     "capacity": 25,
+     "queueRule": "PRIORITY",
+     "position": {
+      "x": 150,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-mid1",
+     "name": "Cut-Bend Buffer",
+     "capacity": 10,
+     "queueRule": "PRIORITY",
+     "position": {
+      "x": 450,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-mid2",
+     "name": "Bend-Weld Buffer",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 750,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-orders",
+     "target": "b-in"
+    },
+    {
+     "id": "c1",
+     "source": "b-in",
+     "target": "s-cut"
+    },
+    {
+     "id": "c2",
+     "source": "s-cut",
+     "target": "b-mid1"
+    },
+    {
+     "id": "c3",
+     "source": "b-mid1",
+     "target": "s-bend"
+    },
+    {
+     "id": "c4",
+     "source": "s-bend",
+     "target": "b-mid2"
+    },
+    {
+     "id": "c5",
+     "source": "b-mid2",
+     "target": "s-weld"
+    },
+    {
+     "id": "c6",
+     "source": "s-weld",
+     "target": "sink-1"
+    },
+    {
+     "id": "c-op",
+     "source": "op-tech",
+     "target": "s-weld"
+    }
+   ],
+   "products": [
+    {
+     "id": "p-rush",
+     "name": "Rush Frame",
+     "routing": [
+      "s-cut",
+      "s-bend",
+      "s-weld"
+     ],
+     "arrivalRate": 120,
+     "priority": 10,
+     "dueDate": 300
+    },
+    {
+     "id": "p-normal",
+     "name": "Standard Frame",
+     "routing": [
+      "s-cut",
+      "s-bend",
+      "s-weld"
+     ],
+     "arrivalRate": 80,
+     "priority": 3,
+     "dueDate": 900
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-orders",
+     "type": "source",
+     "data": {
+      "id": "src-orders",
+      "name": "Order Queue",
+      "arrivalRate": 60,
+      "feedMode": "orders"
+     },
+     "position": {
+      "x": 30,
+      "y": 250
+     }
+    },
+    {
+     "id": "op-tech",
+     "type": "operator",
+     "data": {
+      "id": "op-tech",
+      "name": "Weld Technician",
+      "count": 1,
+      "efficiency": 90
+     },
+     "position": {
+      "x": 900,
+      "y": 400
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Shipping"
+     },
+     "position": {
+      "x": 1100,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "filtered-sources",
+  "name": "Multi-Source Product Filter",
+  "template": {
+   "stations": [
+    {
+     "id": "s-prep",
+     "name": "Preparation",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 25
+      }
+     },
+     "productCycleTimes": {
+      "p-steel": {
+       "type": "constant",
+       "parameters": {
+        "value": 35
+       }
+      },
+      "p-alum": {
+       "type": "constant",
+       "parameters": {
+        "value": 20
+       }
+      },
+      "p-copper": {
+       "type": "constant",
+       "parameters": {
+        "value": 30
+       }
+      }
+     },
+     "position": {
+      "x": 400,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-coat",
+     "name": "Coating",
+     "cycleTime": {
+      "type": "exponential",
+      "parameters": {
+       "mean": 40
+      }
+     },
+     "position": {
+      "x": 700,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b-in",
+     "name": "Shared Input",
+     "capacity": 30,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 250,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-mid",
+     "name": "Coating Queue",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 550,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c-src1",
+     "source": "src-steel",
+     "target": "b-in"
+    },
+    {
+     "id": "c-src2",
+     "source": "src-alum",
+     "target": "b-in"
+    },
+    {
+     "id": "c-src3",
+     "source": "src-copper",
+     "target": "b-in"
+    },
+    {
+     "id": "c1",
+     "source": "b-in",
+     "target": "s-prep"
+    },
+    {
+     "id": "c2",
+     "source": "s-prep",
+     "target": "b-mid"
+    },
+    {
+     "id": "c3",
+     "source": "b-mid",
+     "target": "s-coat"
+    },
+    {
+     "id": "c4",
+     "source": "s-coat",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p-steel",
+     "name": "Steel Part",
+     "routing": [
+      "s-prep",
+      "s-coat"
+     ],
+     "arrivalRate": 50
+    },
+    {
+     "id": "p-alum",
+     "name": "Aluminum Part",
+     "routing": [
+      "s-prep",
+      "s-coat"
+     ],
+     "arrivalRate": 35
+    },
+    {
+     "id": "p-copper",
+     "name": "Copper Part",
+     "routing": [
+      "s-prep",
+      "s-coat"
+     ],
+     "arrivalRate": 70
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-steel",
+     "type": "source",
+     "data": {
+      "id": "src-steel",
+      "name": "Steel Supply",
+      "arrivalRate": 50,
+      "feedMode": "interval",
+      "productFilter": "p-steel"
+     },
+     "position": {
+      "x": 50,
+      "y": 100
+     }
+    },
+    {
+     "id": "src-alum",
+     "type": "source",
+     "data": {
+      "id": "src-alum",
+      "name": "Aluminum Supply",
+      "arrivalRate": 35,
+      "feedMode": "interval",
+      "productFilter": "p-alum"
+     },
+     "position": {
+      "x": 50,
+      "y": 250
+     }
+    },
+    {
+     "id": "src-copper",
+     "type": "source",
+     "data": {
+      "id": "src-copper",
+      "name": "Copper Supply",
+      "arrivalRate": 70,
+      "feedMode": "interval",
+      "productFilter": "p-copper"
+     },
+     "position": {
+      "x": 50,
+      "y": 400
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Warehouse"
+     },
+     "position": {
+      "x": 900,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "distribution-showcase",
+  "name": "Distribution Showcase",
+  "template": {
+   "stations": [
+    {
+     "id": "s-const",
+     "name": "Constant (30s)",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 30
+      }
+     },
+     "position": {
+      "x": 200,
+      "y": 100
+     }
+    },
+    {
+     "id": "s-normal",
+     "name": "Normal (40s ±5)",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 40,
+       "std": 5
+      }
+     },
+     "position": {
+      "x": 400,
+      "y": 100
+     }
+    },
+    {
+     "id": "s-expo",
+     "name": "Exponential (35s)",
+     "cycleTime": {
+      "type": "exponential",
+      "parameters": {
+       "mean": 35
+      }
+     },
+     "position": {
+      "x": 600,
+      "y": 100
+     }
+    },
+    {
+     "id": "s-tri",
+     "name": "Triangular (20-30-50)",
+     "cycleTime": {
+      "type": "triangular",
+      "parameters": {
+       "min": 20,
+       "mode": 30,
+       "max": 50
+      }
+     },
+     "position": {
+      "x": 200,
+      "y": 400
+     }
+    },
+    {
+     "id": "s-uni",
+     "name": "Uniform (25-45)",
+     "cycleTime": {
+      "type": "uniform",
+      "parameters": {
+       "min": 25,
+       "max": 45
+      }
+     },
+     "position": {
+      "x": 400,
+      "y": 400
+     }
+    },
+    {
+     "id": "s-weib",
+     "name": "Weibull (shape=2)",
+     "cycleTime": {
+      "type": "weibull",
+      "parameters": {
+       "shape": 2,
+       "scale": 35
+      }
+     },
+     "position": {
+      "x": 600,
+      "y": 400
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b1",
+     "name": "Buffer 1-2",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 300,
+      "y": 100
+     }
+    },
+    {
+     "id": "b2",
+     "name": "Buffer 2-3",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 500,
+      "y": 100
+     }
+    },
+    {
+     "id": "b-cross",
+     "name": "Cross Buffer",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 400,
+      "y": 250
+     }
+    },
+    {
+     "id": "b4",
+     "name": "Buffer 4-5",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 300,
+      "y": 400
+     }
+    },
+    {
+     "id": "b5",
+     "name": "Buffer 5-6",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 500,
+      "y": 400
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "s-const"
+    },
+    {
+     "id": "c1",
+     "source": "s-const",
+     "target": "b1"
+    },
+    {
+     "id": "c2",
+     "source": "b1",
+     "target": "s-normal"
+    },
+    {
+     "id": "c3",
+     "source": "s-normal",
+     "target": "b2"
+    },
+    {
+     "id": "c4",
+     "source": "b2",
+     "target": "s-expo"
+    },
+    {
+     "id": "c5",
+     "source": "s-expo",
+     "target": "b-cross"
+    },
+    {
+     "id": "c6",
+     "source": "b-cross",
+     "target": "s-tri"
+    },
+    {
+     "id": "c7",
+     "source": "s-tri",
+     "target": "b4"
+    },
+    {
+     "id": "c8",
+     "source": "b4",
+     "target": "s-uni"
+    },
+    {
+     "id": "c9",
+     "source": "s-uni",
+     "target": "b5"
+    },
+    {
+     "id": "c10",
+     "source": "b5",
+     "target": "s-weib"
+    },
+    {
+     "id": "c11",
+     "source": "s-weib",
+     "target": "sink-1"
+    }
+   ],
+   "products": [
+    {
+     "id": "p1",
+     "name": "Test Part",
+     "routing": [
+      "s-const",
+      "s-normal",
+      "s-expo",
+      "s-tri",
+      "s-uni",
+      "s-weib"
+     ],
+     "arrivalRate": 35
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Source",
+      "arrivalRate": 35,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 30,
+      "y": 100
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Sink"
+     },
+     "position": {
+      "x": 800,
+      "y": 400
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "percentage-splitter-line",
+  "name": "Percentage Splitter",
+  "template": {
+   "stations": [
+    {
+     "id": "s-intake",
+     "name": "Intake",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 15
+      }
+     },
+     "position": {
+      "x": 200,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-line-a",
+     "name": "Line A",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 50,
+       "std": 5
+      }
+     },
+     "position": {
+      "x": 500,
+      "y": 80
+     }
+    },
+    {
+     "id": "s-line-b",
+     "name": "Line B",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 55,
+       "std": 6
+      }
+     },
+     "scrapRate": 0.03,
+     "position": {
+      "x": 500,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-line-c",
+     "name": "Line C",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 45,
+       "std": 4
+      }
+     },
+     "mtbf": 3,
+     "mttr": 0.2,
+     "position": {
+      "x": 500,
+      "y": 420
+     }
+    },
+    {
+     "id": "s-pack",
+     "name": "Packing",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 20
+      }
+     },
+     "position": {
+      "x": 850,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b-in",
+     "name": "Intake Queue",
+     "capacity": 30,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 100,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-a",
+     "name": "Line A Queue",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 350,
+      "y": 80
+     }
+    },
+    {
+     "id": "b-b",
+     "name": "Line B Queue",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 350,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-c",
+     "name": "Line C Queue",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 350,
+      "y": 420
+     }
+    },
+    {
+     "id": "b-pack",
+     "name": "Pack Queue",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 700,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "b-in"
+    },
+    {
+     "id": "c1",
+     "source": "b-in",
+     "target": "s-intake"
+    },
+    {
+     "id": "c2",
+     "source": "s-intake",
+     "target": "split-pct"
+    },
+    {
+     "id": "c3a",
+     "source": "split-pct",
+     "target": "b-a"
+    },
+    {
+     "id": "c3b",
+     "source": "split-pct",
+     "target": "b-b"
+    },
+    {
+     "id": "c3c",
+     "source": "split-pct",
+     "target": "b-c"
+    },
+    {
+     "id": "c4a",
+     "source": "b-a",
+     "target": "s-line-a"
+    },
+    {
+     "id": "c4b",
+     "source": "b-b",
+     "target": "s-line-b"
+    },
+    {
+     "id": "c4c",
+     "source": "b-c",
+     "target": "s-line-c"
+    },
+    {
+     "id": "c5a",
+     "source": "s-line-a",
+     "target": "merge-1"
+    },
+    {
+     "id": "c5b",
+     "source": "s-line-b",
+     "target": "merge-1"
+    },
+    {
+     "id": "c5c",
+     "source": "s-line-c",
+     "target": "merge-1"
+    },
+    {
+     "id": "c6",
+     "source": "merge-1",
+     "target": "b-pack"
+    },
+    {
+     "id": "c7",
+     "source": "b-pack",
+     "target": "s-pack"
+    },
+    {
+     "id": "c8",
+     "source": "s-pack",
+     "target": "sink-1"
+    },
+    {
+     "id": "cs1a",
+     "source": "s-intake",
+     "target": "b-a"
+    },
+    {
+     "id": "cs1b",
+     "source": "s-intake",
+     "target": "b-b"
+    },
+    {
+     "id": "cs1c",
+     "source": "s-intake",
+     "target": "b-c"
+    },
+    {
+     "id": "cs2a",
+     "source": "s-line-a",
+     "target": "b-pack"
+    },
+    {
+     "id": "cs2b",
+     "source": "s-line-b",
+     "target": "b-pack"
+    },
+    {
+     "id": "cs2c",
+     "source": "s-line-c",
+     "target": "b-pack"
+    }
+   ],
+   "products": [
+    {
+     "id": "p1",
+     "name": "Product",
+     "routing": [
+      "s-intake",
+      "s-line-a",
+      "s-pack"
+     ],
+     "arrivalRate": 25
+    },
+    {
+     "id": "p2",
+     "name": "Product B",
+     "routing": [
+      "s-intake",
+      "s-line-b",
+      "s-pack"
+     ],
+     "arrivalRate": 25
+    },
+    {
+     "id": "p3",
+     "name": "Product C",
+     "routing": [
+      "s-intake",
+      "s-line-c",
+      "s-pack"
+     ],
+     "arrivalRate": 25
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Source",
+      "arrivalRate": 20,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 30,
+      "y": 250
+     }
+    },
+    {
+     "id": "split-pct",
+     "type": "splitter",
+     "data": {
+      "id": "split-pct",
+      "name": "Random Distributor",
+      "outputs": 3,
+      "splitType": "percentage",
+      "percentages": [
+       50,
+       30,
+       20
+      ]
+     },
+     "position": {
+      "x": 350,
+      "y": 165
+     }
+    },
+    {
+     "id": "merge-1",
+     "type": "merge",
+     "data": {
+      "id": "merge-1",
+      "name": "Collector",
+      "inputs": 3,
+      "mergeType": "fifo"
+     },
+     "position": {
+      "x": 650,
+      "y": 165
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Shipping"
+     },
+     "position": {
+      "x": 1050,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "all-extra-nodes",
+  "name": "All Extra Nodes Demo",
+  "template": {
+   "stations": [
+    {
+     "id": "s-prep",
+     "name": "Preparation",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 20
+      }
+     },
+     "position": {
+      "x": 200,
+      "y": 200
+     }
+    },
+    {
+     "id": "s-sub-a",
+     "name": "Sub-Line A",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 30,
+       "std": 3
+      }
+     },
+     "position": {
+      "x": 500,
+      "y": 80
+     }
+    },
+    {
+     "id": "s-sub-b",
+     "name": "Sub-Line B",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 35,
+       "std": 4
+      }
+     },
+     "position": {
+      "x": 500,
+      "y": 380
+     }
+    },
+    {
+     "id": "s-final",
+     "name": "Final Process",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 25
+      }
+     },
+     "scrapRate": 0.01,
+     "position": {
+      "x": 1100,
+      "y": 200
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b-in",
+     "name": "Input",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 100,
+      "y": 200
+     }
+    },
+    {
+     "id": "b-a",
+     "name": "Sub A Buffer",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 350,
+      "y": 80
+     }
+    },
+    {
+     "id": "b-b",
+     "name": "Sub B Buffer",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 350,
+      "y": 380
+     }
+    },
+    {
+     "id": "b-merge",
+     "name": "Assembly Queue",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 750,
+      "y": 200
+     }
+    },
+    {
+     "id": "b-final",
+     "name": "Final Buffer",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 1000,
+      "y": 200
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "b-in"
+    },
+    {
+     "id": "c1",
+     "source": "b-in",
+     "target": "s-prep"
+    },
+    {
+     "id": "c2",
+     "source": "s-prep",
+     "target": "split-1"
+    },
+    {
+     "id": "c3a",
+     "source": "split-1",
+     "target": "b-a"
+    },
+    {
+     "id": "c3b",
+     "source": "split-1",
+     "target": "b-b"
+    },
+    {
+     "id": "c4a",
+     "source": "b-a",
+     "target": "s-sub-a"
+    },
+    {
+     "id": "c4b",
+     "source": "b-b",
+     "target": "s-sub-b"
+    },
+    {
+     "id": "c5a",
+     "source": "s-sub-a",
+     "target": "conv-a"
+    },
+    {
+     "id": "c5b",
+     "source": "s-sub-b",
+     "target": "conv-b"
+    },
+    {
+     "id": "c6a",
+     "source": "conv-a",
+     "target": "merge-1"
+    },
+    {
+     "id": "c6b",
+     "source": "conv-b",
+     "target": "merge-1"
+    },
+    {
+     "id": "c7",
+     "source": "merge-1",
+     "target": "match-1"
+    },
+    {
+     "id": "c8",
+     "source": "match-1",
+     "target": "b-merge"
+    },
+    {
+     "id": "c9",
+     "source": "b-merge",
+     "target": "insp-1"
+    },
+    {
+     "id": "c10",
+     "source": "insp-1",
+     "target": "b-final"
+    },
+    {
+     "id": "c11",
+     "source": "b-final",
+     "target": "s-final"
+    },
+    {
+     "id": "c12",
+     "source": "s-final",
+     "target": "sink-1"
+    },
+    {
+     "id": "cs1",
+     "source": "s-prep",
+     "target": "b-a"
+    },
+    {
+     "id": "cs2",
+     "source": "s-prep",
+     "target": "b-b"
+    },
+    {
+     "id": "cs3",
+     "source": "s-sub-a",
+     "target": "b-merge"
+    },
+    {
+     "id": "cs4",
+     "source": "s-sub-b",
+     "target": "b-merge"
+    }
+   ],
+   "products": [
+    {
+     "id": "p-a",
+     "name": "Part A",
+     "routing": [
+      "s-prep",
+      "s-sub-a",
+      "s-final"
+     ],
+     "arrivalRate": 50
+    },
+    {
+     "id": "p-b",
+     "name": "Part B",
+     "routing": [
+      "s-prep",
+      "s-sub-b",
+      "s-final"
+     ],
+     "arrivalRate": 50
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Material In",
+      "arrivalRate": 40,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 30,
+      "y": 200
+     }
+    },
+    {
+     "id": "split-1",
+     "type": "splitter",
+     "data": {
+      "id": "split-1",
+      "name": "Line Router",
+      "outputs": 2,
+      "splitType": "equal"
+     },
+     "position": {
+      "x": 300,
+      "y": 200
+     }
+    },
+    {
+     "id": "conv-a",
+     "type": "conveyor",
+     "data": {
+      "id": "conv-a",
+      "name": "Conveyor A",
+      "length": 8,
+      "speed": 2,
+      "capacity": 5
+     },
+     "position": {
+      "x": 650,
+      "y": 80
+     }
+    },
+    {
+     "id": "conv-b",
+     "type": "conveyor",
+     "data": {
+      "id": "conv-b",
+      "name": "Conveyor B",
+      "length": 8,
+      "speed": 2,
+      "capacity": 5
+     },
+     "position": {
+      "x": 650,
+      "y": 380
+     }
+    },
+    {
+     "id": "merge-1",
+     "type": "merge",
+     "data": {
+      "id": "merge-1",
+      "name": "Merge Point",
+      "inputs": 2,
+      "mergeType": "fifo"
+     },
+     "position": {
+      "x": 750,
+      "y": 130
+     }
+    },
+    {
+     "id": "match-1",
+     "type": "matchbuffer",
+     "data": {
+      "id": "match-1",
+      "name": "Part Sync",
+      "capacity": 10,
+      "matchKey": "batch",
+      "requiredParts": [
+       {
+        "productId": "p-a",
+        "productName": "Part A",
+        "quantity": 1
+       },
+       {
+        "productId": "p-b",
+        "productName": "Part B",
+        "quantity": 1
+       }
+      ],
+      "timeout": 300
+     },
+     "position": {
+      "x": 850,
+      "y": 200
+     }
+    },
+    {
+     "id": "insp-1",
+     "type": "inspection",
+     "data": {
+      "id": "insp-1",
+      "name": "QC Check",
+      "inspectionTime": 12,
+      "defectRate": 2.5,
+      "inspectionType": "automated"
+     },
+     "position": {
+      "x": 900,
+      "y": 130
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Finished"
+     },
+     "position": {
+      "x": 1300,
+      "y": 200
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "wip-injection",
+  "name": "WIP Injection (Mid-Line Start)",
+  "template": {
+   "stations": [
+    {
+     "id": "s-raw",
+     "name": "Raw Processing",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 40,
+       "std": 5
+      }
+     },
+     "position": {
+      "x": 200,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-machining",
+     "name": "Machining",
+     "cycleTime": {
+      "type": "weibull",
+      "parameters": {
+       "shape": 3,
+       "scale": 50
+      }
+     },
+     "position": {
+      "x": 500,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-assembly",
+     "name": "Assembly",
+     "cycleTime": {
+      "type": "triangular",
+      "parameters": {
+       "min": 30,
+       "mode": 45,
+       "max": 70
+      }
+     },
+     "position": {
+      "x": 800,
+      "y": 250
+     }
+    },
+    {
+     "id": "s-test",
+     "name": "Final Test",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 20
+      }
+     },
+     "scrapRate": 0.015,
+     "position": {
+      "x": 1100,
+      "y": 250
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b-raw",
+     "name": "Raw Queue",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 100,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-mach",
+     "name": "Machining Queue",
+     "capacity": 12,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 350,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-assy",
+     "name": "Assembly Queue",
+     "capacity": 12,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 650,
+      "y": 250
+     }
+    },
+    {
+     "id": "b-test",
+     "name": "Test Queue",
+     "capacity": 8,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 950,
+      "y": 250
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-new",
+     "target": "b-raw"
+    },
+    {
+     "id": "c1",
+     "source": "b-raw",
+     "target": "s-raw"
+    },
+    {
+     "id": "c2",
+     "source": "s-raw",
+     "target": "b-mach"
+    },
+    {
+     "id": "c3",
+     "source": "b-mach",
+     "target": "s-machining"
+    },
+    {
+     "id": "c4",
+     "source": "s-machining",
+     "target": "b-assy"
+    },
+    {
+     "id": "c5",
+     "source": "b-assy",
+     "target": "s-assembly"
+    },
+    {
+     "id": "c6",
+     "source": "s-assembly",
+     "target": "b-test"
+    },
+    {
+     "id": "c7",
+     "source": "b-test",
+     "target": "s-test"
+    },
+    {
+     "id": "c8",
+     "source": "s-test",
+     "target": "sink-1"
+    },
+    {
+     "id": "c9",
+     "source": "src-wip",
+     "target": "b-assy"
+    }
+   ],
+   "products": [
+    {
+     "id": "p-new",
+     "name": "New Order",
+     "routing": [
+      "s-raw",
+      "s-machining",
+      "s-assembly",
+      "s-test"
+     ],
+     "arrivalRate": 60
+    },
+    {
+     "id": "p-wip",
+     "name": "WIP (mid-line)",
+     "routing": [
+      "s-assembly",
+      "s-test"
+     ]
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-new",
+     "type": "source",
+     "data": {
+      "id": "src-new",
+      "name": "New Orders",
+      "arrivalRate": 60,
+      "feedMode": "interval",
+      "productFilter": "p-new"
+     },
+     "position": {
+      "x": 30,
+      "y": 200
+     }
+    },
+    {
+     "id": "src-wip",
+     "type": "source",
+     "data": {
+      "id": "src-wip",
+      "name": "WIP Entry (Mid-Line)",
+      "arrivalRate": 90,
+      "feedMode": "interval",
+      "productFilter": "p-wip"
+     },
+     "position": {
+      "x": 550,
+      "y": 400
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Ship Dock"
+     },
+     "position": {
+      "x": 1300,
+      "y": 250
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "smart-factory",
+  "name": "Smart Factory (AGV + Robotics + Humanoids)",
+  "template": {
+   "stations": [
+    {
+     "id": "s-weld",
+     "name": "Weld Station",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 45,
+       "std": 5
+      }
+     },
+     "position": {
+      "x": 400,
+      "y": 150
+     }
+    },
+    {
+     "id": "s-paint",
+     "name": "Paint Booth",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 60
+      }
+     },
+     "position": {
+      "x": 700,
+      "y": 150
+     }
+    },
+    {
+     "id": "s-pack",
+     "name": "Packing",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 20
+      }
+     },
+     "position": {
+      "x": 1100,
+      "y": 300
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "b-in",
+     "name": "Raw Material",
+     "capacity": 30,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 100,
+      "y": 300
+     }
+    },
+    {
+     "id": "b-weld",
+     "name": "Weld Queue",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 300,
+      "y": 150
+     }
+    },
+    {
+     "id": "b-paint",
+     "name": "Paint Queue",
+     "capacity": 8,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 600,
+      "y": 150
+     }
+    },
+    {
+     "id": "b-assy",
+     "name": "Assembly Queue",
+     "capacity": 12,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 700,
+      "y": 400
+     }
+    },
+    {
+     "id": "b-insp",
+     "name": "Inspection Queue",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 900,
+      "y": 300
+     }
+    },
+    {
+     "id": "b-pack",
+     "name": "Pack Queue",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 1000,
+      "y": 300
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "c0",
+     "source": "src-1",
+     "target": "b-in"
+    },
+    {
+     "id": "c1",
+     "source": "b-in",
+     "target": "agv-1"
+    },
+    {
+     "id": "c2",
+     "source": "agv-1",
+     "target": "b-weld"
+    },
+    {
+     "id": "c3",
+     "source": "b-weld",
+     "target": "rc-weld"
+    },
+    {
+     "id": "c4",
+     "source": "rc-weld",
+     "target": "b-paint"
+    },
+    {
+     "id": "c5",
+     "source": "b-paint",
+     "target": "s-paint"
+    },
+    {
+     "id": "c6",
+     "source": "s-paint",
+     "target": "agv-2"
+    },
+    {
+     "id": "c7",
+     "source": "agv-2",
+     "target": "b-assy"
+    },
+    {
+     "id": "c8",
+     "source": "b-assy",
+     "target": "rc-assy"
+    },
+    {
+     "id": "c9",
+     "source": "rc-assy",
+     "target": "b-insp"
+    },
+    {
+     "id": "c10",
+     "source": "b-insp",
+     "target": "hum-insp"
+    },
+    {
+     "id": "c11",
+     "source": "hum-insp",
+     "target": "b-pack"
+    },
+    {
+     "id": "c12",
+     "source": "b-pack",
+     "target": "s-pack"
+    },
+    {
+     "id": "c13",
+     "source": "s-pack",
+     "target": "sink-1"
+    },
+    {
+     "id": "cw1",
+     "source": "b-in",
+     "target": "s-weld"
+    },
+    {
+     "id": "cw2",
+     "source": "s-weld",
+     "target": "b-paint"
+    }
+   ],
+   "products": [
+    {
+     "id": "p-chassis",
+     "name": "Chassis",
+     "routing": [
+      "s-weld",
+      "s-paint",
+      "s-pack"
+     ],
+     "arrivalRate": 45
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-1",
+     "type": "source",
+     "data": {
+      "id": "src-1",
+      "name": "Raw Parts In",
+      "arrivalRate": 45,
+      "feedMode": "interval"
+     },
+     "position": {
+      "x": 30,
+      "y": 300
+     }
+    },
+    {
+     "id": "agv-1",
+     "type": "agv",
+     "data": {
+      "id": "agv-1",
+      "name": "Material AGV",
+      "count": 2,
+      "speed": 1.5,
+      "capacity": 1
+     },
+     "position": {
+      "x": 200,
+      "y": 300
+     }
+    },
+    {
+     "id": "rc-weld",
+     "type": "roboticcell",
+     "data": {
+      "id": "rc-weld",
+      "name": "Welding Robot",
+      "cycleTime": 45,
+      "program": "Weld-MIG-01"
+     },
+     "position": {
+      "x": 500,
+      "y": 150
+     }
+    },
+    {
+     "id": "agv-2",
+     "type": "agv",
+     "data": {
+      "id": "agv-2",
+      "name": "Transfer AGV",
+      "count": 1,
+      "speed": 2,
+      "capacity": 1
+     },
+     "position": {
+      "x": 800,
+      "y": 250
+     }
+    },
+    {
+     "id": "rc-assy",
+     "type": "roboticcell",
+     "data": {
+      "id": "rc-assy",
+      "name": "Assembly Robot",
+      "cycleTime": 35,
+      "program": "Assy-Clip-02"
+     },
+     "position": {
+      "x": 800,
+      "y": 400
+     }
+    },
+    {
+     "id": "hum-insp",
+     "type": "humanoid",
+     "data": {
+      "id": "hum-insp",
+      "name": "Inspector Bot",
+      "count": 1,
+      "efficiency": 95,
+      "skill": "Visual QC"
+     },
+     "position": {
+      "x": 950,
+      "y": 200
+     }
+    },
+    {
+     "id": "sink-1",
+     "type": "sink",
+     "data": {
+      "id": "sink-1",
+      "name": "Shipping"
+     },
+     "position": {
+      "x": 1250,
+      "y": 300
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "master-test",
+  "name": "Master Test Factory",
+  "template": {
+   "stations": [
+    {
+     "id": "s-cnc",
+     "name": "CNC Mill (Weibull)",
+     "cycleTime": {
+      "type": "weibull",
+      "parameters": {
+       "shape": 2.5,
+       "scale": 45
+      }
+     },
+     "setupTime": {
+      "type": "triangular",
+      "parameters": {
+       "min": 30,
+       "mode": 60,
+       "max": 120
+      }
+     },
+     "mtbf": 8,
+     "mttr": 0.5,
+     "scrapRate": 0.03,
+     "position": {
+      "x": 550,
+      "y": 30
+     }
+    },
+    {
+     "id": "s-grind",
+     "name": "Grinder (Triangular)",
+     "cycleTime": {
+      "type": "triangular",
+      "parameters": {
+       "min": 25,
+       "mode": 40,
+       "max": 60
+      }
+     },
+     "mtbf": 12,
+     "mttr": 0.3,
+     "position": {
+      "x": 550,
+      "y": 170
+     }
+    },
+    {
+     "id": "s-quality",
+     "name": "Quality Check (Normal)",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 30,
+       "std": 4
+      }
+     },
+     "position": {
+      "x": 1100,
+      "y": 100
+     }
+    },
+    {
+     "id": "s-intake",
+     "name": "Intake (Constant)",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 15
+      }
+     },
+     "position": {
+      "x": 330,
+      "y": 400
+     }
+    },
+    {
+     "id": "s-pct-a",
+     "name": "Fast Line (Uniform)",
+     "cycleTime": {
+      "type": "uniform",
+      "parameters": {
+       "min": 25,
+       "max": 45
+      }
+     },
+     "productCycleTimes": {
+      "p-fast": {
+       "type": "constant",
+       "parameters": {
+        "value": 20
+       }
+      }
+     },
+     "position": {
+      "x": 780,
+      "y": 300
+     }
+    },
+    {
+     "id": "s-pct-b",
+     "name": "Medium Line (Empirical)",
+     "cycleTime": {
+      "type": "empirical",
+      "parameters": {
+       "data": [
+        30,
+        35,
+        40,
+        38,
+        42,
+        33,
+        37
+       ]
+      }
+     },
+     "position": {
+      "x": 780,
+      "y": 400
+     }
+    },
+    {
+     "id": "s-pct-c",
+     "name": "Slow Line (Normal+Shifts)",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 55,
+       "std": 8
+      }
+     },
+     "shifts": [
+      {
+       "name": "Day",
+       "startHour": 6,
+       "endHour": 14,
+       "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+       ]
+      },
+      {
+       "name": "Swing",
+       "startHour": 14,
+       "endHour": 22,
+       "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+       ]
+      }
+     ],
+     "position": {
+      "x": 780,
+      "y": 500
+     }
+    },
+    {
+     "id": "s-pack-b",
+     "name": "Packing (Constant)",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 20
+      }
+     },
+     "position": {
+      "x": 1200,
+      "y": 400
+     }
+    },
+    {
+     "id": "s-coat",
+     "name": "Coating (Lognormal)",
+     "cycleTime": {
+      "type": "lognormal",
+      "parameters": {
+       "mean": 3.2,
+       "std": 0.4
+      }
+     },
+     "scrapRate": 0.05,
+     "position": {
+      "x": 650,
+      "y": 640
+     }
+    },
+    {
+     "id": "s-heat",
+     "name": "Heat Treat (Exponential)",
+     "cycleTime": {
+      "type": "exponential",
+      "parameters": {
+       "mean": 40
+      }
+     },
+     "batchSize": 5,
+     "position": {
+      "x": 650,
+      "y": 760
+     }
+    },
+    {
+     "id": "s-test",
+     "name": "Final Test (Constant)",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 25
+      }
+     },
+     "position": {
+      "x": 1100,
+      "y": 700
+     }
+    },
+    {
+     "id": "s-prep",
+     "name": "Prep Station",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 20
+      }
+     },
+     "position": {
+      "x": 300,
+      "y": 990
+     }
+    },
+    {
+     "id": "s-prep-x",
+     "name": "Process Sub-X (Uniform)",
+     "cycleTime": {
+      "type": "uniform",
+      "parameters": {
+       "min": 20,
+       "max": 35
+      }
+     },
+     "position": {
+      "x": 720,
+      "y": 920
+     }
+    },
+    {
+     "id": "s-prep-y",
+     "name": "Process Sub-Y (Exponential)",
+     "cycleTime": {
+      "type": "exponential",
+      "parameters": {
+       "mean": 30
+      }
+     },
+     "position": {
+      "x": 720,
+      "y": 1060
+     }
+    },
+    {
+     "id": "s-finish",
+     "name": "Finish (Normal)",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 35,
+       "std": 5
+      }
+     },
+     "position": {
+      "x": 1250,
+      "y": 990
+     }
+    },
+    {
+     "id": "s-fill",
+     "name": "Filling (Constant)",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 12
+      }
+     },
+     "position": {
+      "x": 300,
+      "y": 1280
+     }
+    },
+    {
+     "id": "s-label",
+     "name": "Labeling (Triangular)",
+     "cycleTime": {
+      "type": "triangular",
+      "parameters": {
+       "min": 8,
+       "mode": 12,
+       "max": 20
+      }
+     },
+     "position": {
+      "x": 1050,
+      "y": 1280
+     }
+    },
+    {
+     "id": "s-rush",
+     "name": "Rush Process (Constant)",
+     "cycleTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 30
+      }
+     },
+     "setupTime": {
+      "type": "constant",
+      "parameters": {
+       "value": 45
+      }
+     },
+     "position": {
+      "x": 380,
+      "y": 1550
+     }
+    },
+    {
+     "id": "s-rush-fin",
+     "name": "Rush Finish (Normal)",
+     "cycleTime": {
+      "type": "normal",
+      "parameters": {
+       "mean": 40,
+       "std": 6
+      }
+     },
+     "position": {
+      "x": 700,
+      "y": 1550
+     }
+    }
+   ],
+   "buffers": [
+    {
+     "id": "buf-a-in",
+     "name": "Zone A Input",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 200,
+      "y": 100
+     }
+    },
+    {
+     "id": "buf-a-qual",
+     "name": "Quality Queue",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 960,
+      "y": 100
+     }
+    },
+    {
+     "id": "buf-b-in",
+     "name": "Zone B Input",
+     "capacity": 25,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 180,
+      "y": 400
+     }
+    },
+    {
+     "id": "buf-pa",
+     "name": "Fast Queue",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 630,
+      "y": 300
+     }
+    },
+    {
+     "id": "buf-pb",
+     "name": "Medium Queue",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 630,
+      "y": 400
+     }
+    },
+    {
+     "id": "buf-pc",
+     "name": "Slow Queue",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 630,
+      "y": 500
+     }
+    },
+    {
+     "id": "buf-b-out",
+     "name": "Zone B Merge",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 1060,
+      "y": 400
+     }
+    },
+    {
+     "id": "buf-c-in",
+     "name": "Zone C Input",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 200,
+      "y": 700
+     }
+    },
+    {
+     "id": "buf-c-1",
+     "name": "Coat Queue",
+     "capacity": 8,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 500,
+      "y": 640
+     }
+    },
+    {
+     "id": "buf-c-2",
+     "name": "Heat Queue",
+     "capacity": 30,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 500,
+      "y": 760
+     }
+    },
+    {
+     "id": "buf-c-out",
+     "name": "Zone C Merge",
+     "capacity": 12,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 950,
+      "y": 700
+     }
+    },
+    {
+     "id": "buf-d-in",
+     "name": "Disassembly Input",
+     "capacity": 15,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 150,
+      "y": 990
+     }
+    },
+    {
+     "id": "buf-d-mid",
+     "name": "Sub-Process Queue",
+     "capacity": 12,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 580,
+      "y": 990
+     }
+    },
+    {
+     "id": "buf-d-sync",
+     "name": "Sync Queue",
+     "capacity": 20,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 880,
+      "y": 990
+     }
+    },
+    {
+     "id": "buf-e-in",
+     "name": "Fill Input",
+     "capacity": 30,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 150,
+      "y": 1280
+     }
+    },
+    {
+     "id": "buf-lifo",
+     "name": "LIFO Staging",
+     "capacity": 40,
+     "queueRule": "LIFO",
+     "position": {
+      "x": 900,
+      "y": 1280
+     }
+    },
+    {
+     "id": "buf-priority",
+     "name": "Priority Order Queue",
+     "capacity": 25,
+     "queueRule": "PRIORITY",
+     "position": {
+      "x": 220,
+      "y": 1550
+     }
+    },
+    {
+     "id": "buf-f-mid",
+     "name": "Rush WIP",
+     "capacity": 10,
+     "queueRule": "FIFO",
+     "position": {
+      "x": 540,
+      "y": 1550
+     }
+    }
+   ],
+   "connections": [
+    {
+     "id": "ca0a",
+     "source": "src-a1",
+     "target": "buf-a-in"
+    },
+    {
+     "id": "ca0b",
+     "source": "src-a2",
+     "target": "buf-a-in"
+    },
+    {
+     "id": "ca1",
+     "source": "buf-a-in",
+     "target": "split-product"
+    },
+    {
+     "id": "ca2",
+     "source": "split-product",
+     "target": "s-cnc"
+    },
+    {
+     "id": "ca3",
+     "source": "split-product",
+     "target": "s-grind"
+    },
+    {
+     "id": "ca4",
+     "source": "s-cnc",
+     "target": "merge-alt"
+    },
+    {
+     "id": "ca5",
+     "source": "s-grind",
+     "target": "merge-alt"
+    },
+    {
+     "id": "ca6",
+     "source": "merge-alt",
+     "target": "conv-a"
+    },
+    {
+     "id": "ca7",
+     "source": "conv-a",
+     "target": "buf-a-qual"
+    },
+    {
+     "id": "ca8",
+     "source": "buf-a-qual",
+     "target": "s-quality"
+    },
+    {
+     "id": "ca9",
+     "source": "s-quality",
+     "target": "insp-visual"
+    },
+    {
+     "id": "ca10",
+     "source": "insp-visual",
+     "target": "sink-a"
+    },
+    {
+     "id": "ca-op",
+     "source": "op-quality",
+     "target": "s-quality"
+    },
+    {
+     "id": "csa1",
+     "source": "s-cnc",
+     "target": "buf-a-qual"
+    },
+    {
+     "id": "csa2",
+     "source": "s-grind",
+     "target": "buf-a-qual"
+    },
+    {
+     "id": "cb0",
+     "source": "src-b",
+     "target": "buf-b-in"
+    },
+    {
+     "id": "cb1",
+     "source": "buf-b-in",
+     "target": "s-intake"
+    },
+    {
+     "id": "cb2",
+     "source": "s-intake",
+     "target": "split-pct"
+    },
+    {
+     "id": "cb3a",
+     "source": "split-pct",
+     "target": "buf-pa"
+    },
+    {
+     "id": "cb3b",
+     "source": "split-pct",
+     "target": "buf-pb"
+    },
+    {
+     "id": "cb3c",
+     "source": "split-pct",
+     "target": "buf-pc"
+    },
+    {
+     "id": "cb4a",
+     "source": "buf-pa",
+     "target": "s-pct-a"
+    },
+    {
+     "id": "cb4b",
+     "source": "buf-pb",
+     "target": "s-pct-b"
+    },
+    {
+     "id": "cb4c",
+     "source": "buf-pc",
+     "target": "s-pct-c"
+    },
+    {
+     "id": "cb5a",
+     "source": "s-pct-a",
+     "target": "merge-fifo"
+    },
+    {
+     "id": "cb5b",
+     "source": "s-pct-b",
+     "target": "merge-fifo"
+    },
+    {
+     "id": "cb5c",
+     "source": "s-pct-c",
+     "target": "merge-fifo"
+    },
+    {
+     "id": "cb6",
+     "source": "merge-fifo",
+     "target": "buf-b-out"
+    },
+    {
+     "id": "cb7",
+     "source": "buf-b-out",
+     "target": "s-pack-b"
+    },
+    {
+     "id": "cb8",
+     "source": "s-pack-b",
+     "target": "sink-b"
+    },
+    {
+     "id": "csb1a",
+     "source": "s-intake",
+     "target": "buf-pa"
+    },
+    {
+     "id": "csb1b",
+     "source": "s-intake",
+     "target": "buf-pb"
+    },
+    {
+     "id": "csb1c",
+     "source": "s-intake",
+     "target": "buf-pc"
+    },
+    {
+     "id": "csb2a",
+     "source": "s-pct-a",
+     "target": "buf-b-out"
+    },
+    {
+     "id": "csb2b",
+     "source": "s-pct-b",
+     "target": "buf-b-out"
+    },
+    {
+     "id": "csb2c",
+     "source": "s-pct-c",
+     "target": "buf-b-out"
+    },
+    {
+     "id": "cc0a",
+     "source": "src-c1",
+     "target": "buf-c-in"
+    },
+    {
+     "id": "cc0b",
+     "source": "src-c2",
+     "target": "buf-c-in"
+    },
+    {
+     "id": "cc1",
+     "source": "buf-c-in",
+     "target": "split-equal"
+    },
+    {
+     "id": "cc2a",
+     "source": "split-equal",
+     "target": "buf-c-1"
+    },
+    {
+     "id": "cc2b",
+     "source": "split-equal",
+     "target": "buf-c-2"
+    },
+    {
+     "id": "cc3a",
+     "source": "buf-c-1",
+     "target": "s-coat"
+    },
+    {
+     "id": "cc3b",
+     "source": "buf-c-2",
+     "target": "s-heat"
+    },
+    {
+     "id": "cc4a",
+     "source": "s-coat",
+     "target": "merge-prio"
+    },
+    {
+     "id": "cc4b",
+     "source": "s-heat",
+     "target": "merge-prio"
+    },
+    {
+     "id": "cc5",
+     "source": "merge-prio",
+     "target": "buf-c-out"
+    },
+    {
+     "id": "cc6",
+     "source": "buf-c-out",
+     "target": "s-test"
+    },
+    {
+     "id": "cc7",
+     "source": "s-test",
+     "target": "sink-c"
+    },
+    {
+     "id": "csc1a",
+     "source": "buf-c-in",
+     "target": "s-coat"
+    },
+    {
+     "id": "csc1b",
+     "source": "buf-c-in",
+     "target": "s-heat"
+    },
+    {
+     "id": "csc2a",
+     "source": "s-coat",
+     "target": "buf-c-out"
+    },
+    {
+     "id": "csc2b",
+     "source": "s-heat",
+     "target": "buf-c-out"
+    },
+    {
+     "id": "cd0",
+     "source": "src-d",
+     "target": "buf-d-in"
+    },
+    {
+     "id": "cd1",
+     "source": "buf-d-in",
+     "target": "s-prep"
+    },
+    {
+     "id": "cd2",
+     "source": "s-prep",
+     "target": "disasm-1"
+    },
+    {
+     "id": "cd3a",
+     "source": "disasm-1",
+     "target": "s-prep-x"
+    },
+    {
+     "id": "cd3b",
+     "source": "disasm-1",
+     "target": "s-prep-y"
+    },
+    {
+     "id": "cd4a",
+     "source": "s-prep-x",
+     "target": "match-1"
+    },
+    {
+     "id": "cd4b",
+     "source": "s-prep-y",
+     "target": "match-1"
+    },
+    {
+     "id": "cd5",
+     "source": "match-1",
+     "target": "assy-1"
+    },
+    {
+     "id": "cd6",
+     "source": "assy-1",
+     "target": "s-finish"
+    },
+    {
+     "id": "cd7",
+     "source": "s-finish",
+     "target": "insp-auto"
+    },
+    {
+     "id": "cd8",
+     "source": "insp-auto",
+     "target": "sink-d"
+    },
+    {
+     "id": "csd1",
+     "source": "s-prep",
+     "target": "buf-d-mid"
+    },
+    {
+     "id": "csd2a",
+     "source": "buf-d-mid",
+     "target": "s-prep-x"
+    },
+    {
+     "id": "csd2b",
+     "source": "buf-d-mid",
+     "target": "s-prep-y"
+    },
+    {
+     "id": "csd3a",
+     "source": "s-prep-x",
+     "target": "buf-d-sync"
+    },
+    {
+     "id": "csd3b",
+     "source": "s-prep-y",
+     "target": "buf-d-sync"
+    },
+    {
+     "id": "csd4",
+     "source": "buf-d-sync",
+     "target": "s-finish"
+    },
+    {
+     "id": "ce0",
+     "source": "src-e",
+     "target": "buf-e-in"
+    },
+    {
+     "id": "ce1",
+     "source": "buf-e-in",
+     "target": "s-fill"
+    },
+    {
+     "id": "ce2",
+     "source": "s-fill",
+     "target": "pall-1"
+    },
+    {
+     "id": "ce3",
+     "source": "pall-1",
+     "target": "conv-e"
+    },
+    {
+     "id": "ce4",
+     "source": "conv-e",
+     "target": "depall-1"
+    },
+    {
+     "id": "ce5",
+     "source": "depall-1",
+     "target": "buf-lifo"
+    },
+    {
+     "id": "ce6",
+     "source": "buf-lifo",
+     "target": "s-label"
+    },
+    {
+     "id": "ce7",
+     "source": "s-label",
+     "target": "sink-e"
+    },
+    {
+     "id": "cse1",
+     "source": "s-fill",
+     "target": "buf-lifo"
+    },
+    {
+     "id": "cf0",
+     "source": "src-f",
+     "target": "buf-priority"
+    },
+    {
+     "id": "cf1",
+     "source": "buf-priority",
+     "target": "s-rush"
+    },
+    {
+     "id": "cf2",
+     "source": "s-rush",
+     "target": "buf-f-mid"
+    },
+    {
+     "id": "cf3",
+     "source": "buf-f-mid",
+     "target": "s-rush-fin"
+    },
+    {
+     "id": "cf4",
+     "source": "s-rush-fin",
+     "target": "insp-sample"
+    },
+    {
+     "id": "cf5",
+     "source": "insp-sample",
+     "target": "sink-f"
+    },
+    {
+     "id": "cf-op",
+     "source": "op-rush",
+     "target": "s-rush"
+    }
+   ],
+   "products": [
+    {
+     "id": "p-alpha",
+     "name": "Product Alpha",
+     "routing": [
+      "s-cnc",
+      "s-quality"
+     ],
+     "priority": 5
+    },
+    {
+     "id": "p-beta",
+     "name": "Product Beta",
+     "routing": [
+      "s-grind",
+      "s-quality"
+     ],
+     "priority": 3
+    },
+    {
+     "id": "p-fast",
+     "name": "Fast Product",
+     "routing": [
+      "s-intake",
+      "s-pct-a",
+      "s-pack-b"
+     ],
+     "arrivalRate": 60
+    },
+    {
+     "id": "p-med",
+     "name": "Medium Product",
+     "routing": [
+      "s-intake",
+      "s-pct-b",
+      "s-pack-b"
+     ],
+     "arrivalRate": 60
+    },
+    {
+     "id": "p-slow",
+     "name": "Slow Product",
+     "routing": [
+      "s-intake",
+      "s-pct-c",
+      "s-pack-b"
+     ],
+     "arrivalRate": 60
+    },
+    {
+     "id": "p-line-1",
+     "name": "Coat Line Product",
+     "routing": [
+      "s-coat",
+      "s-test"
+     ]
+    },
+    {
+     "id": "p-line-2",
+     "name": "Heat Line Product",
+     "routing": [
+      "s-heat",
+      "s-test"
+     ]
+    },
+    {
+     "id": "p-raw",
+     "name": "Raw Assembly",
+     "routing": [
+      "s-prep"
+     ]
+    },
+    {
+     "id": "p-sub-x",
+     "name": "Sub-Component X",
+     "routing": [
+      "s-prep-x",
+      "s-finish"
+     ]
+    },
+    {
+     "id": "p-sub-y",
+     "name": "Sub-Component Y",
+     "routing": [
+      "s-prep-y",
+      "s-finish"
+     ]
+    },
+    {
+     "id": "p-bulk",
+     "name": "Bulk Item",
+     "routing": [
+      "s-fill",
+      "s-label"
+     ]
+    },
+    {
+     "id": "p-rush",
+     "name": "Rush Order",
+     "routing": [
+      "s-rush",
+      "s-rush-fin"
+     ],
+     "priority": 10,
+     "dueDate": 300
+    },
+    {
+     "id": "p-normal",
+     "name": "Standard Order",
+     "routing": [
+      "s-rush",
+      "s-rush-fin"
+     ],
+     "priority": 3,
+     "dueDate": 900
+    }
+   ],
+   "resources": [],
+   "extraNodes": [
+    {
+     "id": "src-a1",
+     "type": "source",
+     "data": {
+      "id": "src-a1",
+      "name": "Alpha Supply",
+      "arrivalRate": 50,
+      "feedMode": "interval",
+      "productFilter": "p-alpha"
+     },
+     "position": {
+      "x": 30,
+      "y": 50
+     }
+    },
+    {
+     "id": "src-a2",
+     "type": "source",
+     "data": {
+      "id": "src-a2",
+      "name": "Beta Supply",
+      "arrivalRate": 50,
+      "feedMode": "interval",
+      "productFilter": "p-beta"
+     },
+     "position": {
+      "x": 30,
+      "y": 150
+     }
+    },
+    {
+     "id": "src-b",
+     "type": "source",
+     "data": {
+      "id": "src-b",
+      "name": "Pct Source (Batch=3)",
+      "arrivalRate": 25,
+      "feedMode": "interval",
+      "productBatchSize": 3
+     },
+     "position": {
+      "x": 30,
+      "y": 400
+     }
+    },
+    {
+     "id": "src-c1",
+     "type": "source",
+     "data": {
+      "id": "src-c1",
+      "name": "Coat Supply",
+      "arrivalRate": 40,
+      "feedMode": "interval",
+      "productFilter": "p-line-1"
+     },
+     "position": {
+      "x": 30,
+      "y": 640
+     }
+    },
+    {
+     "id": "src-c2",
+     "type": "source",
+     "data": {
+      "id": "src-c2",
+      "name": "Heat Supply",
+      "arrivalRate": 40,
+      "feedMode": "interval",
+      "productFilter": "p-line-2"
+     },
+     "position": {
+      "x": 30,
+      "y": 760
+     }
+    },
+    {
+     "id": "src-d",
+     "type": "source",
+     "data": {
+      "id": "src-d",
+      "name": "Raw Material",
+      "arrivalRate": 180,
+      "feedMode": "interval",
+      "productFilter": "p-raw"
+     },
+     "position": {
+      "x": 30,
+      "y": 990
+     }
+    },
+    {
+     "id": "src-e",
+     "type": "source",
+     "data": {
+      "id": "src-e",
+      "name": "Bulk Supply",
+      "arrivalRate": 20,
+      "feedMode": "interval",
+      "productFilter": "p-bulk"
+     },
+     "position": {
+      "x": 30,
+      "y": 1280
+     }
+    },
+    {
+     "id": "src-f",
+     "type": "source",
+     "data": {
+      "id": "src-f",
+      "name": "Order Queue",
+      "arrivalRate": 60,
+      "feedMode": "orders"
+     },
+     "position": {
+      "x": 30,
+      "y": 1550
+     }
+    },
+    {
+     "id": "sink-a",
+     "type": "sink",
+     "data": {
+      "id": "sink-a",
+      "name": "Ship A"
+     },
+     "position": {
+      "x": 1450,
+      "y": 100
+     }
+    },
+    {
+     "id": "sink-b",
+     "type": "sink",
+     "data": {
+      "id": "sink-b",
+      "name": "Ship B"
+     },
+     "position": {
+      "x": 1380,
+      "y": 400
+     }
+    },
+    {
+     "id": "sink-c",
+     "type": "sink",
+     "data": {
+      "id": "sink-c",
+      "name": "Ship C"
+     },
+     "position": {
+      "x": 1280,
+      "y": 700
+     }
+    },
+    {
+     "id": "sink-d",
+     "type": "sink",
+     "data": {
+      "id": "sink-d",
+      "name": "Ship D"
+     },
+     "position": {
+      "x": 1500,
+      "y": 990
+     }
+    },
+    {
+     "id": "sink-e",
+     "type": "sink",
+     "data": {
+      "id": "sink-e",
+      "name": "Ship E"
+     },
+     "position": {
+      "x": 1230,
+      "y": 1280
+     }
+    },
+    {
+     "id": "sink-f",
+     "type": "sink",
+     "data": {
+      "id": "sink-f",
+      "name": "Ship F"
+     },
+     "position": {
+      "x": 1060,
+      "y": 1550
+     }
+    },
+    {
+     "id": "split-product",
+     "type": "splitter",
+     "data": {
+      "id": "split-product",
+      "name": "Product Router",
+      "outputs": 2,
+      "splitType": "product-based",
+      "productRouting": {
+       "p-alpha": 0,
+       "p-beta": 1
+      }
+     },
+     "position": {
+      "x": 380,
+      "y": 100
+     }
+    },
+    {
+     "id": "split-pct",
+     "type": "splitter",
+     "data": {
+      "id": "split-pct",
+      "name": "Pct Distributor",
+      "outputs": 3,
+      "splitType": "percentage",
+      "percentages": [
+       50,
+       30,
+       20
+      ]
+     },
+     "position": {
+      "x": 500,
+      "y": 400
+     }
+    },
+    {
+     "id": "split-equal",
+     "type": "splitter",
+     "data": {
+      "id": "split-equal",
+      "name": "Equal Splitter",
+      "outputs": 2,
+      "splitType": "equal"
+     },
+     "position": {
+      "x": 370,
+      "y": 700
+     }
+    },
+    {
+     "id": "merge-alt",
+     "type": "merge",
+     "data": {
+      "id": "merge-alt",
+      "name": "Alternating Merge",
+      "inputs": 2,
+      "mergeType": "alternating"
+     },
+     "position": {
+      "x": 730,
+      "y": 100
+     }
+    },
+    {
+     "id": "merge-fifo",
+     "type": "merge",
+     "data": {
+      "id": "merge-fifo",
+      "name": "FIFO Merge",
+      "inputs": 3,
+      "mergeType": "fifo"
+     },
+     "position": {
+      "x": 940,
+      "y": 400
+     }
+    },
+    {
+     "id": "merge-prio",
+     "type": "merge",
+     "data": {
+      "id": "merge-prio",
+      "name": "Priority Merge",
+      "inputs": 2,
+      "mergeType": "priority"
+     },
+     "position": {
+      "x": 820,
+      "y": 700
+     }
+    },
+    {
+     "id": "conv-a",
+     "type": "conveyor",
+     "data": {
+      "id": "conv-a",
+      "name": "Main Conveyor",
+      "length": 6,
+      "speed": 2,
+      "capacity": 6
+     },
+     "position": {
+      "x": 850,
+      "y": 50
+     }
+    },
+    {
+     "id": "conv-e",
+     "type": "conveyor",
+     "data": {
+      "id": "conv-e",
+      "name": "Pallet Conveyor",
+      "length": 10,
+      "speed": 3,
+      "capacity": 10
+     },
+     "position": {
+      "x": 600,
+      "y": 1230
+     }
+    },
+    {
+     "id": "insp-visual",
+     "type": "inspection",
+     "data": {
+      "id": "insp-visual",
+      "name": "Visual QC",
+      "inspectionTime": 15,
+      "defectRate": 3,
+      "inspectionType": "visual"
+     },
+     "position": {
+      "x": 1280,
+      "y": 100
+     }
+    },
+    {
+     "id": "insp-auto",
+     "type": "inspection",
+     "data": {
+      "id": "insp-auto",
+      "name": "Auto Inspection",
+      "inspectionTime": 10,
+      "defectRate": 2,
+      "inspectionType": "automated"
+     },
+     "position": {
+      "x": 1380,
+      "y": 990
+     }
+    },
+    {
+     "id": "insp-sample",
+     "type": "inspection",
+     "data": {
+      "id": "insp-sample",
+      "name": "Sampling QC",
+      "inspectionTime": 20,
+      "defectRate": 1.5,
+      "inspectionType": "sampling"
+     },
+     "position": {
+      "x": 880,
+      "y": 1550
+     }
+    },
+    {
+     "id": "op-quality",
+     "type": "operator",
+     "data": {
+      "id": "op-quality",
+      "name": "QC Inspector",
+      "count": 2,
+      "efficiency": 90,
+      "skill": "inspection"
+     },
+     "position": {
+      "x": 1100,
+      "y": 0
+     }
+    },
+    {
+     "id": "op-rush",
+     "type": "operator",
+     "data": {
+      "id": "op-rush",
+      "name": "Rush Operator",
+      "count": 1,
+      "efficiency": 85,
+      "skill": "machining"
+     },
+     "position": {
+      "x": 380,
+      "y": 1450
+     }
+    },
+    {
+     "id": "disasm-1",
+     "type": "disassembly",
+     "data": {
+      "id": "disasm-1",
+      "name": "Disassembly",
+      "cycleTime": 25,
+      "outputParts": [
+       {
+        "productId": "p-sub-x",
+        "productName": "Sub-Component X",
+        "quantity": 1
+       },
+       {
+        "productId": "p-sub-y",
+        "productName": "Sub-Component Y",
+        "quantity": 1
+       }
+      ]
+     },
+     "position": {
+      "x": 460,
+      "y": 940
+     }
+    },
+    {
+     "id": "match-1",
+     "type": "matchbuffer",
+     "data": {
+      "id": "match-1",
+      "name": "Part Synchronizer",
+      "capacity": 20,
+      "matchKey": "batch",
+      "requiredParts": [
+       {
+        "productId": "p-sub-x",
+        "productName": "Sub-Component X",
+        "quantity": 1
+       },
+       {
+        "productId": "p-sub-y",
+        "productName": "Sub-Component Y",
+        "quantity": 1
+       }
+      ],
+      "timeout": 600
+     },
+     "position": {
+      "x": 900,
+      "y": 940
+     }
+    },
+    {
+     "id": "assy-1",
+     "type": "assembly",
+     "data": {
+      "id": "assy-1",
+      "name": "Assembly",
+      "cycleTime": 40,
+      "inputParts": 2,
+      "inputPartsByProduct": [
+       {
+        "productId": "p-sub-x",
+        "productName": "Sub-Component X",
+        "quantity": 1
+       },
+       {
+        "productId": "p-sub-y",
+        "productName": "Sub-Component Y",
+        "quantity": 1
+       }
+      ]
+     },
+     "position": {
+      "x": 1060,
+      "y": 940
+     }
+    },
+    {
+     "id": "pall-1",
+     "type": "palletize",
+     "data": {
+      "id": "pall-1",
+      "name": "Palletizer",
+      "defaultPalletSize": 12,
+      "palletSizeByProduct": {
+       "p-bulk": 8
+      },
+      "cycleTime": 25
+     },
+     "position": {
+      "x": 450,
+      "y": 1280
+     }
+    },
+    {
+     "id": "depall-1",
+     "type": "depalletize",
+     "data": {
+      "id": "depall-1",
+      "name": "Depalletizer",
+      "cycleTime": 4
+     },
+     "position": {
+      "x": 750,
+      "y": 1280
+     }
+    }
+   ],
+   "orders": [
+    {
+     "id": "ord-1",
+     "productId": "p-rush",
+     "quantity": 50,
+     "priority": "urgent",
+     "dueDate": "2026-03-01",
+     "status": "pending",
+     "isWip": false
+    },
+    {
+     "id": "ord-2",
+     "productId": "p-normal",
+     "quantity": 100,
+     "priority": "medium",
+     "dueDate": "2026-03-15",
+     "status": "pending",
+     "isWip": false
+    },
+    {
+     "id": "ord-3",
+     "productId": "p-rush",
+     "quantity": 30,
+     "priority": "high",
+     "dueDate": "2026-02-28",
+     "status": "in_progress",
+     "isWip": true,
+     "initialStationId": "s-rush"
+    }
+   ]
+  }
+ }
+]

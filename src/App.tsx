@@ -1,6 +1,10 @@
 import React from 'react';
+import { useI18n } from './i18n';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { OnboardingTour } from './components/common/OnboardingTour';
+import { KeyboardShortcutsPanel } from './components/common/KeyboardShortcuts';
 import { Dashboard } from './components/dashboards/Dashboard';
 import { FactoryBuilder } from './components/factory-builder/FactoryBuilder';
 import { ScenarioManager } from './components/scenarios/ScenarioManager';
@@ -10,6 +14,9 @@ import { OrderManager } from './components/orders/OrderManager';
 import { Settings } from './components/Settings';
 import { ParameterSweep } from './components/sweep/ParameterSweep';
 import { PluginManager } from './components/plugins/PluginManager';
+import { ExperimentManager } from './components/experiment/ExperimentManager';
+import { HierarchyManager } from './components/hierarchy/HierarchyManager';
+import { ScenarioViewer } from './components/scenario-viewer/ScenarioViewer';
 import { useAppStore } from './stores/appStore';
 import { useModelStore } from './stores/modelStore';
 import { useLiveSimulationStore } from './stores/liveSimulationStore';
@@ -50,6 +57,7 @@ function PopoutAnimationView() {
 function App() {
   const { isInitialized, initialize, addToast } = useAppStore();
   const navigate = useNavigate();
+  const lang = useI18n((st) => st.lang);
 
   // P9 — Check for popout query param
   const isPopout = React.useMemo(() => {
@@ -99,20 +107,28 @@ function App() {
     return <PopoutAnimationView />;
   }
 
+  // Changing the language remounts the page tree, so every t() call re-reads it
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/builder" element={<FactoryBuilder />} />
-        <Route path="/scenarios" element={<ScenarioManager />} />
-        <Route path="/orders" element={<OrderManager />} />
-        <Route path="/code" element={<CodeEditor />} />
-        <Route path="/data" element={<DataSync />} />
-        <Route path="/sweep" element={<ParameterSweep />} />
-        <Route path="/plugins" element={<PluginManager />} />
-        <Route path="/settings" element={<Settings />} />
-      </Routes>
+    <Layout key={lang}>
+      <ErrorBoundary>
+        <OnboardingTour />
+        <KeyboardShortcutsPanel />
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/builder" element={<FactoryBuilder />} />
+          <Route path="/world" element={<ScenarioViewer />} />
+          <Route path="/scenarios" element={<ScenarioManager />} />
+          <Route path="/orders" element={<OrderManager />} />
+          <Route path="/code" element={<CodeEditor />} />
+          <Route path="/data" element={<DataSync />} />
+          <Route path="/sweep" element={<ParameterSweep />} />
+          <Route path="/plugins" element={<PluginManager />} />
+          <Route path="/experiments" element={<ExperimentManager />} />
+          <Route path="/hierarchy" element={<HierarchyManager />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+      </ErrorBoundary>
     </Layout>
   );
 }

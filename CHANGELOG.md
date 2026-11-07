@@ -5,6 +5,35 @@ All notable changes to FactorySim will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-10-26
+
+### Added
+- **Simple mode** (on by default, switch in the sidebar) — a guided *Build → Run → Compare* workflow for production engineers. Expert tools (code editor, plugins, hierarchy, experiments, parameter sweep, data sync, orders, 3D world) move under a collapsible "Advanced tools" section; nothing is removed.
+- **Plain-language results summary** — "Your line produced 408 parts in 8 hours — about 51 per hour", the bottleneck station and what to try, with a link straight to that station in the builder.
+- **Essential-elements palette** in Simple mode: Source, Station, Buffer, Conveyor, Inspection, Assembly, Operator, Sink (one click each).
+- **Guided empty dashboard** that tells a new user what to do next.
+- **Engine verification suite** (`python/tests/test_verification.py`) against exact queueing results: M/M/1 time in system, two-station blocking throughput (B+2)/(B+3), seed reproducibility. See `VERIFICATION.md`.
+- **`arrivals_throttled` warning** when arrivals are held back by a full first buffer (previously silent lost demand).
+- **Self-contained Windows Python** bundled in the installer (`scripts/prepare-python-runtime.py`) — end users no longer need Python installed.
+
+### Fixed
+- **Multi-replication results were inflated**: in-flight products of replication *k* were counted as completions of replication *k+1*. Replications are now also reproducible run-to-run.
+- **Throughput and cycle time counted parts created after warm-up instead of parts leaving after warm-up**, undercounting throughput in congested lines.
+- **Long runs hung** (O(n²) cycle-time statistics); a 100,000 s run went from >10 min to ~17 s.
+- **Replication seeds overlapped** between adjacent seeds; `seed = 0` silently became 42.
+- **Throughput card always showed "+12%"** (hard-coded value).
+- Bottleneck panel captions contradicted their own thresholds.
+- OEE, throughput and waterfall charts overflowed their cards; unreadable loss labels; "−-0.0%" labels.
+- Builder toolbar wrapped into four rows; dashboard header controls wrapped and clipped.
+- `npm run build` failed on 8 TypeScript errors; one frontend test suite never ran (circular import between logger and app store).
+- Installer shipped the developer's Python venv (worked only on PCs with the same Python at the same path), twice; installer size 319 MB → 196 MB.
+
+### Changed
+- Bundled IBM Plex fonts locally (no Google Fonts request; works offline).
+- One colour palette across tokens and Tailwind classes; readable sidebar contrast.
+- Five export buttons merged into one Export menu; run settings grouped.
+- Packaging config consolidated into `electron-builder.yml`; Windows installer builds from any OS.
+
 ## [1.1.0] - 2026-03-06
 
 ### Added

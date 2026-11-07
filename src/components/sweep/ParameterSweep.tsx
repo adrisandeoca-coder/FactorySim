@@ -4,11 +4,13 @@ import { useModelStore } from '../../stores/modelStore';
 import { useSimulationStore } from '../../stores/simulationStore';
 import { useSweepStore } from '../../stores/sweepStore';
 import { getParametersForEntityType } from '../../services/scenarioModelBuilder';
-import { generateGrid, KPI_OPTIONS, extractKpiValue } from '../../services/sweepService';
+import { generateSweepPoints, KPI_OPTIONS, extractKpiValue } from '../../services/sweepService';
+import { SensitivityTable } from './SensitivityTable';
 import { TornadoChart } from './TornadoChart';
 import { SweepLineChart } from './SweepLineChart';
 import { SweepHeatmap } from './SweepHeatmap';
-import type { SweepParameterDef, SweepConfig, ScenarioParameterOverride } from '../../types';
+import { OptimizationPanel } from './OptimizationPanel';
+import type { SweepParameterDef, SweepConfig, ScenarioParameterOverride, SweepMode } from '../../types';
 
 const ENTITY_TYPES: { value: ScenarioParameterOverride['entityType']; label: string }[] = [
   { value: 'station', label: 'Station' },
@@ -23,15 +25,52 @@ const ENTITY_TYPES: { value: ScenarioParameterOverride['entityType']; label: str
 ];
 
 export function ParameterSweep() {
+  const [activeTab, setActiveTab] = useState<'sweep' | 'optimize'>('sweep');
+
+  return (
+    <div className="p-6 space-y-6 overflow-auto h-full">
+      <div className="flex items-center gap-6">
+        <h1 className="text-2xl font-bold text-gray-900">Parameter Analysis</h1>
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => setActiveTab('sweep')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'sweep'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Sweep
+          </button>
+          <button
+            onClick={() => setActiveTab('optimize')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'optimize'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Optimize
+          </button>
+        </div>
+      </div>
+
+      {activeTab === 'sweep' ? <SweepPanel /> : <OptimizationPanel />}
+    </div>
+  );
+}
+
+function SweepPanel() {
   const { model } = useModelStore();
   const { defaultOptions } = useSimulationStore();
   const { sweepResult, isRunning, progress, error, startSweep, cancelSweep, clearResults, setSweepConfig } = useSweepStore();
 
   // Parameter definition state
   const [parameters, setParameters] = useState<SweepParameterDef[]>([]);
-  const [mode, setMode] = useState<'oat' | 'full'>('oat');
+  const [mode, setMode] = useState<SweepMode>('oat');
+  const [sampleCount, setSampleCount] = useState(20);
   const [kpiTarget, setKpiTarget] = useState('oee.overall');
-  const [resultTab, setResultTab] = useState<'tornado' | 'line' | 'heatmap' | 'table'>('tornado');
+  const [resultTab, setResultTab] = useState<'tornado' | 'line' | 'heatmap' | 'table' | 'sensitivity'>('tornado');
 
   // Add parameter form state
   const [addEntityType, setAddEntityType] = useState<string>('station');
@@ -66,8 +105,9 @@ export function ParameterSweep() {
 
   const gridSize = useMemo(() => {
     if (parameters.length === 0) return 0;
-    return generateGrid(parameters, mode).length;
-  }, [parameters, mode]);
+    if (mode === 'lhs' || mode === 'montecarlo') return sampleCount;
+    return generateSweepPoints(parameters, mode, sampleCount).length;
+  }, [parameters, mode, sampleCount]);
 
   const handleAddParameter = () => {
     const entity = entities.find((e) => e.id === addEntityId);
@@ -100,6 +140,7 @@ export function ParameterSweep() {
       parameters,
       mode,
       kpiTarget,
+      sampleCount,
       baseOptions: defaultOptions,
     };
     setSweepConfig(config);
@@ -241,13 +282,28 @@ export function ParameterSweep() {
             <label className="block text-xs font-medium text-gray-600 mb-1">Mode</label>
             <select
               value={mode}
-              onChange={(e) => setMode(e.target.value as 'oat' | 'full')}
+              onChange={(e) => setMode(e.target.value as SweepMode)}
               className="border rounded px-2 py-1.5 text-sm"
             >
               <option value="oat">One-at-a-Time (OAT)</option>
               <option value="full">Full Grid</option>
+              <option value="lhs">Latin Hypercube (LHS)</option>
+              <option value="montecarlo">Monte Carlo</option>
             </select>
           </div>
+          {(mode === 'lhs' || mode === 'montecarlo') && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Sample Count</label>
+              <input
+                type="number"
+                value={sampleCount}
+                onChange={(e) => setSampleCount(Math.max(2, parseInt(e.target.value) || 2))}
+                min="2"
+                max="500"
+                className="border rounded px-2 py-1.5 text-sm w-24"
+              />
+            </div>
+          )}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Target KPI</label>
             <select
@@ -314,7 +370,7 @@ export function ParameterSweep() {
             </span>
             <div className="flex-1" />
             <div className="flex gap-1">
-              {(['tornado', 'line', 'heatmap', 'table'] as const).map((tab) => (
+              {(['tornado', 'line', 'heatmap', 'table', 'sensitivity'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setResultTab(tab)}
@@ -325,7 +381,7 @@ export function ParameterSweep() {
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40'
                   }`}
                 >
-                  {tab === 'tornado' ? 'Tornado' : tab === 'line' ? 'Line' : tab === 'heatmap' ? 'Heatmap' : 'Table'}
+                  {tab === 'tornado' ? 'Tornado' : tab === 'line' ? 'Line' : tab === 'heatmap' ? 'Heatmap' : tab === 'sensitivity' ? 'Sensitivity' : 'Table'}
                 </button>
               ))}
             </div>
@@ -378,6 +434,9 @@ export function ParameterSweep() {
                 </tbody>
               </table>
             </div>
+          )}
+          {resultTab === 'sensitivity' && (
+            <SensitivityTable result={sweepResult} parameters={parameters} />
           )}
         </div>
       )}

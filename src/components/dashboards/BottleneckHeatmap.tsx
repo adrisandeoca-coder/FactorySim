@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { AlertTriangle, AlertCircle, BarChart3, CheckCircle2, ArrowUpDown, Settings, X, Factory } from 'lucide-react';
 import type { Station, KPIData, Connection } from '../../types';
+import { ChartEmptyState } from './ChartEmptyState';
 
+import { t } from '../../i18n';
 interface BottleneckHeatmapProps {
   stations: Station[];
   kpis: KPIData;
@@ -25,22 +26,16 @@ interface StationMetrics {
   bufferTotalItems: number;
   isBottleneck: boolean;
   severity: 'low' | 'medium' | 'high' | 'critical';
-  color: string;
-  gradient: string;
+  setup: number;
+  failed: number;
 }
 
-export function BottleneckHeatmap({ stations, kpis, connections }: BottleneckHeatmapProps) {
+const BottleneckHeatmap = React.memo(function BottleneckHeatmap({ stations, kpis, connections }: BottleneckHeatmapProps) {
   const [selectedStation, setSelectedStation] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'flow' | 'grid'>(stations.length > 8 ? 'grid' : 'flow');
+  const [showAll, setShowAll] = useState(false);
 
-  if (stations.length === 0) {
-    return (
-      <div className="h-80 flex flex-col items-center justify-center text-gray-500 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
-        <FactoryIcon className="w-16 h-16 text-gray-300 mb-4" />
-        <p className="text-lg font-medium">No stations in model</p>
-        <p className="text-sm text-gray-400 mt-1">Add stations in the Factory Builder to see bottleneck analysis</p>
-      </div>
-    );
+  if (!kpis || stations.length === 0) {
+    return <ChartEmptyState message="No bottleneck data available" height="h-80" />;
   }
 
   // Build station → input buffer mapping from connections
@@ -91,8 +86,8 @@ export function BottleneckHeatmap({ stations, kpis, connections }: BottleneckHea
       bufferTotalItems,
       isBottleneck,
       severity,
-      color: getColor(severity),
-      gradient: getGradient(severity),
+      setup,
+      failed,
     };
   });
 
@@ -108,703 +103,241 @@ export function BottleneckHeatmap({ stations, kpis, connections }: BottleneckHea
   const topSpread = topBottleneck.utilization - avgUtilization;
   const hasClearBottleneck = hasBottlenecks || topSpread > 0.10;
 
+  const selected = stationMetrics.find((m) => m.station.id === selectedStation) ?? null;
+  const overloaded = stationMetrics.filter((m) => m.utilization >= 0.95).length;
+  const headroom = stationMetrics.filter((m) => m.utilization < 0.75).length;
+  // Flow order (as modelled) for the state bars; long lines show the 12 busiest unless expanded
+  const flowRows = !showAll && stationMetrics.length > 12
+    ? stationMetrics.filter((m) => sortedMetrics.slice(0, 12).includes(m))
+    : stationMetrics;
+
+  const extraNodes = (kpis as any).extraNodes || {};
+  const stationIds = new Set(stations.map((st) => st.id));
+  const extraEntries = Object.entries(extraNodes).filter(([id, v]) => !stationIds.has(id) && !(v as any)?.warehouse) as [string, any][];
+
   return (
-    <div className="space-y-6">
-      {/* No clear bottleneck warning */}
+    <div style={{ display: 'grid', gap: 14 }}>
       {!hasClearBottleneck && (
-        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-          <WarningIcon className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <h4 className="text-sm font-semibold text-amber-800">No Clear Bottleneck Detected</h4>
-            <p className="text-sm text-amber-600 mt-1">
-              All stations have similar utilization levels (avg {(avgUtilization * 100).toFixed(0)}%, spread {(topSpread * 100).toFixed(0)}pp).
-              The line is relatively balanced — consider increasing arrival rate or reducing buffer sizes to reveal the true constraint.
-            </p>
-          </div>
-        </div>
+        <Note tone="warn" title={t('No clear bottleneck')}>
+          Utilisation is evenly spread (the busiest station is {Math.round(topSpread * 100)} points above the average).
+          The line is balanced: more output needs capacity at several stations, not one.
+        </Note>
       )}
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-4 gap-4">
-        <SummaryCard
-          title={hasClearBottleneck ? "Top Bottleneck" : "Highest Utilization"}
-          value={topBottleneck.station.name}
-          subtitle={`${(topBottleneck.utilization * 100).toFixed(1)}% (busy + setup + failed)`}
-          icon={<AlertIcon className="w-5 h-5" />}
-          color={hasClearBottleneck ? "red" : "blue"}
-        />
-        <SummaryCard
-          title="Critical Stations"
-          value={stationMetrics.filter(m => m.severity === 'critical').length.toString()}
-          subtitle="Above 90% busy"
-          icon={<WarningIcon className="w-5 h-5" />}
-          color="orange"
-        />
-        <SummaryCard
-          title="Avg Utilization"
-          value={`${(avgUtilization * 100).toFixed(1)}%`}
-          subtitle="Across all stations"
-          icon={<ChartIcon className="w-5 h-5" />}
-          color="blue"
-        />
-        <div title={stationMetrics.filter(m => m.severity === 'low').map(m => m.station.name).join(', ') || 'None'}>
-          <SummaryCard
-            title="Healthy Stations"
-            value={`${stationMetrics.filter(m => m.severity === 'low').length} of ${stationMetrics.length}`}
-            subtitle="Operating normally"
-            icon={<CheckIcon className="w-5 h-5" />}
-            color="green"
-          />
-        </div>
+      <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
+        <Tile label={t('Top bottleneck')} value={shortName(topBottleneck.station.name)}
+          sub={`${pct(topBottleneck.utilization, 1)} in use (busy + setup + failed)`} tone={topBottleneck.utilization >= 0.9 ? 'bad' : topBottleneck.utilization >= 0.8 ? 'warn' : undefined} />
+        <Tile label={t('Overloaded stations')} value={String(overloaded)} sub="≥ 95 % of the time in use" tone={overloaded ? 'bad' : undefined} />
+        <Tile label={t('Average utilisation')} value={pct(avgUtilization, 1)} sub={`across ${stationMetrics.length} stations`} />
+        <Tile label={t('Stations with headroom')} value={`${headroom} of ${stationMetrics.length}`} sub="below 75 % in use" />
       </div>
 
-      {/* View Mode Toggle */}
-      <div className="flex items-center justify-between">
-        <h4 className="text-sm font-semibold text-gray-700">Factory Floor Analysis</h4>
-        <div className="flex bg-gray-100 rounded-lg p-1">
-          {(['flow', 'grid'] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                viewMode === mode
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              {mode === 'flow' ? 'Flow View' : 'Grid View'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Top 5 Bottleneck Chips */}
-      {stations.length > 12 && viewMode === 'grid' && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-semibold text-gray-500">Top 5:</span>
-          {sortedMetrics.slice(0, 5).map((m, i) => (
-            <button
-              key={m.station.id}
-              onClick={() => setSelectedStation(selectedStation === m.station.id ? null : m.station.id)}
-              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                selectedStation === m.station.id
-                  ? 'ring-2 ring-blue-400 bg-blue-50 text-blue-700'
-                  : `${m.gradient} text-white shadow-sm hover:shadow-md`
-              }`}
-            >
-              <span className="font-bold mr-1">#{i + 1}</span>
-              {shortName(m.station.name)}
-              <span className="ml-1.5 opacity-80">{(m.utilization * 100).toFixed(0)}%</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Main Visualization */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Visual Map */}
-        <div className="xl:col-span-2">
-          {viewMode === 'flow' && (
-            <FlowView
-              metrics={stationMetrics}
-              selectedStation={selectedStation}
-              onSelectStation={setSelectedStation}
-            />
-          )}
-          {viewMode === 'grid' && (
-            <GridView
-              metrics={stationMetrics}
-              selectedStation={selectedStation}
-              onSelectStation={setSelectedStation}
-            />
-          )}
-        </div>
-
-        {/* Ranking Panel — scrollable with dynamic height */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex flex-col">
-          <h4 className="text-sm font-semibold text-gray-800 mb-4 flex items-center flex-shrink-0">
-            <RankIcon className="w-4 h-4 mr-2 text-gray-500" />
-            Bottleneck Ranking
-            <span className="ml-auto text-xs text-gray-400 font-normal" title="Utilization = busy + setup + failed">{sortedMetrics.length} stations</span>
-          </h4>
-
-          <div
-            className="space-y-3 overflow-y-auto flex-1"
-            style={{ maxHeight: Math.min(sortedMetrics.length * 72, 480) }}
-          >
-            {sortedMetrics.map((metrics, index) => (
-              <StationRankCard
-                key={metrics.station.id}
-                metrics={metrics}
-                rank={index + 1}
-                isSelected={selectedStation === metrics.station.id}
-                onClick={() => setSelectedStation(
-                  selectedStation === metrics.station.id ? null : metrics.station.id
-                )}
-              />
-            ))}
+      <div style={{ display: 'grid', gap: 14, gridTemplateColumns: 'minmax(0, 2fr) minmax(260px, 1fr)' }}>
+        <figure style={{ margin: 0 }}>
+          <figcaption style={capStyle}>{t('Time split per station, in flow order')}</figcaption>
+          <Legend />
+          <div role="list" style={{ display: 'grid', gap: 4, marginTop: 6 }}>
+            {flowRows.map((m) => {
+              const isSel = m.station.id === selectedStation;
+              const busy = Math.max(0, m.utilization - m.setup - m.failed);
+              const idle = Math.max(0, 1 - m.utilization - m.blocked - m.starved);
+              return (
+                <button key={m.station.id} type="button" role="listitem"
+                  onClick={() => setSelectedStation(isSel ? null : m.station.id)}
+                  aria-pressed={isSel}
+                  title={`${m.station.name}: ${pct(m.utilization, 1)} in use · blocked ${pct(m.blocked)} · starved ${pct(m.starved)}`}
+                  style={{
+                    display: 'grid', gridTemplateColumns: '140px 1fr 56px', alignItems: 'center', gap: 10,
+                    padding: '4px 6px', border: '1px solid', borderColor: isSel ? 'var(--select-border, #7DB2EC)' : 'transparent',
+                    background: isSel ? 'var(--select-bg, #DCEBFB)' : 'transparent', borderRadius: 2, cursor: 'pointer', textAlign: 'left',
+                  }}>
+                  <span style={{ fontSize: 12, color: 'var(--t1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: m.isBottleneck ? 600 : 400 }}>
+                    {shortName(m.station.name)}
+                  </span>
+                  <span style={{ display: 'flex', height: 14, background: 'var(--gray-100, #F1F5F9)', border: '1px solid var(--border, #E2E8F0)' }}>
+                    {SEGMENTS.map((seg) => {
+                      const v = seg.key === 'busy' ? busy : seg.key === 'setup' ? m.setup : seg.key === 'failed' ? m.failed : seg.key === 'blocked' ? m.blocked : seg.key === 'starved' ? m.starved : idle;
+                      return v > 0.002 ? <span key={seg.key} style={{ width: `${v * 100}%`, background: seg.color }} /> : null;
+                    })}
+                  </span>
+                  <span style={{ ...numStyle, color: toneColor(m.utilization) }}>{pct(m.utilization)}</span>
+                </button>
+              );
+            })}
           </div>
+          {stationMetrics.length > 12 && (
+            <button type="button" className="ribbon-sbtn" style={{ marginTop: 6 }} onClick={() => setShowAll((v) => !v)}>
+              {showAll ? 'Show the 12 busiest' : `Show all ${stationMetrics.length} stations`}
+            </button>
+          )}
+        </figure>
 
-          {/* Enhanced Legend */}
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <div className="text-xs font-medium text-gray-600 mb-3">Severity Legend</div>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { label: 'Critical (>90%)', color: 'bg-red-500', pulse: true },
-                { label: 'High (80-90%)', color: 'bg-orange-500', pulse: false },
-                { label: 'Medium (65-80%)', color: 'bg-yellow-500', pulse: false },
-                { label: 'Low (<65%)', color: 'bg-green-500', pulse: false },
-              ].map((item) => (
-                <div key={item.label} className="flex items-center space-x-2">
-                  <div className={`w-3 h-3 rounded-full ${item.color} ${item.pulse ? 'animate-pulse' : ''}`} />
-                  <span className="text-xs text-gray-500">{item.label}</span>
-                </div>
+        <div>
+          <div style={capStyle}>{t('Ranking by utilisation')}</div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ color: 'var(--t3)', textAlign: 'right' }}>
+                {['#', 'Station', 'In use', 'Queue', 'Wait'].map((h, i) => (
+                  <th key={h} style={{ ...thStyle, textAlign: i === 1 ? 'left' : 'right' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sortedMetrics.slice(0, showAll ? undefined : 12).map((m, i) => (
+                <tr key={m.station.id} onClick={() => setSelectedStation(m.station.id === selectedStation ? null : m.station.id)}
+                  style={{ cursor: 'pointer', background: m.station.id === selectedStation ? 'var(--select-bg, #DCEBFB)' : undefined }}>
+                  <td style={{ ...tdStyle, ...numStyle, color: 'var(--t3)' }}>{i + 1}</td>
+                  <td style={{ ...tdStyle, textAlign: 'left', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {shortName(m.station.name)}{m.isBottleneck && <span style={tagStyle}>{t('BOTTLENECK')}</span>}
+                  </td>
+                  <td style={{ ...tdStyle, ...numStyle, color: toneColor(m.utilization) }}>{pct(m.utilization, 1)}</td>
+                  <td style={{ ...tdStyle, ...numStyle }}>{m.isPassThrough ? '—' : m.queueLength}</td>
+                  <td style={{ ...tdStyle, ...numStyle }}>{fmtWait(m.waitTime)}</td>
+                </tr>
               ))}
-            </div>
-          </div>
+            </tbody>
+          </table>
+          <p style={{ fontSize: 11, color: 'var(--t3)', margin: '6px 0 0', lineHeight: 1.4 }}>
+            In use = busy + setup + failed. Bottleneck = above 85 %. Queue and wait are for the station&apos;s input buffer.
+          </p>
         </div>
       </div>
 
-      {/* Extra Nodes Section (palletizer, conveyor, etc.) */}
-      {(() => {
-        const extraNodes = (kpis as any).extraNodes || {};
-        const stationIds = new Set(stations.map(s => s.id));
-        const extraEntries = Object.entries(extraNodes).filter(([id]) => !stationIds.has(id));
-        if (extraEntries.length === 0) return null;
-        return (
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center">
-              <StationIcon className="w-4 h-4 mr-2 text-gray-500" />
-              Extra Nodes
-              <span className="ml-auto text-xs text-gray-400 font-normal">{extraEntries.length} nodes</span>
-            </h4>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {extraEntries.map(([id, stats]: [string, any]) => {
+      {selected && <StationDetails metrics={selected} onClose={() => setSelectedStation(null)} />}
+
+      {extraEntries.length > 0 && (
+        <div>
+          <div style={capStyle}>{t('Other elements')}</div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ color: 'var(--t3)', textAlign: 'right' }}>
+                {['Element', 'Processing', 'Waiting', 'Occupied'].map((h, i) => <th key={h} style={{ ...thStyle, textAlign: i === 0 ? 'left' : 'right' }}>{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {extraEntries.map(([id, stats]) => {
                 const st = stats.state_times || stats.stateTimes || {};
-                const total = Object.values(st).reduce((s: number, v: any) => s + (v as number), 0) || 1;
-                const processing = ((st.processing || 0) / (total as number));
-                const waiting = ((st.waiting || 0) / (total as number));
-                const util = processing + waiting;
-                const severity = getSeverity(util);
+                const total = (Object.values(st) as number[]).reduce((a, v) => a + v, 0) || 1;
+                const processing = (st.processing || 0) / total;
+                const waiting = (st.waiting || 0) / total;
                 return (
-                  <div key={id} className={`p-3 rounded-xl ${getGradient(severity)} shadow-md`} style={{ minWidth: 160 }}>
-                    <div className="text-sm font-bold text-white mb-1 truncate">{stats.name || id}</div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-white/70">Occupied</span>
-                      <span className="text-sm font-bold text-white">{(util * 100).toFixed(0)}%</span>
-                    </div>
-                    <div className="h-2 bg-white/30 rounded-full overflow-hidden mt-1">
-                      <div className="h-full bg-white rounded-full" style={{ width: `${util * 100}%` }} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-1 mt-2 pt-1.5 border-t border-white/20">
-                      <div className="text-center">
-                        <div className="text-[9px] text-white/60">Process</div>
-                        <div className="text-[11px] font-bold text-white">{(processing * 100).toFixed(0)}%</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-[9px] text-white/60">Wait</div>
-                        <div className="text-[11px] font-bold text-white">{(waiting * 100).toFixed(0)}%</div>
-                      </div>
-                    </div>
-                  </div>
+                  <tr key={id}>
+                    <td style={{ ...tdStyle, textAlign: 'left' }}>{stats.name || id}</td>
+                    <td style={{ ...tdStyle, ...numStyle }}>{pct(processing)}</td>
+                    <td style={{ ...tdStyle, ...numStyle }}>{pct(waiting)}</td>
+                    <td style={{ ...tdStyle, ...numStyle, color: toneColor(processing + waiting) }}>{pct(processing + waiting)}</td>
+                  </tr>
                 );
               })}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Selected Station Details */}
-      {selectedStation && (
-        <StationDetails
-          metrics={stationMetrics.find(m => m.station.id === selectedStation)!}
-          onClose={() => setSelectedStation(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-// Flow View Component - Shows stations connected with flow lines
-function FlowView({
-  metrics,
-  selectedStation,
-  onSelectStation,
-}: {
-  metrics: StationMetrics[];
-  selectedStation: string | null;
-  onSelectStation: (id: string | null) => void;
-}) {
-  const [showAll, setShowAll] = useState(false);
-
-  const displayMetrics = !showAll && metrics.length > 10
-    ? [...metrics].sort((a, b) => b.utilization - a.utilization).slice(0, 10)
-    : metrics;
-
-  return (
-    <div
-      className="relative bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 rounded-xl border border-gray-200 overflow-y-auto"
-      style={{ maxHeight: '70vh', minHeight: 200 }}
-    >
-      {/* Grid Pattern Background */}
-      <svg className="absolute inset-0 w-full h-full opacity-30 pointer-events-none">
-        <defs>
-          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#cbd5e1" strokeWidth="0.5" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#grid)" />
-      </svg>
-
-      {/* Show all toggle for large station counts */}
-      {metrics.length > 10 && (
-        <div className="relative px-4 pt-3 flex justify-end">
-          <button
-            onClick={() => setShowAll(!showAll)}
-            className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
-          >
-            {showAll ? 'Show top 10' : `Show all ${metrics.length}`}
-          </button>
-        </div>
-      )}
-
-      {/* Station Nodes — flow layout with wrapping */}
-      <div className="relative p-4 flex flex-wrap gap-4 justify-center">
-        {displayMetrics.map((m) => {
-          const isSelected = selectedStation === m.station.id;
-
-          return (
-            <div
-              key={m.station.id}
-              className={`relative transition-all duration-300 cursor-pointer
-                ${isSelected ? 'scale-110 z-20' : 'hover:scale-105 z-10'}`}
-              onClick={() => onSelectStation(isSelected ? null : m.station.id)}
-              title={m.station.name}
-            >
-              {/* Pulse ring for bottlenecks */}
-              {m.isBottleneck && (
-                <div className="absolute inset-0 -m-2">
-                  <div className={`w-full h-full rounded-xl ${m.color} opacity-30 animate-ping`} />
-                </div>
-              )}
-
-              {/* Station Card */}
-              <div
-                className={`relative p-3 rounded-xl shadow-lg border-2 transition-all
-                  ${isSelected ? 'border-blue-500 ring-4 ring-blue-100' : 'border-transparent'}
-                  ${m.gradient}`}
-                style={{ minWidth: 180, maxWidth: 220 }}
-              >
-                <div className="text-sm font-bold text-white mb-1.5" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{shortName(m.station.name)}</div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-white/80">Busy</span>
-                  <span className="text-sm font-bold text-white">{(m.utilization * 100).toFixed(0)}%</span>
-                </div>
-                <div className="mt-1.5 h-2 bg-white/30 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-white rounded-full transition-all duration-500"
-                    style={{ width: `${m.utilization * 100}%` }}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-1 mt-2 pt-1.5 border-t border-white/20">
-                  <div className="text-center">
-                    <div className="text-[9px] text-white/60">Queue</div>
-                    <div className="text-[11px] font-bold text-white">{m.queueLength}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-[9px] text-white/60">Thru</div>
-                    <div className="text-[11px] font-bold text-white">{m.throughput}/hr</div>
-                  </div>
-                </div>
-                {m.isBottleneck && (
-                  <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow">
-                    <span className="text-[10px] text-red-600 font-bold">!</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// Grid View Component - Clean grid layout
-function GridView({
-  metrics,
-  selectedStation,
-  onSelectStation,
-}: {
-  metrics: StationMetrics[];
-  selectedStation: string | null;
-  onSelectStation: (id: string | null) => void;
-}) {
-  return (
-    <div
-      className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200 p-4 overflow-y-auto"
-      style={{ maxHeight: '70vh', minHeight: 200 }}
-    >
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {metrics.map((m) => {
-          const isSelected = selectedStation === m.station.id;
-          return (
-            <div
-              key={m.station.id}
-              onClick={() => onSelectStation(isSelected ? null : m.station.id)}
-              title={m.station.name}
-              className={`relative p-4 rounded-xl cursor-pointer transition-all duration-300
-                ${m.gradient} shadow-md hover:shadow-xl
-                ${isSelected ? 'ring-4 ring-blue-400 scale-105' : 'hover:scale-102'}`}
-              style={{ minWidth: 180 }}
-            >
-              {m.isBottleneck && (
-                <div className="absolute top-2 right-2">
-                  <span className="relative flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
-                  </span>
-                </div>
-              )}
-
-              <div className="text-sm font-bold text-white mb-2" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{shortName(m.station.name)}</div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-white/70">Occupied</span>
-                  <span className="text-sm font-bold text-white">{(m.utilization * 100).toFixed(1)}%</span>
-                </div>
-                <div className="h-2 bg-white/30 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-white rounded-full"
-                    style={{ width: `${m.utilization * 100}%` }}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-1 mt-2 pt-2 border-t border-white/20">
-                  <div className="text-center">
-                    <div className="text-[10px] text-white/60">Queue</div>
-                    <div className="text-xs font-bold text-white">{m.queueLength}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-[10px] text-white/60">Thru</div>
-                    <div className="text-xs font-bold text-white">{m.throughput}/hr</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// Station Rank Card Component
-function StationRankCard({
-  metrics,
-  rank,
-  isSelected,
-  onClick,
-}: {
-  metrics: StationMetrics;
-  rank: number;
-  isSelected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <div
-      onClick={onClick}
-      className={`flex items-center p-3 rounded-lg cursor-pointer transition-all duration-200
-        ${isSelected ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50 border border-transparent'}`}
-    >
-      <div className={`w-8 h-8 rounded-lg ${metrics.gradient} flex items-center justify-center shadow-sm mr-3`}>
-        <span className="text-xs font-bold text-white">{rank}</span>
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center">
-          <span className="text-sm font-medium text-gray-900 truncate" title={metrics.station.name}>{shortName(metrics.station.name)}</span>
-          {metrics.isBottleneck && (
-            <span className="ml-2 status-pill status-pill-bad">
-              <span className="status-dot status-dot-bad" />
-              BOTTLENECK
-            </span>
-          )}
-        </div>
-        <div className="flex items-center space-x-3 mt-1">
-          <span className="text-xs text-gray-500">
-            {metrics.isPassThrough ? `Flow-through (${metrics.bufferTotalItems} items)` : `Queue: ${metrics.queueLength}`}
-          </span>
-          <span className="text-xs text-gray-500">Wait: {metrics.waitTime.toFixed(0)}s</span>
-          {metrics.blocked > 0.3 && (
-            <span className="text-xs text-amber-600 font-medium">Blocked: {(metrics.blocked * 100).toFixed(0)}%</span>
-          )}
-          {metrics.starved > 0.5 && (
-            <span className="text-xs text-purple-600 font-medium">Starved: {(metrics.starved * 100).toFixed(0)}%</span>
-          )}
-        </div>
-      </div>
-
-      <div className="text-right ml-2" title="Busy % (processing + setup + failed)">
-        <div className={`text-sm font-bold font-mono tabular-nums ${getTextColor(metrics.severity)}`}>
-          {(metrics.utilization * 100).toFixed(1)}%
-        </div>
-        <div className="w-16 h-1.5 bg-gray-200 rounded-full mt-1 overflow-hidden">
-          <div
-            className={`h-full ${metrics.color} rounded-full transition-all duration-500`}
-            style={{ width: `${metrics.utilization * 100}%` }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Station Details Panel
-function StationDetails({
-  metrics,
-  onClose,
-}: {
-  metrics: StationMetrics;
-  onClose: () => void;
-}) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center">
-          <div className={`w-10 h-10 rounded-xl ${metrics.gradient} flex items-center justify-center mr-3`}>
-            <StationIcon className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-gray-900">{metrics.station.name}</h3>
-            <span className={`text-sm ${getTextColor(metrics.severity)}`}>
-              {metrics.severity.charAt(0).toUpperCase() + metrics.severity.slice(1)} Priority
-            </span>
-          </div>
-        </div>
-        <button
-          onClick={onClose}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <CloseIcon className="w-5 h-5 text-gray-500" />
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <MetricBox
-          label="Occupied"
-          value={`${(metrics.utilization * 100).toFixed(1)}%`}
-          trend={metrics.utilization > 0.85 ? 'up' : 'stable'}
-          color={metrics.severity}
-        />
-        <MetricBox
-          label="Blocked"
-          value={`${(metrics.blocked * 100).toFixed(1)}%`}
-          trend={metrics.blocked > 0.3 ? 'up' : 'stable'}
-          color={metrics.blocked > 0.3 ? 'high' : 'low'}
-        />
-        <MetricBox
-          label="Starved"
-          value={`${(metrics.starved * 100).toFixed(1)}%`}
-          trend={metrics.starved > 0.5 ? 'up' : 'stable'}
-          color={metrics.starved > 0.5 ? 'high' : 'low'}
-        />
-        <MetricBox
-          label="Avg Wait Time"
-          value={`${metrics.waitTime.toFixed(1)}s`}
-          trend={metrics.waitTime > 60 ? 'up' : 'down'}
-          color={metrics.waitTime > 60 ? 'high' : 'low'}
-        />
-        <MetricBox
-          label="Throughput"
-          value={`${metrics.throughput}/hr`}
-          trend="stable"
-          color="low"
-        />
-        <MetricBox
-          label="Queue Length"
-          value={metrics.queueLength.toString()}
-          trend={metrics.queueLength > 10 ? 'up' : 'stable'}
-          color={metrics.queueLength > 10 ? 'medium' : 'low'}
-        />
-      </div>
-
-      {metrics.isBottleneck && (
-        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <div className="flex items-start">
-            <WarningIcon className="w-5 h-5 text-red-500 mt-0.5 mr-3" />
-            <div>
-              <h4 className="text-sm font-semibold text-red-800">Bottleneck Detected</h4>
-              <p className="text-sm text-red-600 mt-1">
-                This station is constraining overall throughput. Consider adding capacity,
-                reducing cycle time, or balancing load with parallel stations.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {metrics.blocked > 0.3 && (
-        <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-          <div className="flex items-start">
-            <WarningIcon className="w-5 h-5 text-amber-500 mt-0.5 mr-3" />
-            <div>
-              <h4 className="text-sm font-semibold text-amber-800">
-                Critically Blocked ({(metrics.blocked * 100).toFixed(0)}%)
-              </h4>
-              <p className="text-sm text-amber-600 mt-1">
-                This station spends {(metrics.blocked * 100).toFixed(0)}% of the time blocked waiting
-                to push items downstream. Check downstream buffer capacity or processing speed.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {metrics.starved > 0.5 && !metrics.isBottleneck && (
-        <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-          <div className="flex items-start">
-            <WarningIcon className="w-5 h-5 text-purple-500 mt-0.5 mr-3" />
-            <div>
-              <h4 className="text-sm font-semibold text-purple-800">
-                Severely Starved ({(metrics.starved * 100).toFixed(0)}%)
-              </h4>
-              <p className="text-sm text-purple-600 mt-1">
-                This station is idle {(metrics.starved * 100).toFixed(0)}% of the time waiting for
-                input. The upstream process cannot keep up.
-              </p>
-            </div>
-          </div>
+            </tbody>
+          </table>
         </div>
       )}
     </div>
   );
+});
+
+export { BottleneckHeatmap };
+
+// ── Presentation helpers (engineering style: square borders, tokens, tabular numbers) ──
+
+const SEGMENTS = [
+  { key: 'busy', label: 'Busy', color: '#2563EB' },
+  { key: 'setup', label: 'Setup', color: '#7C8BA1' },
+  { key: 'failed', label: 'Failed', color: '#DC2626' },
+  { key: 'blocked', label: 'Blocked', color: '#D97706' },
+  { key: 'starved', label: 'Starved', color: '#E8C26A' },
+  { key: 'idle', label: 'Idle', color: 'transparent' },
+] as const;
+
+const capStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: 'var(--t1)', marginBottom: 6 };
+const numStyle: React.CSSProperties = { fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontVariantNumeric: 'tabular-nums', textAlign: 'right' };
+const thStyle: React.CSSProperties = { padding: '4px 6px', fontWeight: 600, fontSize: 10.5, letterSpacing: '0.04em', textTransform: 'uppercase', borderBottom: '1px solid var(--border)' };
+const tdStyle: React.CSSProperties = { padding: '4px 6px', borderBottom: '1px solid var(--border-subtle, #F1F5F9)', textAlign: 'right' };
+const tagStyle: React.CSSProperties = { marginLeft: 6, fontSize: 9.5, fontWeight: 600, letterSpacing: '0.04em', color: 'var(--red)', border: '1px solid var(--red)', padding: '0 3px', borderRadius: 2 };
+
+const pct = (v: number, d = 0) => `${(v * 100).toFixed(d)}%`;
+const fmtWait = (s: number) => (s >= 3600 ? `${(s / 3600).toFixed(1)} h` : s >= 60 ? `${Math.round(s / 60)} min` : `${Math.round(s)} s`);
+const toneColor = (u: number) => (u >= 0.9 ? 'var(--red)' : u >= 0.8 ? 'var(--amber)' : 'var(--t1)');
+
+function Legend() {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', fontSize: 11, color: 'var(--t2)' }}>
+      {SEGMENTS.map((sg) => (
+        <span key={sg.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 10, height: 10, background: sg.color, border: sg.key === 'idle' ? '1px solid var(--border)' : 'none' }} />{sg.label}
+        </span>
+      ))}
+    </div>
+  );
 }
 
-// Summary Card Component
-function SummaryCard({
-  title,
-  value,
-  subtitle,
-  icon,
-  color,
-}: {
-  title: string;
-  value: string;
-  subtitle: string;
-  icon: React.ReactNode;
-  color: 'red' | 'orange' | 'blue' | 'green';
-}) {
-  const colors = {
-    red: 'bg-red-50 border-red-200 text-red-600',
-    orange: 'bg-orange-50 border-orange-200 text-orange-600',
-    blue: 'bg-blue-50 border-blue-200 text-blue-600',
-    green: 'bg-green-50 border-green-200 text-green-600',
-  };
-
-  const iconColors = {
-    red: 'bg-red-100 text-red-600',
-    orange: 'bg-orange-100 text-orange-600',
-    blue: 'bg-blue-100 text-blue-600',
-    green: 'bg-green-100 text-green-600',
-  };
-
+function Tile({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: 'warn' | 'bad' }) {
+  const color = tone === 'bad' ? 'var(--red)' : tone === 'warn' ? 'var(--amber)' : 'var(--t1)';
   return (
-    <div className={`p-4 rounded-xl border ${colors[color]}`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium opacity-80">{title}</span>
-        <div className={`p-1.5 rounded-lg ${iconColors[color]}`}>
-          {icon}
+    <div style={{ border: '1px solid var(--border)', borderRadius: 3, padding: '10px 12px', background: 'var(--surface)' }}>
+      <div style={{ fontSize: 10.5, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--t3)', fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 600, color, marginTop: 2, fontVariantNumeric: 'tabular-nums', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+      {sub && <div style={{ fontSize: 11.5, color: 'var(--t2)', marginTop: 1 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function Note({ tone, title, children }: { tone: 'warn' | 'bad' | 'info'; title: string; children: React.ReactNode }) {
+  const c = tone === 'bad' ? 'var(--red)' : tone === 'warn' ? 'var(--amber)' : 'var(--blue)';
+  const bg = tone === 'bad' ? 'var(--red-bg)' : tone === 'warn' ? 'var(--amber-bg)' : 'var(--blue-bg)';
+  return (
+    <div style={{ borderLeft: `3px solid ${c}`, background: bg, padding: '8px 12px' }}>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--t1)' }}>{title}</div>
+      <div style={{ fontSize: 12, color: 'var(--t2)', marginTop: 2, lineHeight: 1.45 }}>{children}</div>
+    </div>
+  );
+}
+
+function StationDetails({ metrics: m, onClose }: { metrics: StationMetrics; onClose: () => void }) {
+  const cells: [string, string][] = [
+    ['In use', pct(m.utilization, 1)], ['Blocked', pct(m.blocked, 1)], ['Starved', pct(m.starved, 1)],
+    ['Throughput', `${m.throughput}/h`], ['Queue (avg)', m.isPassThrough ? '—' : String(m.queueLength)], ['Wait in queue', fmtWait(m.waitTime)],
+  ];
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 3, background: 'var(--surface)' }}>
+      <div className="dock-panel-title">
+        <span>{m.station.name}</span>
+        <button type="button" onClick={onClose} aria-label={t('Close details')} title={t('Close')}
+          style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--t3)', fontSize: 14, lineHeight: 1 }}>×</button>
+      </div>
+      <div style={{ padding: '10px 12px', display: 'grid', gap: 10 }}>
+        <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))' }}>
+          {cells.map(([k, v]) => (
+            <div key={k}>
+              <div style={{ fontSize: 10.5, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--t3)', fontWeight: 600 }}>{k}</div>
+              <div style={{ ...numStyle, textAlign: 'left', fontSize: 15, color: 'var(--t1)' }}>{v}</div>
+            </div>
+          ))}
         </div>
-      </div>
-      <div className="text-xl font-bold truncate font-mono tabular-nums">{value}</div>
-      <div className="text-xs opacity-70 mt-1">{subtitle}</div>
-    </div>
-  );
-}
-
-// Metric Box Component
-function MetricBox({
-  label,
-  value,
-  trend,
-}: {
-  label: string;
-  value: string;
-  trend: 'up' | 'down' | 'stable';
-  color?: string;
-}) {
-  return (
-    <div className="p-3 bg-gray-50 rounded-lg">
-      <div className="text-xs text-gray-500 mb-1">{label}</div>
-      <div className="flex items-center justify-between">
-        <span className="text-lg font-bold text-gray-900 font-mono tabular-nums">{value}</span>
-        {trend === 'up' && <span className="text-red-500 text-sm">↑</span>}
-        {trend === 'down' && <span className="text-green-500 text-sm">↓</span>}
-        {trend === 'stable' && <span className="text-gray-400 text-sm">→</span>}
+        {m.isBottleneck && (
+          <Note tone="bad" title={t('Constrains the line')}>
+            Above 85 % in use. Shorter cycle time, a parallel machine or less setup and downtime here raises output; improving other stations will not.
+          </Note>
+        )}
+        {m.blocked > 0.3 && (
+          <Note tone="warn" title={`Blocked ${pct(m.blocked)} of the time`}>
+            It waits to pass parts downstream: the next buffer is full or the next station is slower.
+          </Note>
+        )}
+        {m.starved > 0.5 && !m.isBottleneck && (
+          <Note tone="info" title={`Starved ${pct(m.starved)} of the time`}>
+            It waits for parts: upstream cannot keep up, so capacity here is not the issue.
+          </Note>
+        )}
       </div>
     </div>
   );
 }
 
-// Helper Functions
 function getSeverity(utilization: number): 'low' | 'medium' | 'high' | 'critical' {
-  if (utilization >= 0.95) return 'critical';
-  if (utilization >= 0.85) return 'high';
-  if (utilization >= 0.75) return 'medium';
+  if (utilization > 0.9) return 'critical';
+  if (utilization > 0.8) return 'high';
+  if (utilization > 0.65) return 'medium';
   return 'low';
-}
-
-function getColor(severity: string): string {
-  switch (severity) {
-    case 'critical': return 'bg-red-500';
-    case 'high': return 'bg-orange-500';
-    case 'medium': return 'bg-yellow-500';
-    default: return 'bg-green-500';
-  }
-}
-
-function getGradient(severity: string): string {
-  switch (severity) {
-    case 'critical': return 'bg-gradient-to-br from-red-500 to-red-700';
-    case 'high': return 'bg-gradient-to-br from-orange-500 to-orange-700';
-    case 'medium': return 'bg-gradient-to-br from-yellow-500 to-yellow-600';
-    default: return 'bg-gradient-to-br from-green-500 to-green-700';
-  }
-}
-
-function getTextColor(severity: string): string {
-  switch (severity) {
-    case 'critical': return 'text-red-600';
-    case 'high': return 'text-orange-600';
-    case 'medium': return 'text-yellow-600';
-    default: return 'text-green-600';
-  }
-}
-
-// Icon wrappers using Lucide
-const sw = 1.75;
-function FactoryIcon({ className }: { className?: string }) {
-  return <Factory className={className} strokeWidth={sw} />;
-}
-function AlertIcon({ className }: { className?: string }) {
-  return <AlertTriangle className={className} strokeWidth={sw} />;
-}
-function WarningIcon({ className }: { className?: string }) {
-  return <AlertCircle className={className} strokeWidth={sw} />;
-}
-function ChartIcon({ className }: { className?: string }) {
-  return <BarChart3 className={className} strokeWidth={sw} />;
-}
-function CheckIcon({ className }: { className?: string }) {
-  return <CheckCircle2 className={className} strokeWidth={sw} />;
-}
-function RankIcon({ className }: { className?: string }) {
-  return <ArrowUpDown className={className} strokeWidth={sw} />;
-}
-function StationIcon({ className }: { className?: string }) {
-  return <Settings className={className} strokeWidth={sw} />;
-}
-function CloseIcon({ className }: { className?: string }) {
-  return <X className={className} strokeWidth={sw} />;
 }

@@ -3,6 +3,7 @@ import { Button } from '../common/Button';
 import { useModelStore } from '../../stores/modelStore';
 import { useAppStore } from '../../stores/appStore';
 
+import { t } from '../../i18n';
 interface SavedModelSummary {
   id: string;
   name: string;
@@ -65,7 +66,7 @@ export function ModelManager({ isOpen, onClose }: ModelManagerProps) {
       <div className="bg-white rounded-lg w-full max-w-lg max-h-[70vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Saved Models</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t('Saved Models')}</h2>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
             <CloseIcon className="w-5 h-5 text-gray-500" />
           </button>
@@ -76,8 +77,8 @@ export function ModelManager({ isOpen, onClose }: ModelManagerProps) {
           {savedModels.length === 0 ? (
             <div className="text-center py-8 text-gray-400">
               <FolderIcon className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-              <p className="text-sm">No saved models yet</p>
-              <p className="text-xs mt-1">Save your current model using the save button in the header</p>
+              <p className="text-sm">{t('No saved models yet')}</p>
+              <p className="text-xs mt-1">{t('Save your current model using the save button in the header')}</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -95,7 +96,7 @@ export function ModelManager({ isOpen, onClose }: ModelManagerProps) {
                   <div className="flex items-center space-x-1.5 ml-3">
                     {deleteConfirm === m.id ? (
                       <>
-                        <span className="text-xs text-red-600 mr-1">Delete?</span>
+                        <span className="text-xs text-red-600 mr-1">{t('Delete?')}</span>
                         <Button size="sm" variant="danger" onClick={() => handleDelete(m.id)}>
                           Yes
                         </Button>
@@ -111,7 +112,7 @@ export function ModelManager({ isOpen, onClose }: ModelManagerProps) {
                         <button
                           onClick={() => setDeleteConfirm(m.id)}
                           className="p-1.5 hover:bg-red-50 rounded"
-                          title="Delete"
+                          title={t('Delete')}
                         >
                           <TrashIcon className="w-4 h-4 text-red-400" />
                         </button>

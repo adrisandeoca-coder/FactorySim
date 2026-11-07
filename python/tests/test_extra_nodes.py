@@ -431,12 +431,21 @@ class TestSplitterMerge:
         assert merge.items_processed > 0
 
     def test_splitter_tags_product(self):
-        """Splitter should set _splitter_output attribute on products."""
+        """Splitter assigns every product an output, alternating for 'equal'.
+
+        The _splitter_output tag is consumed (popped) by the router as soon as
+        the product is redirected, so it never survives to completion; check
+        the splitter's route decisions instead of the leftover attribute.
+        """
         result, sim = run_scenario(MODEL_SPLITTER_MERGE, duration=7200, label="split_tag")
-        # Check completed products for splitter tags
-        tagged = [p for p in sim.completed_products
-                  if "_splitter_output" in p.attributes]
-        assert len(tagged) > 0, "Some products should be tagged by splitter"
+        routes = [e["details"]["output_index"] for e in sim.event_log
+                  if e["type"] == "splitter_route"]
+        split = sim.extra_nodes["split-1"]
+        assert len(routes) == split.items_processed > 0
+        assert set(routes) == {0, 1}, "equal split should use both outputs"
+        assert abs(routes.count(0) - routes.count(1)) <= 1
+        # The router consumed the tag: no completed part still carries it
+        assert not any("_splitter_output" in p.attributes for p in sim.completed_products)
 
 
 class TestAssemblyDisassembly:

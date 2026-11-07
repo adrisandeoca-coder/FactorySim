@@ -1,6 +1,5 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { LogOut } from 'lucide-react';
 
 interface SinkNodeData {
   label: string;
@@ -8,26 +7,88 @@ interface SinkNodeData {
   isSelected?: boolean;
 }
 
+function SinkIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" width="14" height="14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="13" width="14" height="4" rx="1.5" />
+      <path d="M10 3v7M6.5 6.5L10 10l3.5-3.5" />
+    </svg>
+  );
+}
+
 export const SinkNode = memo(({ data, selected }: NodeProps<SinkNodeData>) => {
   return (
     <div
-      className={`px-3 py-2.5 rounded-lg border-2 min-w-[140px] ${
-        selected ? 'border-red-500 shadow-lg' : 'border-red-300'
-      } bg-red-50`}
+      className={`factory-node sink ${selected ? 'selected' : ''}`}
+      style={{ minWidth: 140 }}
     >
-      <Handle type="target" position={Position.Left} className="w-3 h-3 bg-red-500" />
-      <div className="flex items-center space-x-2">
-        <div className="w-7 h-7 bg-red-500 rounded-full flex items-center justify-center">
-          <LogOut className="w-4 h-4 text-white" strokeWidth={1.75} />
+      <Handle type="target" position={Position.Left} style={{ background: '#ef4444', borderColor: '#dc2626' }} />
+
+      {/* Header */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '8px 10px 7px',
+        background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+        borderBottom: '1px solid #fecaca',
+      }}>
+        <div style={{
+          width: 28,
+          height: 28,
+          borderRadius: 7,
+          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          boxShadow: '0 1px 4px rgba(220,38,38,0.4)',
+          color: '#fff',
+        }}>
+          <SinkIcon />
         </div>
-        <div>
-          <div className="font-semibold text-[13px] text-red-900">{data.label}</div>
-          <div className="text-[11px] text-red-600">Sink / Exit</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#7f1d1d', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>
+            {data.label}
+          </div>
+          <div style={{ fontSize: 10, color: '#991b1b' }}>
+            Exit / Collector
+          </div>
         </div>
       </div>
+
+      {/* Body */}
       {data.totalProcessed !== undefined && (
-        <div className="mt-1.5 text-[11px] bg-red-100 rounded px-1.5 py-0.5 text-red-700 font-mono tabular-nums">
-          {data.totalProcessed} processed
+        <div style={{ padding: '5px 10px 7px' }}>
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '1px 7px',
+            borderRadius: 4,
+            fontSize: 10,
+            fontWeight: 700,
+            background: '#fee2e2',
+            color: '#dc2626',
+            fontVariantNumeric: 'tabular-nums',
+          }}>
+            {data.totalProcessed} processed
+          </span>
+        </div>
+      )}
+      {data.totalProcessed === undefined && (
+        <div style={{ padding: '5px 10px 7px' }}>
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '1px 7px',
+            borderRadius: 4,
+            fontSize: 10,
+            fontWeight: 500,
+            background: '#fee2e2',
+            color: '#b91c1c',
+          }}>
+            Collecting
+          </span>
         </div>
       )}
     </div>

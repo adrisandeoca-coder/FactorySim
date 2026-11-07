@@ -1,6 +1,5 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { ArrowDownCircle } from 'lucide-react';
 
 interface SourceNodeData {
   label: string;
@@ -12,42 +11,107 @@ interface SourceNodeData {
   isSelected?: boolean;
 }
 
+function SourceIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" width="14" height="14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="10" cy="10" r="3" fill="currentColor" stroke="none" opacity="0.3" />
+      <circle cx="10" cy="10" r="3" />
+      <path d="M10 2v3M10 15v3M2 10h3M15 10h3" />
+    </svg>
+  );
+}
+
 export const SourceNode = memo(({ data, selected }: NodeProps<SourceNodeData>) => {
   const feedMode = data.feedMode || 'interval';
 
   return (
     <div
-      className={`px-3 py-2.5 rounded-lg border-2 min-w-[140px] ${
-        selected ? 'border-green-500 shadow-lg' : 'border-green-300'
-      } bg-green-50`}
+      className={`factory-node source ${selected ? 'selected' : ''}`}
+      style={{ minWidth: 148 }}
     >
-      <div className="flex items-center space-x-2">
-        <div className="w-7 h-7 bg-green-500 rounded-full flex items-center justify-center">
-          <ArrowDownCircle className="w-4 h-4 text-white" strokeWidth={1.75} />
+      {/* Header */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '8px 10px 7px',
+        background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+        borderBottom: '1px solid #a7f3d0',
+      }}>
+        <div style={{
+          width: 28,
+          height: 28,
+          borderRadius: 7,
+          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          boxShadow: '0 1px 4px rgba(5,150,105,0.4)',
+          color: '#fff',
+        }}>
+          <SourceIcon />
         </div>
-        <div>
-          <div className="font-semibold text-[13px] text-green-900">{data.label}</div>
-          <div className="text-[11px] text-green-600">
-            {feedMode === 'orders' ? 'From orders' : data.arrivalRate ? `${data.arrivalRate}s interval` : 'Source'}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#064e3b', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>
+            {data.label}
+          </div>
+          <div style={{ fontSize: 10, color: '#065f46' }}>
+            {feedMode === 'orders' ? 'Order-driven' : data.arrivalRate ? `↻ ${data.arrivalRate}s` : 'Continuous'}
           </div>
         </div>
       </div>
-      <div className="mt-1.5 space-y-1">
-        <div className={`text-[11px] rounded px-1.5 py-0.5 ${feedMode === 'orders' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-          {feedMode === 'orders' ? 'Order queue' : 'Interval'}
-        </div>
+
+      {/* Body */}
+      <div style={{ padding: '5px 10px 7px', display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          padding: '1px 7px',
+          borderRadius: 4,
+          fontSize: 10,
+          fontWeight: 600,
+          background: feedMode === 'orders' ? '#dbeafe' : '#d1fae5',
+          color: feedMode === 'orders' ? '#1d4ed8' : '#065f46',
+        }}>
+          {feedMode === 'orders' ? 'Orders' : 'Interval'}
+        </span>
         {data.productType && (
-          <div className="text-[11px] bg-green-100 rounded px-1.5 py-0.5 text-green-700">
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '1px 7px',
+            borderRadius: 4,
+            fontSize: 10,
+            fontWeight: 500,
+            background: '#f0fdf4',
+            color: '#16a34a',
+            maxWidth: 100,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
             {data.productType}
-          </div>
+          </span>
         )}
         {data.productBatchSize && data.productBatchSize > 1 && (
-          <div className="text-[11px] bg-yellow-100 rounded px-1.5 py-0.5 text-yellow-700 font-mono tabular-nums">
-            Batch: {data.productBatchSize}
-          </div>
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '1px 7px',
+            borderRadius: 4,
+            fontSize: 10,
+            fontWeight: 600,
+            background: '#fef9c3',
+            color: '#854d0e',
+            fontVariantNumeric: 'tabular-nums',
+          }}>
+            ×{data.productBatchSize}
+          </span>
         )}
       </div>
-      <Handle type="source" position={Position.Right} className="w-3 h-3 bg-green-500" />
+
+      <Handle type="source" position={Position.Right} style={{ background: '#10b981', borderColor: '#059669' }} />
     </div>
   );
 });

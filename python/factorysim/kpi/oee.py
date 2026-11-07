@@ -124,9 +124,12 @@ class OEECalculator:
         if results:
             avg_availability = np.mean([r.availability for r in results])
             avg_performance = np.mean([r.performance for r in results])
-            # System-wide quality: good completed output vs good + scrapped
-            total_good_output = len([p for p in self.sim.completed_products if not p.is_scrap])
-            total_scrapped = sum(s.items_scrapped for s in self.sim.stations.values())
+            # System-wide quality: good completed output vs good + scrapped (excluding warmup)
+            warmup = self.sim.config.warmup_period
+            total_good_output = len([p for p in self.sim.completed_products
+                                     if not p.is_scrap and (p.completion_time if p.completion_time is not None else self.sim.env.now) >= warmup])
+            total_scrapped = len([p for p in self.sim.completed_products
+                                  if p.is_scrap and (p.completion_time if p.completion_time is not None else self.sim.env.now) >= warmup])
             avg_quality = (total_good_output / (total_good_output + total_scrapped)
                            if (total_good_output + total_scrapped) > 0 else 1.0)
             overall_oee = avg_availability * avg_performance * avg_quality

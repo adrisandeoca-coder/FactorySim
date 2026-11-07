@@ -8,6 +8,9 @@ import { getElement, getCachedImage } from './elementRegistry';
 import { generateModelExcelBase64 } from './modelExcelExporter';
 import { useLiveSimulationStore } from '../stores/liveSimulationStore';
 import type { FactoryModel, SimulationResult } from '../types';
+import { createLogger } from './logger';
+
+const log = createLogger('ArtifactService');
 
 export interface RunArtifactOptions {
   model: FactoryModel;
@@ -52,7 +55,7 @@ export async function saveRunArtifacts(opts: RunArtifactOptions): Promise<string
   const { model, result, simOptions, scenarioName, dashboardScreenshot, modelScreenshot, diagSnapshots, capturedFrames: passedFrames } = opts;
 
   if (!window.factorySim?.artifacts?.saveRunBundle) {
-    console.warn('artifacts:saveRunBundle IPC not available');
+    log.warn('artifacts:saveRunBundle IPC not available');
     return null;
   }
 
@@ -223,7 +226,7 @@ export async function saveRunArtifacts(opts: RunArtifactOptions): Promise<string
     });
     return savedPath;
   } catch (err) {
-    console.error('Failed to save run artifacts:', err);
+    log.error('Failed to save run artifacts', err);
     return null;
   }
 }

@@ -5,10 +5,11 @@ export function ToastContainer() {
   const { toasts, removeToast } = useAppStore();
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 space-y-2">
+    <div className="fixed bottom-4 right-4 z-50 space-y-2" aria-live="polite" aria-label="Notifications">
       {toasts.map((toast) => (
         <div
           key={toast.id}
+          role="alert"
           className={`toast toast-${toast.type} flex items-center space-x-3 animate-slide-in`}
         >
           <ToastIcon type={toast.type} />
@@ -16,6 +17,7 @@ export function ToastContainer() {
           <button
             onClick={() => removeToast(toast.id)}
             className="ml-2 hover:opacity-80"
+            aria-label="Dismiss notification"
           >
             <X className="w-4 h-4" strokeWidth={1.75} />
           </button>

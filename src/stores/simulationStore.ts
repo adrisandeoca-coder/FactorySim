@@ -2,12 +2,18 @@ import { create } from 'zustand';
 import type { SimulationResult, SimulationOptions, KPIData, Scenario } from '../types';
 import { useModelStore } from './modelStore';
 import { useLiveSimulationStore } from './liveSimulationStore';
+import { createLogger } from '../services/logger';
+
+const log = createLogger('SimulationStore');
 
 interface SimulationState {
   // Current simulation
   isRunning: boolean;
   progress: number;
   currentRunId: string | null;
+
+  // Error state
+  lastError: string | null;
 
   // Results
   lastResult: SimulationResult | null;
@@ -28,6 +34,8 @@ interface SimulationState {
   stopSimulation: () => void;
   setProgress: (progress: number, runId: string) => void;
   setResult: (result: SimulationResult) => void;
+  setError: (message: string) => void;
+  clearError: () => void;
   clearResults: () => void;
   markRunSaved: (runId: string) => void;
 
@@ -48,6 +56,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   isRunning: false,
   progress: 0,
   currentRunId: null,
+  lastError: null,
   lastResult: null,
   resultHistory: [],
   lastSavedRunId: null,
@@ -70,10 +79,11 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       isRunning: true,
       progress: 0,
       currentRunId: runId,
+      lastError: null,
     });
 
     // In a real implementation, this would call the Python bridge
-    console.log('Starting simulation with options:', {
+    log.info('Starting simulation with options', {
       ...get().defaultOptions,
       ...options,
     });
@@ -97,9 +107,23 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     set((state) => ({
       isRunning: false,
       progress: 100,
+      lastError: null,
       lastResult: result,
       resultHistory: [result, ...state.resultHistory].slice(0, 10),
     }));
+  },
+
+  setError: (message) => {
+    log.error('Simulation error:', message);
+    set({
+      isRunning: false,
+      progress: 0,
+      lastError: message,
+    });
+  },
+
+  clearError: () => {
+    set({ lastError: null });
   },
 
   clearResults: () => {
@@ -172,7 +196,12 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 // (stations/buffers/connections added/removed/edited), even when Dashboard
 // is unmounted.  This prevents stale KPIs from a previous model configuration.
 function modelFingerprint(m: { id?: string; stations: unknown[]; buffers: unknown[]; connections: unknown[]; products: unknown[] }): string {
-  return `${m.id ?? ''}|${m.stations.length}|${m.buffers.length}|${m.connections.length}|${m.products.length}|${JSON.stringify(m.stations.map((s: any) => s.id).sort())}`;
+  // Include key properties (not just counts/IDs) so property edits invalidate stale results
+  const stationFP = m.stations.map((s: any) => `${s.id}:${JSON.stringify(s.cycleTime)}:${s.scrapRate ?? 0}:${s.batchSize ?? 1}:${s.mtbf ?? ''}:${s.mttr ?? ''}`).sort().join(',');
+  const bufferFP = m.buffers.map((b: any) => `${b.id}:${b.capacity}`).sort().join(',');
+  const connFP = m.connections.map((c: any) => `${c.source}-${c.target}`).sort().join(',');
+  const prodFP = m.products.map((p: any) => `${p.id}:${p.arrivalRate ?? ''}:${JSON.stringify(p.routing)}`).sort().join(',');
+  return `${m.id ?? ''}|${stationFP}|${bufferFP}|${connFP}|${prodFP}`;
 }
 let _prevFingerprint: string | undefined;
 useModelStore.subscribe((state) => {

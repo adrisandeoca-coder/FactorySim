@@ -33,6 +33,23 @@ export function tor(r: number, tube: number, material: THREE.Material, x = 0, y 
   return m;
 }
 
+/** Box mesh + dark edge lines for crisp industrial look */
+export function beveledBox(
+  w: number, h: number, d: number,
+  mat: THREE.Material,
+  edgeColor = 0x1a1e24,
+): THREE.Group {
+  const g = new THREE.Group();
+  const geo = new THREE.BoxGeometry(w, h, d);
+  g.add(new THREE.Mesh(geo, mat));
+  const edges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(geo),
+    new THREE.LineBasicMaterial({ color: edgeColor, transparent: true, opacity: 0.6 })
+  );
+  g.add(edges);
+  return g;
+}
+
 /** Create a status light stack (3-color andon lamp) */
 export function createStatusLight(x = 0, y = 0, z = 0): THREE.Group {
   const g = new THREE.Group();

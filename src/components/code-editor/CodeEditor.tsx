@@ -5,8 +5,10 @@ import { Card, CardHeader } from '../common/Card';
 import { Button } from '../common/Button';
 import { useModelStore } from '../../stores/modelStore';
 import { useAppStore } from '../../stores/appStore';
-import { captureToBase64 } from '../../services/screenshotService';
-import { registerElement, setCachedImage } from '../../services/elementRegistry';
+import { useElementScreenshot } from '../../hooks/useElementScreenshot';
+import { ModelScriptEditor } from './ModelScriptEditor';
+import { runPythonScript } from '../../services/modelScript';
+import { t, useT } from '../../i18n';
 
 // Configure Monaco to use local package instead of CDN (CDN fails in Electron)
 loader.config({ monaco });
@@ -18,32 +20,20 @@ function getFilename(modelName: string | undefined, ext: string): string {
 }
 
 export function CodeEditor() {
+  useT();
   const { model } = useModelStore();
   const { addToast } = useAppStore();
 
   const [code, setCode] = useState('');
   const [output, setOutput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
-  const [viewMode, setViewMode] = useState<'code' | 'json' | 'diff'>('code');
+  const [viewMode, setViewMode] = useState<'script' | 'code' | 'json' | 'diff'>('script');
   const [monacoFailed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [diffSummary, setDiffSummary] = useState<string>('');
-  const codeEditorRef = useRef<HTMLDivElement>(null);
+  const codeEditorRef = useElementScreenshot('code-editor-tab');
   const exportRef = useRef<HTMLDivElement>(null);
-
-  // Register code editor tab for cross-tab screenshot capture
-  useEffect(() => {
-    registerElement('code-editor-tab', codeEditorRef.current);
-    return () => {
-      if (codeEditorRef.current) {
-        captureToBase64(codeEditorRef.current)
-          .then((base64) => setCachedImage('code-editor-tab', base64))
-          .catch(() => {});
-      }
-      registerElement('code-editor-tab', null);
-    };
-  }, []);
 
   // Close export dropdown on outside click
   useEffect(() => {
@@ -63,6 +53,7 @@ export function CodeEditor() {
 
   // Generate code from model via backend IPC
   useEffect(() => {
+    if (viewMode === 'script') return;
     if (viewMode === 'code') {
       setCode('# Generating code...');
       const factorySim = (window as any).factorySim;
@@ -136,24 +127,13 @@ export function CodeEditor() {
 
   const handleRunCode = async () => {
     setIsRunning(true);
-    setOutput('Running...\n');
-
-    setTimeout(() => {
-      setOutput(`Simulation started at ${new Date().toLocaleTimeString()}\n` +
-        `Processing ${model.stations.length} stations...\n` +
-        `Simulation complete.\n` +
-        `\nResults:\n` +
-        `- Total throughput: 1,250 units\n` +
-        `- OEE: 72.5%\n` +
-        `- Avg cycle time: 180s\n`
-      );
-      setIsRunning(false);
-      addToast({ type: 'success', message: 'Code executed successfully' });
-    }, 2000);
-  };
-
-  const handleSaveCode = () => {
-    addToast({ type: 'success', message: 'Code saved' });
+    setOutput(t('Running the exported script in Python…') + '\n');
+    const started = Date.now();
+    const r = await runPythonScript(code);
+    const secs = ((Date.now() - started) / 1000).toFixed(1);
+    setOutput((r.output || '') + (r.ok ? `\n[${t('finished in {s} s', { s: secs })}]` : `\n${r.error ?? ''}\n${r.traceback ?? ''}`));
+    setIsRunning(false);
+    addToast({ type: r.ok ? 'success' : 'error', message: r.ok ? t('Script finished') : t('Script failed') });
   };
 
   const handleExportFile = () => {
@@ -196,12 +176,22 @@ export function CodeEditor() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Code Editor</h1>
-          <p className="text-gray-500">View and edit the SimPy model code</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('Code Editor')}</h1>
+          <p className="text-gray-500">{viewMode === 'script' ? t('Build a model from Python and see it as you type') : t('View the model as SimPy code or JSON')}</p>
         </div>
 
         <div className="flex items-center space-x-3">
           <div className="flex bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('script')}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'script'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              {t('Model script')}
+            </button>
             <button
               onClick={() => setViewMode('code')}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
@@ -210,7 +200,7 @@ export function CodeEditor() {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Python
+              {t('SimPy export')}
             </button>
             <button
               onClick={() => setViewMode('json')}
@@ -233,18 +223,20 @@ export function CodeEditor() {
               Diff
             </button>
           </div>
-          <button
+          {viewMode !== 'script' && <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="p-2 hover:bg-gray-100 rounded-md text-gray-500"
             title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
           >
             <SidebarIcon className="w-5 h-5" />
-          </button>
+          </button>}
         </div>
       </div>
 
+      {viewMode === 'script' && <ModelScriptEditor />}
+
       {/* Main content */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0">
+      {viewMode !== 'script' && <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0">
         {/* Editor */}
         <div className={`${sidebarOpen ? 'lg:col-span-2' : 'lg:col-span-3'} flex flex-col`}>
           <Card padding={false} className="flex-1 flex flex-col overflow-hidden">
@@ -286,10 +278,6 @@ export function CodeEditor() {
                     </div>
                   )}
                 </div>
-                <Button variant="ghost" size="sm" onClick={handleSaveCode}>
-                  <SaveIcon className="w-4 h-4 mr-1" />
-                  Save
-                </Button>
               </div>
             </div>
             <div className="flex-1 min-h-0">
@@ -356,14 +344,15 @@ export function CodeEditor() {
           <div className="flex flex-col space-y-4">
             {/* Run panel */}
             <Card>
-              <CardHeader title="Execute" subtitle="Run simulation code" />
+              <CardHeader title="Execute" subtitle="Runs the exported script in Python" />
               <Button
                 onClick={handleRunCode}
                 loading={isRunning}
+                disabled={viewMode !== 'code'}
                 className="w-full"
                 icon={<PlayIcon className="w-4 h-4" />}
               >
-                {isRunning ? 'Running...' : 'Run Simulation'}
+                {isRunning ? t('Running...') : t('Run script')}
               </Button>
             </Card>
 
@@ -415,7 +404,7 @@ export function CodeEditor() {
             </Card>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -426,14 +415,6 @@ function PlayIcon({ className }: { className?: string }) {
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  );
-}
-
-function SaveIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
     </svg>
   );
 }

@@ -190,7 +190,25 @@ class ExtraNode:
             "palletize": Palletize,
             "depalletize": Depalletize,
             "matchbuffer": MatchBuffer,
+            "agv": AGV,
+            "crane": Crane,
+            "forklift": Forklift,
+            "turntable": Turntable,
+            "elevator": Elevator,
+            "overheadconveyor": OverheadConveyor,
+            "sorter": Sorter,
+            "shuttle": Shuttle,
+            "rollerconveyor": RollerConveyor,
+            "trackguidedvehicle": TrackGuidedVehicle,
+            "crossover": Crossover,
+            "pickstation": PickStation,
+            "weighing": Weighing,
+            "labeler": Labeler,
         }
+
+        if node_type in ("warehouse", "coldstorage"):
+            from factorysim.engine.warehouse import Warehouse  # local import: warehouse imports this module
+            return Warehouse(data, env, sim)
 
         constructor = _constructors.get(node_type)
         if constructor:
@@ -203,7 +221,12 @@ class ExtraNode:
 # ═════════════════════════════════════════════════════════════════
 
 class Conveyor(ExtraNode):
-    """Adds transport delay based on length / speed."""
+    """Adds transport delay based on length / speed.
+
+    Supports two modes:
+    - non-accumulating (default): items move independently, no blocking
+    - accumulating: items queue at exit end if downstream blocks
+    """
 
     def __init__(self, data: Dict[str, Any], env: simpy.Environment,
                  sim: "Simulation"):
@@ -218,10 +241,18 @@ class Conveyor(ExtraNode):
         self.transit_time: float = (
             self.length / self.speed if self.speed > 0 else 0
         )
+        self.accumulation_mode: str = data.get("accumulationMode", "non-accumulating")
         # WIP tracking for conveyors (mirrors Buffer.wip_history)
         self._items_on_conveyor: int = 0
         self.wip_history: list = []
         self._total_item_time: float = 0.0  # sum of (items × time) for avg WIP
+        self.total_blocked_time: float = 0.0  # time items waited at exit
+
+        # For accumulating mode: exit queue limits concurrent exits
+        if self.accumulation_mode == "accumulating":
+            self._exit_store = simpy.Store(env, capacity=self.capacity)
+        else:
+            self._exit_store = None
 
     def _record_wip(self) -> None:
         self.wip_history.append({"time": self.env.now, "level": self._items_on_conveyor})
@@ -238,6 +269,16 @@ class Conveyor(ExtraNode):
 
         yield self.env.timeout(self.transit_time)
 
+        # For accumulating conveyors, items queue at exit end
+        if self._exit_store is not None:
+            exit_start = self.env.now
+            yield self._exit_store.put(product)
+            blocked = self.env.now - exit_start
+            if blocked > 0:
+                self.total_blocked_time += blocked
+            # Immediately get to allow next item through
+            yield self._exit_store.get()
+
         self._items_on_conveyor -= 1
         self._record_wip()
         self._total_item_time += self.transit_time
@@ -253,8 +294,25 @@ class Conveyor(ExtraNode):
 
     def get_statistics(self) -> Dict[str, Any]:
         stats = super().get_statistics()
-        duration = self.env.now if self.env.now > 0 else 1
-        stats["average_wip"] = self._total_item_time / duration
+        stats["accumulation_mode"] = self.accumulation_mode
+        stats["total_blocked_time"] = round(self.total_blocked_time, 2)
+        # Time-weighted average WIP from wip_history (accounts for concurrency)
+        hist = self.wip_history
+        if len(hist) < 2:
+            stats["average_wip"] = float(self._items_on_conveyor)
+        else:
+            total_wip_time = 0.0
+            total_time = 0.0
+            for i in range(len(hist) - 1):
+                duration = hist[i + 1]["time"] - hist[i]["time"]
+                total_wip_time += hist[i]["level"] * duration
+                total_time += duration
+            # Include final segment to current time
+            if hist:
+                duration = self.env.now - hist[-1]["time"]
+                total_wip_time += hist[-1]["level"] * duration
+                total_time += duration
+            stats["average_wip"] = total_wip_time / total_time if total_time > 0 else 0.0
         return stats
 
 
@@ -829,4 +887,708 @@ class Depalletize(ExtraNode):
 
         self._set_state(ExtraNodeState.IDLE)
         product.total_waiting_time += total_time
+        return product
+
+
+# ═════════════════════════════════════════════════════════════════
+#  Transport Nodes
+# ═════════════════════════════════════════════════════════════════
+
+class AGV(ExtraNode):
+    """Models AGV transport between stations using the transport network.
+
+    When a transport network is present, uses A* pathfinding to compute
+    the route between station-stop waypoints and derives transit time
+    from path distance and AGV speed.  When no network is configured,
+    falls back to a fixed transit time based on configured defaults.
+
+    The AGV fleet is modelled as a SimPy Resource so products compete
+    for a limited number of vehicles.
+    """
+
+    def __init__(self, data: Dict[str, Any], env: simpy.Environment,
+                 sim: "Simulation"):
+        super().__init__(
+            data.get("id", ""),
+            data.get("name", "AGV"),
+            "agv", env, sim,
+        )
+        self.count: int = max(1, int(data.get("count", 1)))
+        self.speed: float = data.get("speed", 1.5)   # m/s
+        self.capacity: int = data.get("capacity", 1)  # items per trip
+        self.fallback_transit_time: float = data.get("transitTime", 30.0)  # seconds
+
+        # Fleet resource — products must acquire an AGV before transit
+        self._fleet = simpy.Resource(env, capacity=self.count)
+
+        # Transport network (injected by Simulation after construction)
+        self._network: Optional[Dict[str, Any]] = None
+        self._waypoint_map: Dict[str, Dict[str, Any]] = {}
+        self._graph: Dict[str, List[Dict[str, Any]]] = {}
+
+        # Path cache: (source_wp_id, target_wp_id) -> {path, distance, time}
+        self._path_cache: Dict[tuple, Optional[Dict[str, Any]]] = {}
+
+        # Statistics
+        self.total_distance: float = 0.0
+        self.total_transit_time: float = 0.0
+        self.total_wait_for_agv: float = 0.0
+        self.trips: int = 0
+
+    def set_transport_network(self, network: Dict[str, Any]) -> None:
+        """Inject transport network data and build the pathfinding graph."""
+        self._network = network
+        waypoints = network.get("waypoints", [])
+        lanes = network.get("lanes", [])
+
+        self._waypoint_map = {wp["id"]: wp for wp in waypoints}
+
+        # Build adjacency list
+        self._graph = {wp["id"]: [] for wp in waypoints}
+        for lane in lanes:
+            wp_ids = lane.get("waypoints", [])
+            speed_limit = lane.get("speedLimit", 2.0)
+            one_way = lane.get("oneWay", False)
+            for i in range(len(wp_ids) - 1):
+                a_id, b_id = wp_ids[i], wp_ids[i + 1]
+                a = self._waypoint_map.get(a_id)
+                b = self._waypoint_map.get(b_id)
+                if not a or not b:
+                    continue
+                d = self._euclidean(a["position"], b["position"])
+                self._graph[a_id].append({
+                    "id": b_id, "distance": d, "speed": speed_limit,
+                })
+                if not one_way:
+                    self._graph[b_id].append({
+                        "id": a_id, "distance": d, "speed": speed_limit,
+                    })
+
+        self._path_cache = {}
+
+    @staticmethod
+    def _euclidean(a: Dict[str, float], b: Dict[str, float]) -> float:
+        dx = a.get("x", 0) - b.get("x", 0)
+        dy = a.get("y", 0) - b.get("y", 0)
+        return (dx * dx + dy * dy) ** 0.5
+
+    def _find_station_stop(self, station_id: str) -> Optional[str]:
+        """Find waypoint of type 'station-stop' linked to a station ID."""
+        if not self._network:
+            return None
+        for wp in self._network.get("waypoints", []):
+            if wp.get("type") == "station-stop" and wp.get("linkedNodeId") == station_id:
+                return wp["id"]
+        return None
+
+    def _find_path(self, start_id: str, goal_id: str) -> Optional[Dict[str, Any]]:
+        """A* shortest path.  Returns {path, distance, time} or None."""
+        cache_key = (start_id, goal_id)
+        if cache_key in self._path_cache:
+            return self._path_cache[cache_key]
+
+        start = self._waypoint_map.get(start_id)
+        goal = self._waypoint_map.get(goal_id)
+        if not start or not goal:
+            self._path_cache[cache_key] = None
+            return None
+
+        g_score: Dict[str, float] = {start_id: 0}
+        f_score: Dict[str, float] = {start_id: self._euclidean(start["position"], goal["position"])}
+        parent: Dict[str, Optional[str]] = {start_id: None}
+        speed_on_edge: Dict[str, float] = {}
+        open_set = {start_id}
+        closed_set: set = set()
+
+        while open_set:
+            current = min(open_set, key=lambda n: f_score.get(n, float("inf")))
+            if current == goal_id:
+                # Reconstruct path
+                path = []
+                c: Optional[str] = goal_id
+                while c is not None:
+                    path.append(c)
+                    c = parent.get(c)
+                path.reverse()
+
+                total_dist = g_score[goal_id]
+                # Time = sum(edge_distance / edge_speed) along path
+                total_time = 0.0
+                for i in range(1, len(path)):
+                    prev_wp = self._waypoint_map[path[i - 1]]
+                    cur_wp = self._waypoint_map[path[i]]
+                    edge_dist = self._euclidean(prev_wp["position"], cur_wp["position"])
+                    spd = speed_on_edge.get(path[i], self.speed)
+                    total_time += edge_dist / spd if spd > 0 else 0
+
+                result = {"path": path, "distance": total_dist, "time": total_time}
+                self._path_cache[cache_key] = result
+                return result
+
+            open_set.remove(current)
+            closed_set.add(current)
+
+            for neighbor in self._graph.get(current, []):
+                nid = neighbor["id"]
+                if nid in closed_set:
+                    continue
+                tentative_g = g_score[current] + neighbor["distance"]
+                if tentative_g < g_score.get(nid, float("inf")):
+                    parent[nid] = current
+                    g_score[nid] = tentative_g
+                    wp = self._waypoint_map[nid]
+                    h = self._euclidean(wp["position"], goal["position"])
+                    f_score[nid] = tentative_g + h
+                    speed_on_edge[nid] = neighbor["speed"]
+                    open_set.add(nid)
+
+        self._path_cache[cache_key] = None
+        return None
+
+    def _get_transit_time(self, product: "Product") -> tuple:
+        """Compute transit time and distance for the current product move.
+
+        The AGV chain runs after station N is complete and before station N+1.
+        At this point current_routing_index points to station N (just finished),
+        and station N+1 is routing[current_routing_index + 1].
+
+        Returns (transit_time, distance, path_waypoints).
+        Falls back to speed-based default or fixed fallback.
+        """
+        if self._network and self._network.get("enabled"):
+            idx = product.current_routing_index
+            src_station = product.routing[idx] if idx < len(product.routing) else None
+            next_idx = idx + 1
+            tgt_station = product.routing[next_idx] if next_idx < len(product.routing) else None
+
+            if src_station and tgt_station:
+                src_wp = self._find_station_stop(src_station)
+                tgt_wp = self._find_station_stop(tgt_station)
+                if src_wp and tgt_wp:
+                    path_result = self._find_path(src_wp, tgt_wp)
+                    if path_result:
+                        return (path_result["time"], path_result["distance"], path_result["path"])
+
+        # Fallback: use fixed transit time
+        return (self.fallback_transit_time, 0.0, [])
+
+    def process(self, product: "Product"):
+        self.items_entered += 1
+
+        # Wait for an available AGV
+        wait_start = self.env.now
+        self._set_state(ExtraNodeState.WAITING)
+        req = self._fleet.request()
+        yield req
+        wait_duration = self.env.now - wait_start
+        self.total_wait_for_agv += wait_duration
+
+        if wait_duration > 0:
+            product.total_waiting_time += wait_duration
+            self.sim.log_event("agv_wait", self.id, {
+                "product_id": product.id,
+                "wait_time": wait_duration,
+                "agv": self.name,
+            })
+
+        # Calculate transit
+        transit_time, distance, path = self._get_transit_time(product)
+
+        self._set_state(ExtraNodeState.PROCESSING)
+        product._log_trace("agv_transit_start", {
+            "agv": self.id,
+            "transit_time": transit_time,
+            "distance": distance,
+            "path_waypoints": len(path),
+        })
+
+        self.sim.log_event("agv_transit_start", self.id, {
+            "product_id": product.id,
+            "transit_time": transit_time,
+            "distance": distance,
+            "agv": self.name,
+        })
+
+        yield self.env.timeout(transit_time)
+
+        # Release AGV back to fleet
+        self._fleet.release(req)
+
+        # Update statistics
+        self.total_distance += distance
+        self.total_transit_time += transit_time
+        self.trips += 1
+        self.items_processed += 1
+        self._set_state(ExtraNodeState.IDLE)
+
+        self.sim.log_event("agv_transit_complete", self.id, {
+            "product_id": product.id,
+            "transit_time": transit_time,
+            "distance": distance,
+            "agv": self.name,
+        })
+        product.total_waiting_time += transit_time
+        return product
+
+    def get_statistics(self) -> Dict[str, Any]:
+        stats = super().get_statistics()
+        stats["fleet_size"] = self.count
+        stats["speed"] = self.speed
+        stats["total_distance"] = round(self.total_distance, 2)
+        stats["total_transit_time"] = round(self.total_transit_time, 2)
+        stats["total_wait_for_agv"] = round(self.total_wait_for_agv, 2)
+        stats["trips"] = self.trips
+        stats["avg_transit_time"] = (
+            round(self.total_transit_time / self.trips, 2) if self.trips > 0 else 0
+        )
+        stats["avg_wait_for_agv"] = (
+            round(self.total_wait_for_agv / max(1, self.items_entered), 2)
+        )
+        stats["fleet_utilization"] = (
+            round(self.total_transit_time / (self.env.now * self.count), 4)
+            if self.env.now > 0 else 0
+        )
+        return stats
+
+
+class Crane(ExtraNode):
+    """Crane simulation — gantry or bridge crane with lift/travel/lower cycle."""
+
+    def __init__(self, data: Dict[str, Any], env: simpy.Environment,
+                 sim: "Simulation"):
+        super().__init__(
+            data.get("id", ""),
+            data.get("name", "Crane"),
+            "crane", env, sim,
+        )
+        self.crane_type: str = data.get("craneType", "bridge")
+        self.lift_capacity: float = data.get("liftCapacity", 5000)  # kg
+        self.travel_speed: float = data.get("travelSpeed", 1.0)  # m/s
+        self.lift_speed: float = data.get("liftSpeed", 0.5)  # m/s
+        self.span_width: float = data.get("spanWidth", 10)  # m
+        self.lift_height: float = data.get("liftHeight", 5)  # m default lift
+        self._resource = simpy.Resource(env, capacity=1)
+        self.total_lift_time = 0.0
+        self.total_travel_time = 0.0
+        self.total_wait_time = 0.0
+        self.lifts = 0
+
+    def process(self, product: "Product"):
+        self.items_entered += 1
+        self._set_state(ExtraNodeState.WAITING)
+
+        wait_start = self.env.now
+        req = self._resource.request()
+        yield req
+        wait_time = self.env.now - wait_start
+        self.total_wait_time += wait_time
+
+        self._set_state(ExtraNodeState.PROCESSING)
+
+        # Lift cycle: lift + travel + lower
+        lift_time = self.lift_height / self.lift_speed if self.lift_speed > 0 else 0
+        travel_time = self.span_width / self.travel_speed if self.travel_speed > 0 else 0
+        lower_time = lift_time  # same as lift
+        total_cycle = lift_time + travel_time + lower_time
+
+        yield self.env.timeout(total_cycle)
+
+        self._resource.release(req)
+        self.total_lift_time += lift_time + lower_time
+        self.total_travel_time += travel_time
+        self.lifts += 1
+        self.items_processed += 1
+        self._set_state(ExtraNodeState.IDLE)
+
+        self.sim.log_event("crane_cycle", self.id, {
+            "product_id": product.id,
+            "cycle_time": total_cycle,
+            "crane": self.name,
+        })
+        product.total_waiting_time += total_cycle + wait_time
+        return product
+
+    def get_statistics(self) -> Dict[str, Any]:
+        stats = super().get_statistics()
+        stats["crane_type"] = self.crane_type
+        stats["lifts"] = self.lifts
+        stats["total_lift_time"] = round(self.total_lift_time, 2)
+        stats["total_travel_time"] = round(self.total_travel_time, 2)
+        stats["total_wait_time"] = round(self.total_wait_time, 2)
+        stats["utilization"] = (
+            round((self.total_lift_time + self.total_travel_time) / self.env.now, 4)
+            if self.env.now > 0 else 0
+        )
+        return stats
+
+
+class Forklift(ExtraNode):
+    """Forklift fleet simulation — similar to AGV with lift operations."""
+
+    def __init__(self, data: Dict[str, Any], env: simpy.Environment,
+                 sim: "Simulation"):
+        super().__init__(
+            data.get("id", ""),
+            data.get("name", "Forklift"),
+            "forklift", env, sim,
+        )
+        self.count: int = max(1, int(data.get("count", 1)))
+        self.lift_capacity: float = data.get("liftCapacity", 2000)  # kg
+        self.speed: float = data.get("speed", 2.0)  # m/s
+        self.lift_height: float = data.get("liftHeight", 3)  # m
+        self.lift_speed: float = data.get("liftSpeed", 0.3)  # m/s
+        self.transit_distance: float = data.get("transitDistance", 20)  # m fallback
+        self._fleet = simpy.Resource(env, capacity=self.count)
+        self.total_transit_time = 0.0
+        self.total_lift_time = 0.0
+        self.total_wait_time = 0.0
+        self.trips = 0
+
+    def process(self, product: "Product"):
+        self.items_entered += 1
+        self._set_state(ExtraNodeState.WAITING)
+
+        wait_start = self.env.now
+        req = self._fleet.request()
+        yield req
+        wait_time = self.env.now - wait_start
+        self.total_wait_time += wait_time
+
+        self._set_state(ExtraNodeState.PROCESSING)
+
+        # Lift + travel + lower
+        lift_time = self.lift_height / self.lift_speed if self.lift_speed > 0 else 0
+        travel_time = self.transit_distance / self.speed if self.speed > 0 else 0
+        lower_time = lift_time
+        total_cycle = lift_time + travel_time + lower_time
+
+        yield self.env.timeout(total_cycle)
+
+        self._fleet.release(req)
+        self.total_transit_time += travel_time
+        self.total_lift_time += lift_time + lower_time
+        self.trips += 1
+        self.items_processed += 1
+        self._set_state(ExtraNodeState.IDLE)
+
+        self.sim.log_event("forklift_cycle", self.id, {
+            "product_id": product.id,
+            "cycle_time": total_cycle,
+            "forklift": self.name,
+        })
+        product.total_waiting_time += total_cycle + wait_time
+        return product
+
+    def get_statistics(self) -> Dict[str, Any]:
+        stats = super().get_statistics()
+        stats["fleet_size"] = self.count
+        stats["trips"] = self.trips
+        stats["total_transit_time"] = round(self.total_transit_time, 2)
+        stats["total_lift_time"] = round(self.total_lift_time, 2)
+        stats["total_wait_time"] = round(self.total_wait_time, 2)
+        stats["fleet_utilization"] = (
+            round((self.total_transit_time + self.total_lift_time) / (self.env.now * self.count), 4)
+            if self.env.now > 0 else 0
+        )
+        return stats
+
+
+# ═════════════════════════════════════════════════════════════════
+#  Additional Material Flow Nodes
+# ═════════════════════════════════════════════════════════════════
+
+class Turntable(ExtraNode):
+    """Rotary turntable — rotates to align with a lane before transferring."""
+
+    def __init__(self, data: Dict[str, Any], env: simpy.Environment,
+                 sim: "Simulation"):
+        super().__init__(data.get("id", ""), data.get("name", "Turntable"),
+                         "turntable", env, sim)
+        self.rotation_time: float = data.get("rotationTime", 5)  # seconds per 90 deg
+        self.transfer_time: float = data.get("transferTime", 3)
+        self._resource = simpy.Resource(env, capacity=1)
+
+    def process(self, product: "Product"):
+        self.items_entered += 1
+        req = self._resource.request()
+        yield req
+        self._set_state(ExtraNodeState.PROCESSING)
+        yield self.env.timeout(self.rotation_time + self.transfer_time)
+        self._resource.release(req)
+        self.items_processed += 1
+        self._set_state(ExtraNodeState.IDLE)
+        product.total_waiting_time += self.rotation_time + self.transfer_time
+        return product
+
+
+class Elevator(ExtraNode):
+    """Vertical elevator — transports items between floors/levels."""
+
+    def __init__(self, data: Dict[str, Any], env: simpy.Environment,
+                 sim: "Simulation"):
+        super().__init__(data.get("id", ""), data.get("name", "Elevator"),
+                         "elevator", env, sim)
+        self.height: float = data.get("height", 5)  # meters
+        self.speed: float = data.get("speed", 0.5)  # m/s
+        self.load_time: float = data.get("loadTime", 5)  # seconds
+        self.unload_time: float = data.get("unloadTime", 5)
+        self._resource = simpy.Resource(env, capacity=1)
+
+    def process(self, product: "Product"):
+        self.items_entered += 1
+        req = self._resource.request()
+        yield req
+        self._set_state(ExtraNodeState.PROCESSING)
+        travel = self.height / self.speed if self.speed > 0 else 0
+        total = self.load_time + travel + self.unload_time
+        yield self.env.timeout(total)
+        self._resource.release(req)
+        self.items_processed += 1
+        self._set_state(ExtraNodeState.IDLE)
+        product.total_waiting_time += total
+        return product
+
+
+class OverheadConveyor(ExtraNode):
+    """Overhead power-and-free conveyor with carrier-based transport."""
+
+    def __init__(self, data: Dict[str, Any], env: simpy.Environment,
+                 sim: "Simulation"):
+        super().__init__(data.get("id", ""), data.get("name", "Overhead Conveyor"),
+                         "overheadconveyor", env, sim)
+        self.length: float = data.get("length", 20)
+        self.speed: float = data.get("speed", 0.5)
+        self.carriers: int = max(1, int(data.get("carriers", 10)))
+        self._carrier_resource = simpy.Resource(env, capacity=self.carriers)
+        self.total_wait_time = 0.0
+
+    def process(self, product: "Product"):
+        self.items_entered += 1
+        wait_start = self.env.now
+        req = self._carrier_resource.request()
+        yield req
+        self.total_wait_time += self.env.now - wait_start
+        self._set_state(ExtraNodeState.PROCESSING)
+        transit = self.length / self.speed if self.speed > 0 else 0
+        yield self.env.timeout(transit)
+        self._carrier_resource.release(req)
+        self.items_processed += 1
+        self._set_state(ExtraNodeState.IDLE)
+        product.total_waiting_time += transit
+        return product
+
+    def get_statistics(self) -> Dict[str, Any]:
+        stats = super().get_statistics()
+        stats["carriers"] = self.carriers
+        stats["total_wait_time"] = round(self.total_wait_time, 2)
+        return stats
+
+
+class Sorter(ExtraNode):
+    """High-speed sorter — routes items to lanes based on attributes."""
+
+    def __init__(self, data: Dict[str, Any], env: simpy.Environment,
+                 sim: "Simulation"):
+        super().__init__(data.get("id", ""), data.get("name", "Sorter"),
+                         "sorter", env, sim)
+        self.sort_time: float = data.get("sortTime", 2)
+        self.lanes: int = data.get("lanes", 4)
+        self.error_rate: float = data.get("errorRate", 0) / 100.0
+        self.items_missorted = 0
+
+    def process(self, product: "Product"):
+        self.items_entered += 1
+        self._set_state(ExtraNodeState.PROCESSING)
+        yield self.env.timeout(self.sort_time)
+        if self.sim.rng.random() < self.error_rate:
+            self.items_missorted += 1
+            product.set_attribute("_missorted", True)
+        self.items_processed += 1
+        self._set_state(ExtraNodeState.IDLE)
+        product.total_waiting_time += self.sort_time
+        return product
+
+    def get_statistics(self) -> Dict[str, Any]:
+        stats = super().get_statistics()
+        stats["lanes"] = self.lanes
+        stats["items_missorted"] = self.items_missorted
+        return stats
+
+
+class Shuttle(ExtraNode):
+    """Shuttle car — moves items between parallel lanes."""
+
+    def __init__(self, data: Dict[str, Any], env: simpy.Environment,
+                 sim: "Simulation"):
+        super().__init__(data.get("id", ""), data.get("name", "Shuttle"),
+                         "shuttle", env, sim)
+        self.travel_distance: float = data.get("travelDistance", 10)
+        self.speed: float = data.get("speed", 2.0)
+        self.load_time: float = data.get("loadTime", 3)
+        self._resource = simpy.Resource(env, capacity=1)
+
+    def process(self, product: "Product"):
+        self.items_entered += 1
+        req = self._resource.request()
+        yield req
+        self._set_state(ExtraNodeState.PROCESSING)
+        travel = self.travel_distance / self.speed if self.speed > 0 else 0
+        total = self.load_time + travel + self.load_time
+        yield self.env.timeout(total)
+        self._resource.release(req)
+        self.items_processed += 1
+        self._set_state(ExtraNodeState.IDLE)
+        product.total_waiting_time += total
+        return product
+
+
+class RollerConveyor(ExtraNode):
+    """Gravity or powered roller conveyor — simple transport with accumulation zones."""
+
+    def __init__(self, data: Dict[str, Any], env: simpy.Environment,
+                 sim: "Simulation"):
+        super().__init__(data.get("id", ""), data.get("name", "Roller Conveyor"),
+                         "rollerconveyor", env, sim)
+        self.length: float = data.get("length", 10)
+        self.speed: float = data.get("speed", 0.8)
+        self.powered: bool = data.get("powered", True)
+
+    def process(self, product: "Product"):
+        self.items_entered += 1
+        self._set_state(ExtraNodeState.PROCESSING)
+        transit = self.length / self.speed if self.speed > 0 else 0
+        yield self.env.timeout(transit)
+        self.items_processed += 1
+        self._set_state(ExtraNodeState.IDLE)
+        product.total_waiting_time += transit
+        return product
+
+
+class TrackGuidedVehicle(ExtraNode):
+    """Track-guided vehicle (EHB/EMS) — follows fixed rail tracks."""
+
+    def __init__(self, data: Dict[str, Any], env: simpy.Environment,
+                 sim: "Simulation"):
+        super().__init__(data.get("id", ""), data.get("name", "Track Vehicle"),
+                         "trackguidedvehicle", env, sim)
+        self.count: int = max(1, int(data.get("count", 3)))
+        self.speed: float = data.get("speed", 1.5)
+        self.track_length: float = data.get("trackLength", 50)
+        self._fleet = simpy.Resource(env, capacity=self.count)
+        self.total_wait = 0.0
+
+    def process(self, product: "Product"):
+        self.items_entered += 1
+        wait_start = self.env.now
+        req = self._fleet.request()
+        yield req
+        self.total_wait += self.env.now - wait_start
+        self._set_state(ExtraNodeState.PROCESSING)
+        transit = self.track_length / self.speed if self.speed > 0 else 0
+        yield self.env.timeout(transit)
+        self._fleet.release(req)
+        self.items_processed += 1
+        self._set_state(ExtraNodeState.IDLE)
+        product.total_waiting_time += transit
+        return product
+
+    def get_statistics(self) -> Dict[str, Any]:
+        stats = super().get_statistics()
+        stats["fleet_size"] = self.count
+        stats["total_wait"] = round(self.total_wait, 2)
+        return stats
+
+
+class Crossover(ExtraNode):
+    """Crossover/transfer — transfers items between parallel conveyor lines."""
+
+    def __init__(self, data: Dict[str, Any], env: simpy.Environment,
+                 sim: "Simulation"):
+        super().__init__(data.get("id", ""), data.get("name", "Crossover"),
+                         "crossover", env, sim)
+        self.transfer_time: float = data.get("transferTime", 4)
+        self._resource = simpy.Resource(env, capacity=1)
+
+    def process(self, product: "Product"):
+        self.items_entered += 1
+        req = self._resource.request()
+        yield req
+        self._set_state(ExtraNodeState.PROCESSING)
+        yield self.env.timeout(self.transfer_time)
+        self._resource.release(req)
+        self.items_processed += 1
+        self._set_state(ExtraNodeState.IDLE)
+        product.total_waiting_time += self.transfer_time
+        return product
+
+
+class PickStation(ExtraNode):
+    """Pick-to-light / pick-by-voice station for manual picking operations."""
+
+    def __init__(self, data: Dict[str, Any], env: simpy.Environment,
+                 sim: "Simulation"):
+        super().__init__(data.get("id", ""), data.get("name", "Pick Station"),
+                         "pickstation", env, sim)
+        self.pick_time: float = data.get("pickTime", 15)
+        self.error_rate: float = data.get("errorRate", 0) / 100.0
+        self.pickers: int = max(1, int(data.get("pickers", 1)))
+        self._resource = simpy.Resource(env, capacity=self.pickers)
+        self.pick_errors = 0
+
+    def process(self, product: "Product"):
+        self.items_entered += 1
+        req = self._resource.request()
+        yield req
+        self._set_state(ExtraNodeState.PROCESSING)
+        yield self.env.timeout(self.pick_time)
+        if self.sim.rng.random() < self.error_rate:
+            self.pick_errors += 1
+        self._resource.release(req)
+        self.items_processed += 1
+        self._set_state(ExtraNodeState.IDLE)
+        product.total_waiting_time += self.pick_time
+        return product
+
+    def get_statistics(self) -> Dict[str, Any]:
+        stats = super().get_statistics()
+        stats["pickers"] = self.pickers
+        stats["pick_errors"] = self.pick_errors
+        return stats
+
+
+class Weighing(ExtraNode):
+    """Weighing/measurement station — adds a measurement delay."""
+
+    def __init__(self, data: Dict[str, Any], env: simpy.Environment,
+                 sim: "Simulation"):
+        super().__init__(data.get("id", ""), data.get("name", "Weighing"),
+                         "weighing", env, sim)
+        self.measure_time: float = data.get("measureTime", 5)
+
+    def process(self, product: "Product"):
+        self.items_entered += 1
+        self._set_state(ExtraNodeState.PROCESSING)
+        yield self.env.timeout(self.measure_time)
+        self.items_processed += 1
+        self._set_state(ExtraNodeState.IDLE)
+        product.total_waiting_time += self.measure_time
+        return product
+
+
+class Labeler(ExtraNode):
+    """Labeling station — applies labels with configurable time."""
+
+    def __init__(self, data: Dict[str, Any], env: simpy.Environment,
+                 sim: "Simulation"):
+        super().__init__(data.get("id", ""), data.get("name", "Labeler"),
+                         "labeler", env, sim)
+        self.label_time: float = data.get("labelTime", 3)
+
+    def process(self, product: "Product"):
+        self.items_entered += 1
+        self._set_state(ExtraNodeState.PROCESSING)
+        yield self.env.timeout(self.label_time)
+        self.items_processed += 1
+        self._set_state(ExtraNodeState.IDLE)
+        product.total_waiting_time += self.label_time
         return product

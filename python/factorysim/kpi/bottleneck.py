@@ -267,18 +267,83 @@ class BottleneckDetector:
         """
         Detect if the bottleneck shifts between stations during the simulation.
 
-        Not yet implemented — requires periodic bottleneck scoring over the
-        simulation timeline (e.g., recording utilization snapshots at fixed
-        intervals). A future enhancement could compare per-interval scores
-        to identify when the primary bottleneck changes stations.
-
-        Returns:
-            Dictionary with shifting bottleneck analysis (currently a stub)
+        Uses station state_log entries to compute per-interval utilization and
+        identify when the primary bottleneck changes stations over time.
         """
+        if not self.sim.stations:
+            return {"detected": False, "shifts": [], "message": "No stations"}
+
+        total_time = self.sim.env.now
+        if total_time <= 0:
+            return {"detected": False, "shifts": [], "message": "No simulation time"}
+
+        # Divide simulation into intervals
+        n_intervals = min(20, max(4, int(total_time / 3600)))
+        interval = total_time / n_intervals
+
+        # For each interval, compute per-station utilization from state_log
+        station_ids = list(self.sim.stations.keys())
+        interval_bottlenecks: List[str] = []
+        shifts: List[Dict[str, Any]] = []
+
+        for i in range(n_intervals):
+            t_start = i * interval
+            t_end = (i + 1) * interval
+            best_score = -1.0
+            best_station = station_ids[0]
+
+            for sid in station_ids:
+                station = self.sim.stations[sid]
+                # Sum processing time within this interval from state_log
+                processing_in_interval = 0.0
+                for entry in station.state_log:
+                    entry_start = entry.get("time", 0) - entry.get("duration", 0)
+                    entry_end = entry.get("time", 0)
+                    if entry_end <= t_start or entry_start >= t_end:
+                        continue
+                    overlap_start = max(entry_start, t_start)
+                    overlap_end = min(entry_end, t_end)
+                    if entry.get("from_state") == "processing":
+                        processing_in_interval += max(0, overlap_end - overlap_start)
+
+                utilization = processing_in_interval / interval if interval > 0 else 0
+                if utilization > best_score:
+                    best_score = utilization
+                    best_station = sid
+
+            interval_bottlenecks.append(best_station)
+
+        # Detect shifts: when the primary bottleneck changes
+        prev = interval_bottlenecks[0]
+        for i in range(1, len(interval_bottlenecks)):
+            if interval_bottlenecks[i] != prev:
+                from_name = self.sim.stations[prev].name if prev in self.sim.stations else prev
+                to_name = self.sim.stations[interval_bottlenecks[i]].name if interval_bottlenecks[i] in self.sim.stations else interval_bottlenecks[i]
+                shifts.append({
+                    "time": i * interval,
+                    "from_station": prev,
+                    "from_station_name": from_name,
+                    "to_station": interval_bottlenecks[i],
+                    "to_station_name": to_name,
+                })
+                prev = interval_bottlenecks[i]
+
+        detected = len(shifts) > 0
         return {
-            "detected": False,
-            "shifts": [],
-            "message": "Shifting bottleneck analysis requires time-series data",
+            "detected": detected,
+            "shifts": shifts,
+            "intervals": n_intervals,
+            "interval_bottlenecks": [
+                {
+                    "station_id": sid,
+                    "station_name": self.sim.stations[sid].name if sid in self.sim.stations else sid,
+                }
+                for sid in interval_bottlenecks
+            ],
+            "message": (
+                f"Bottleneck shifted {len(shifts)} time(s) across {n_intervals} intervals"
+                if detected else "Bottleneck remained stable throughout the simulation"
+            ),
         }
 
     def get_capacity_recommendations(self) -> List[Dict[str, Any]]:

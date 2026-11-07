@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { PluginInfo } from '../../types';
+import { createLogger } from '../../services/logger';
+
+const log = createLogger('PluginManager');
 
 export function PluginManager() {
   const [plugins, setPlugins] = useState<PluginInfo[]>([]);
@@ -13,7 +16,7 @@ export function PluginManager() {
       const list = await window.factorySim?.plugins?.list();
       setPlugins(list || []);
     } catch (err) {
-      console.error('Failed to load plugins:', err);
+      log.error('Failed to load plugins', err);
     } finally {
       setLoading(false);
     }
@@ -32,7 +35,7 @@ export function PluginManager() {
       }
       await loadPlugins();
     } catch (err) {
-      console.error('Failed to toggle plugin:', err);
+      log.error('Failed to toggle plugin', err);
     }
   };
 
@@ -41,7 +44,7 @@ export function PluginManager() {
       await window.factorySim?.plugins?.reload();
       await loadPlugins();
     } catch (err) {
-      console.error('Failed to reload plugins:', err);
+      log.error('Failed to reload plugins', err);
     }
   };
 
@@ -59,7 +62,38 @@ export function PluginManager() {
     try {
       await window.factorySim?.plugins?.openFolder();
     } catch (err) {
-      console.error('Failed to open plugins folder:', err);
+      log.error('Failed to open plugins folder', err);
+    }
+  };
+
+  const handleImportPlugin = async () => {
+    try {
+      const win = window as any;
+      const result = await win.factorySim?.dialog?.showOpenDialog({
+        properties: ['openFile'],
+        filters: [
+          { name: 'Python Plugins', extensions: ['py', 'zip'] },
+        ],
+      });
+      if (result?.filePaths?.length > 0) {
+        const filePath = result.filePaths[0];
+        const fs = win.require?.('fs');
+        const path = win.require?.('path');
+        if (fs && path) {
+          const userDataPath = await win.factorySim?.app?.getUserDataPath?.();
+          const pluginsDir = path.join(userDataPath, 'plugins');
+          if (!fs.existsSync(pluginsDir)) fs.mkdirSync(pluginsDir, { recursive: true });
+
+          const fileName = path.basename(filePath);
+          const destPath = path.join(pluginsDir, fileName);
+          fs.copyFileSync(filePath, destPath);
+          await handleReload();
+          alert(`Plugin "${fileName}" imported successfully.`);
+        }
+      }
+    } catch (err) {
+      log.error('Failed to import plugin', err);
+      alert('Failed to import plugin. Check that the file is a valid Python plugin.');
     }
   };
 
@@ -68,6 +102,12 @@ export function PluginManager() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Plugins</h1>
         <div className="flex gap-2">
+          <button
+            onClick={handleImportPlugin}
+            className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200"
+          >
+            Import Plugin
+          </button>
           <button
             onClick={handleOpenFolder}
             className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200"
