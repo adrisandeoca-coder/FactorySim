@@ -404,6 +404,9 @@ contextBridge.exposeInMainWorld('factorySim', {
   code: {
     exportModel: (model: object, options?: object) =>
       ipcRenderer.invoke('code:exportModel', model, options),
+    scriptBuild: (code: string) => ipcRenderer.invoke('code:scriptBuild', code),
+    scriptRun: (code: string) => ipcRenderer.invoke('code:scriptRun', code),
+    scriptFromModel: (model: object) => ipcRenderer.invoke('code:scriptFromModel', model),
   },
 
   app: {

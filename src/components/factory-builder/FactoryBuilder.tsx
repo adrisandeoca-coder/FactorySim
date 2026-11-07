@@ -19,8 +19,7 @@ import 'reactflow/dist/style.css';
 import { useNavigate } from 'react-router-dom';
 import {
   Globe as GlobeIcon, LayoutTemplate, LayoutGrid, Network, Box, SquareDashed, Route, Flame, Undo2, Redo2, Search,
-  Camera, Wand2, Shapes, ArrowDownToLine, Cog, Layers, MoveRight, ScanSearch, Combine, UserRound, PackageCheck,
-} from 'lucide-react';
+  Camera, Wand2, Shapes, ArrowDownToLine, Cog, Layers, MoveRight, ScanSearch, Combine, UserRound, PackageCheck, FileCode2 } from 'lucide-react';
 import { RibbonContent, RibbonGroup, RibbonButton, RibbonSmallButton, RibbonStack, DockPanel } from '../layout/Ribbon';
 import { ModelOutline } from './ModelOutline';
 import { useModelStore } from '../../stores/modelStore';
@@ -751,6 +750,7 @@ export function FactoryBuilder() {
       <RibbonContent>
         <RibbonGroup label={t('Model')}>
           <RibbonButton icon={<LayoutTemplate size={26} color="#1F5FAD" />} label={t('Load template')} onClick={() => setShowTemplates(true)} />
+          <RibbonButton icon={<FileCode2 size={26} color="#334155" />} label={t('Python script')} title={t('Build the model from Python code')} onClick={() => navigate('/code')} />
           <RibbonButton
             icon={<LayoutGrid size={26} color="#475569" />}
             label={t('Auto layout')}

@@ -133,7 +133,7 @@ const createEmptyModel = (): FactoryModel => ({
   },
 });
 
-function getDefaultExtraNodeData(type: NodeType, id: string): ExtraNodeData {
+export function getDefaultExtraNodeData(type: NodeType, id: string): ExtraNodeData {
   const name = `${type.charAt(0).toUpperCase() + type.slice(1)}`;
   switch (type) {
     case 'source':

@@ -581,6 +581,18 @@ export function registerIpcHandlers(
     return pythonBridge.executeCode(code);
   });
 
+  ipcMain.handle('code:scriptBuild', async (_event, code: string) => {
+    return pythonBridge.scriptBuild(code);
+  });
+
+  ipcMain.handle('code:scriptRun', async (_event, code: string) => {
+    return pythonBridge.scriptRun(code);
+  });
+
+  ipcMain.handle('code:scriptFromModel', async (_event, model: object) => {
+    return pythonBridge.scriptFromModel(model);
+  });
+
   ipcMain.handle('code:exportModel', async (_event, model: object, options?: object) => {
     return pythonBridge.exportToPython(model, options);
   });

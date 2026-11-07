@@ -7,7 +7,7 @@ import { masterTestTemplate } from './masterTemplate';
 import { WAREHOUSE_DEFAULTS } from '../../utils/warehouseDefaults';
 
 import { t } from '../../i18n';
-const templates: Template[] = [
+export const templates: Template[] = [
   {
     id: 'flow-line',
     name: 'Flow Line',

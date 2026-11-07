@@ -56,6 +56,11 @@ class JsonRpcServer:
             # Code generation
             "export_to_python": self._export_to_python,
 
+            # Model scripts (Python in, model out)
+            "script_build": self._script_build,
+            "script_run": self._script_run,
+            "script_from_model": self._script_from_model,
+
             # Data import
             "import_csv": self._import_csv,
             "import_excel": self._import_excel,
@@ -615,6 +620,18 @@ class JsonRpcServer:
         )
         sim = Simulation(model, config)
         return sim.export_to_python()
+
+    def _script_build(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from factorysim.script.runner import run_script
+        return run_script(params.get("code", ""), mode="model", timeout=float(params.get("timeout", 10)))
+
+    def _script_run(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        from factorysim.script.runner import run_script
+        return run_script(params.get("code", ""), mode="run", timeout=float(params.get("timeout", 120)))
+
+    def _script_from_model(self, params: Dict[str, Any]) -> str:
+        from factorysim.script.codegen import model_to_script
+        return model_to_script(params.get("model", {}), positions=bool(params.get("positions", True)))
 
     def _import_csv(self, params: Dict[str, Any]) -> Dict[str, Any]:
         file_path = params.get("file_path")

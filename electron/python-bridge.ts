@@ -352,6 +352,19 @@ export class PythonBridge extends EventEmitter {
   }
 
   // REPL for advanced users
+  // Model scripts: Python in, model out
+  async scriptBuild(code: string): Promise<unknown> {
+    return this.call('script_build', { code });
+  }
+
+  async scriptRun(code: string): Promise<unknown> {
+    return this.call('script_run', { code });
+  }
+
+  async scriptFromModel(model: object): Promise<string> {
+    return this.call<string>('script_from_model', { model });
+  }
+
   async executeCode(code: string): Promise<unknown> {
     return this.call('execute_code', { code });
   }

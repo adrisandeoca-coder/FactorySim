@@ -32,6 +32,18 @@ export interface ScriptEntry {
   enabled?: boolean;
 }
 
+/** Result of running a model script in the engine (factorysim.script). */
+export interface ScriptResult {
+  ok: boolean;
+  /** The model the script built (mode "model"); `_unplaced` lists ids without a position */
+  model?: FactoryModel & { _unplaced?: string[] };
+  output: string;
+  error?: string;
+  /** 1-based script line of the error, 0 when unknown */
+  line?: number;
+  traceback?: string;
+}
+
 export interface FactoryModel {
   id?: string;
   name: string;
@@ -1120,6 +1132,9 @@ declare global {
       };
       code?: {
         exportModel: (model: FactoryModel, options?: Record<string, unknown>) => Promise<string>;
+        scriptBuild?: (code: string) => Promise<ScriptResult>;
+        scriptRun?: (code: string) => Promise<ScriptResult>;
+        scriptFromModel?: (model: FactoryModel) => Promise<string>;
       };
       app?: {
         getVersion: () => Promise<string>;
